@@ -1,0 +1,16 @@
+# env & secrets
+.env
+*.env
+
+# python
+__pycache__/
+*.pyc
+
+# venv (huge, never commit)
+multi-agent-env/
+
+# macOS
+.DS_Store
+
+# run outputs (optional — your audit JSONs)
+data/runs/
