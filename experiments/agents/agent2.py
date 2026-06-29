@@ -1,13 +1,28 @@
 import os
 import dotenv
-
+from groq import Groq
 dotenv.load_dotenv(".env")
+
 
 
 
 import trafilatura
 import requests
 
+# groq client
+groq_client = Groq(api_key=os.getenv("GROQ_KEY"))
+
+
+
+# when content is junk
+junk_markers = [
+    "rate limit", "403 forbidden", "access denied",
+    "enable javascript", "captcha", "are you a robot",
+    # NEW — security/block pages
+    "reference number", "security check",
+    "akamai", "please wait", "checking your browser",
+    "cloudflare", "cf-ray", "just a moment"
+]
 
 
 # to check content fetch is real content and not raw HTML
@@ -24,8 +39,7 @@ def looks_like_real_content(text: str) -> bool:
 
     # 2. reject error/block pages
     low = text[:400].lower()
-    junk_markers = ["rate limit", "403 forbidden", "access denied",
-                    "enable javascript", "captcha", "are you a robot"]
+
     if any(j in low for j in junk_markers):
         return False
     
@@ -111,7 +125,6 @@ def fetch_url_content(url: str) -> str:
     # Attempt 3 — Tavily (paid but you already have it, most reliable)
     try:
         from tavily import TavilyClient
-        import os
         tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
         result = tavily.extract(urls=[url])
         if result and result.get("results"):
@@ -212,61 +225,131 @@ def ddg_search_background(topic: str, max_results: int = 5) -> list:
 
 # this function summarises the trend news in 7-10 sentences for backstory about the trend using local ollama
 def synthesize_background(topic: str, content: str, snippets: list) -> str:
-    """Ollama filters snippets against the ARTICLE CONTENT (ground truth)
-    and writes one background briefing — filter + synthesis in one call."""
-    if not snippets:
+    if not snippets and not content:
         return ""
 
     snippet_text = "\n\n".join(
         f"[{s['source']} | {s['date']}]\n{s['title']}\n{s['body']}"
         for s in snippets
-    )
+    ) if snippets else f"(no snippets available — search for background on: {topic})"
 
-    prompt = f"""You are a news researcher writing a SHORT background brief.
+    # ── ROUTING DECISION ─────────────────────────────────────────────────
+    # Route to groq/compound when snippets are scarce:
+    #   compound has built-in web search → fills the gap itself
+    # Route to llama3.1:8b when we already HAVE rich snippet data:
+    #   8B synthesises well from existing material, no search needed
+    #   AND large payloads (big content + many snippets) avoid 413
+    
+    has_real_snippets = len(snippets) >= 2   # at least 2 real snippets
+    snippet_chars = len(snippet_text)
+    use_cloud = not has_real_snippets and snippet_chars < 200
+    
+    print(f"  [synth] {len(snippets)} snippets, {snippet_chars} snippet chars "
+          f"→ {'groq/compound (will search)' if use_cloud else 'llama3.1:8b'}")
 
-THE ARTICLE (ground truth — the real story):
-{content[:3500]}
+    if use_cloud:
+        result = _synthesize_grokapi_cloud(content, snippet_text)
+        if result:
+            return result
+        print(f"  [synth] compound empty/failed → local 8B fallback")
 
-SEARCH SNIPPETS (some may be unrelated — ignore those):
+    return _synthesize_local(content[:3500], snippet_text)
+
+
+def _synthesize_grokapi_cloud(content: str, snippet_text: str) -> str:
+    """groq/compound — has built-in web search for 0-snippet stories.
+    Only called when payload is small enough to avoid 413."""
+    content_for_compound = content[:1000]
+    try:
+        resp = groq_client.chat.completions.create(
+            model="groq/compound",        # ← correct model ID
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a news researcher writing background context. "
+                        "Use web search ONLY to find background about the specific "
+                        "topic in the article. Never invent facts. Stay on-topic."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"""Write ONE tight background paragraph (4-6 sentences, MAX 120 words).
+
+THE ARTICLE:
+{content_for_compound}
+
+SEARCH SNIPPETS:
 {snippet_text}
 
-Write ONE tight paragraph (4-6 sentences, MAX 120 words) of background context
-for THE ARTICLE.
+Rules: ONE paragraph, no headers, no invented facts.
+If nothing relevant: INSUFFICIENT DATA
+
+Background paragraph:"""
+                }
+            ],
+            temperature=0.2,
+            max_tokens=300,
+        )
+        raw = resp.choices[0].message.content
+        print(f"  [synth] groq/compound → {len(raw) if raw else 0} chars raw")
+        return _clean_synthesis(raw.strip() if raw else "")
+    except Exception as e:
+        print(f"  [synth] groq/compound failed ({type(e).__name__}: {e})")
+        return ""
+
+
+def _synthesize_local(content: str, snippet_text: str) -> str:
+    """llama3.1:8b local — no payload limit, handles large articles."""
+    try:
+        prompt = f"""Write ONE tight background paragraph (4-6 sentences, MAX 120 words).
+
+THE ARTICLE:
+{content}
+
+SEARCH SNIPPETS:
+{snippet_text}
 
 Rules:
-- ONE paragraph only. Do NOT repeat the same fact in different words.
-- Each sentence must add NEW information.
-- Use ONLY snippets about the SAME topic as THE ARTICLE; ignore off-topic ones.
-- Treat all dates/facts as real. No disclaimers about dates or your knowledge.
-- No labels, headers, or bullet points — just the paragraph.
-- If NO snippets relate, respond with ONLY: INSUFFICIENT DATA
-- Do NOT invent specific numbers, dates, or specs. Only state facts that appear in THE ARTICLE or the snippets. If unsure, stay general.
+- ONE paragraph only, no headers
+- Only facts from the article or snippets
+- Do NOT invent specifics, numbers, model names
+- If no snippets relate: INSUFFICIENT DATA
 
 Background:"""
 
-    try:
         resp = ollama.generate(
-            model="qwen2.5:3b",
+            model="llama3.1:8b",
             prompt=prompt,
             stream=False,
-            options={"temperature": 0.2}
+            options={"temperature": 0.2, "num_ctx": 8192},
+            keep_alive=0 # ← release model from memory(memory overhead but neccesary but in mac it is faster 2-3 sec) after each call
+                    # forces fresh load next call — no context bleed
         )
-        result = resp['response'].strip()
-
-        print(f"Result After Background Syntezing is : {result}")
-
-        if result.upper().startswith("INSUFFICIENT DATA"):
-            return ""
-
-        if "INSUFFICIENT DATA" in result.upper():
-            idx = result.upper().find("INSUFFICIENT DATA")
-            result = result[:idx].strip()
-
-        return result if len(result) > 100 else ""
-
+        result = resp["response"].strip()
+        print(f"  [synth] llama3.1:8b → {len(result)} chars")
+        return _clean_synthesis(result)
     except Exception as e:
-        print(f"[ollama] synthesis failed: {e}")
+        print(f"  [synth] local 8B failed ({e}) → empty")
         return ""
+
+
+def _clean_synthesis(result: str) -> str:
+    """Shared post-processing for both Groq and local synthesis output.
+    Strips INSUFFICIENT DATA, enforces minimum length."""
+    if not result:
+        return ""
+
+    # model sometimes writes text BEFORE saying INSUFFICIENT DATA — trim it
+    upper = result.upper()
+    if upper.startswith("INSUFFICIENT DATA"):
+        return ""
+    if "INSUFFICIENT DATA" in upper:
+        idx = upper.find("INSUFFICIENT DATA")
+        result = result[:idx].strip()
+
+    print(f"Result After Background Syntezing is : {result}")
+    return result if len(result) > 100 else ""
 
 
 
@@ -297,6 +380,7 @@ def fetch_trend_background(topic: str, content: str) -> str:
 
     print(f"  [background] {len(snippets)} snippets, synthesizing (content-anchored)...")
     result=synthesize_background(topic, content, snippets)
+    
     status = f"{len(result)} chars" if result else "EMPTY-No Data"
     print(f"  [bg] background: {status}")
     return result

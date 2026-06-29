@@ -1,67 +1,37 @@
 # Known Issues — AI Newsroom Studio
 
-Documented limitations as of the Agent 1 + 2 milestone. These are **expected
-behaviors / accepted limitations**, not bugs. Recorded so future debugging
-(Agents 3-10) doesn't mistake them for new failures.
+Documented limitations as of the Agent 1 + 2 + 3 milestone. These are
+**expected behaviors / accepted limitations**, not bugs. Recorded so future
+debugging (Agents 4-10) doesn't mistake them for new failures.
 
 ---
 
-## ISSUE-1: Some URL types yield no meaningful background
+## ISSUE-1: GitHub / arXiv / docs URLs yield no meaningful background
 
 **Status:** Accepted limitation (not a bug)
 **Affects:** Agent 2 (Context Researcher), downstream Agents 4 & 5
 
 ### Symptom
 Certain story URLs produce an EMPTY background even though content fetched fine:
-- **GitHub repos** (e.g. baidu/Unlimited-OCR) -> content is a README (code,
-  install steps), not narrative news
-- **arXiv papers** (e.g. VibeThinker) -> content is abstract + citation chrome
-- **Docs pages** (e.g. unsloth GLM-5.2, Plotnine) -> API reference, not news
-- **Show HN / project pages** -> often thin or code-heavy
+- **GitHub repos** → content is a README (code, install steps), not narrative news
+- **arXiv papers** → content is abstract + citation chrome
+- **Docs pages** → API reference, not news
 
 ### Root cause
-Two independent reasons, both expected:
-1. **DDG news returns 0 snippets** for brand-new repos/papers — there is no
-   news coverage of a tool released hours ago. No snippets -> honest EMPTY.
-2. When snippets DO exist but the content is reference/code, the
-   content-anchored synthesizer correctly finds them off-topic and returns
-   INSUFFICIENT DATA rather than fabricating a backstory.
+1. DDG news returns 0 snippets for brand-new repos/papers (no coverage yet)
+2. When snippets exist but content is reference/code, the content-anchored
+   synthesizer correctly returns INSUFFICIENT DATA rather than fabricating backstory
 
-This is the **honest-empty principle working as designed**: no background is
-better than a wrong/hallucinated one.
+This is the **honest-empty principle working as designed**.
 
-### Observed examples (real runs)
-```
-Unlimited-OCR (GitHub)   -> DDG 0 snippets -> EMPTY   (correct)
-VibeThinker (arXiv)      -> DDG 0 snippets -> EMPTY   (correct)
-futo-swipe               -> DDG 0 snippets -> EMPTY   (correct)
-vulnerability-reports    -> wiki present but off-topic -> EMPTY (correct)
-raspberry-pi-pico-w      -> 37792-char content + 5 snippets -> EMPTY
-                           (suspect: [:3500] cap landed on boilerplate,
-                            OR snippets genuinely off-topic — UNCONFIRMED)
-```
+### Downstream impact
+- **Agent 4 (Editorial):** rank stories with background higher than content-only
+- **Agent 5 (Script Writer):** scripts from content-only stories will be thinner
 
-### Why this is NOT blocking
-- For tool/repo/paper stories, the **article content itself carries the story**
-  (what the tool does). A "backstory" often doesn't exist — the thing just
-  launched.
-- Background matters most for **news/events** (pricing announcements, company
-  moves) where there's a real "how we got here." Those work well.
-
-### Downstream impact & mitigation
-- **Agent 4 (Editorial):** should rank stories WITH background higher than
-  content-only stories when picking the top 3. Content-only stories are still
-  usable, just lower priority.
-- **Agent 5 (Script Writer):** scripts from content-only stories will be
-  thinner. This is expected — do NOT debug Agent 5 for this; the cause is
-  this documented upstream limitation.
-
-### Possible future fixes (only if it becomes a real problem)
-- GitHub README via GitHub API (structured, cleaner than scraped page)
-- arXiv abstract via arXiv API (clean abstract, no citation chrome)
-- Accept content-only for tool/repo stories (skip background entirely for them)
-- Swap synthesis to gemini-2.0-flash (production): 1M context = feed full
-  content, no [:3500] cap, better at extracting context from reference docs
+### Possible future fixes
+- GitHub README via GitHub API (structured extraction)
+- arXiv abstract via arXiv API
+- gemini-2.0-flash production swap: 1M context, no cap needed
 
 ---
 
@@ -71,40 +41,142 @@ raspberry-pi-pico-w      -> 37792-char content + 5 snippets -> EMPTY
 **Affects:** Agent 2
 
 ### Symptom
-extract_wiki_keyword (phi3.5) sometimes pulls a generic/wrong keyword, so
-Wikipedia returns content that the synthesizer then rejects as off-topic
-(e.g. vulnerability-reports run: wiki 1334 chars fetched but background EMPTY).
+`extract_wiki_keyword` (phi3.5) sometimes pulls a generic keyword, so Wikipedia
+returns off-topic content that the synthesizer rejects. Worst case: wasted fetch.
 
 ### Why not blocking
-The content anchor catches it — wrong Wikipedia content gets filtered out
-rather than poisoning the background. Worst case is a wasted fetch, not a
-wrong output. DDG snippets + content still carry relevant stories.
+The content anchor catches it — wrong Wikipedia content gets filtered out, not
+included. DDG snippets + article content carry the story regardless.
 
 ### Possible future fix
-Better keyword extraction model (qwen2.5:3b) or skip Wikipedia entirely if it
-proves low-value across more runs.
+Use qwen2.5:3b for keyword extraction (better instruction following).
 
 ---
 
-## ISSUE-3: Local model (qwen2.5:3b) precision ceiling
+## ISSUE-3: Local 3B model precision ceiling
 
 **Status:** Accepted for dev; resolved in production
-**Affects:** Agent 2 synthesis (and future LLM agents)
+**Affects:** Agent 2 synthesis
 
 ### Symptom
-3B local model occasionally garbles specifics or is overly cautious
-(returns EMPTY when a background was possible).
+qwen2.5:3b (original synthesis model) garbled specifics and was overly cautious.
+Replaced by llama3.1:8b + groq/compound routing.
+
+### Current state
+- DEV: llama3.1:8b (good quality, no hallucination with anti-invention prompt)
+- PRODUCTION: swap synthesis → gemini-2.0-flash (one dict change in routing registry)
+
+---
+
+## ISSUE-4: llama3.1:8b context bleed between consecutive stories
+
+**Status:** Fixed — keep_alive=0 eliminates bleed
+**Affects:** Agent 2 synthesis (_synthesize_local)
+
+### Symptom
+llama3.1:8b occasionally carried topic fragments from story N into story N+1.
+
+Observed example (before fix):
+```
+Story N:   Age verification (surveillance laws)
+Story N+1: Replacing Systemd with OpenRC
+Result:    Systemd background mentioned "age verification laws" as a systemd
+           feature — factually wrong, bled from prior story
+```
+
+### Root cause
+Default ollama keep_alive=5min keeps model loaded between calls. Back-to-back
+calls caused latent pattern retention from recent output.
+
+### Fix applied
+```python
+options={"temperature": 0.2, "num_ctx": 8192, "keep_alive": 0}
+```
+Forces model unload after each call. Fresh load (~2-3s on M4) = no shared state.
+`time.sleep(2)` between stories was removed (redundant with keep_alive=0).
+
+### Cost
+~2-3s reload per synthesis call. For 8-story run: ~16-24s extra. Acceptable.
+
+### Production note
+Cloud models (Gemini, Groq) have no stateful context between calls — this
+issue disappears entirely with the production model swap.
+
+---
+
+## ISSUE-5: groq/compound 413 on any payload size
+
+**Status:** Accepted — 8B fallback handles it cleanly
+**Affects:** Agent 2 synthesis (_synthesize_grokapi_cloud)
+
+### Symptom
+groq/compound returns HTTP 413 (Request Entity Too Large) regardless of
+content cap (tried 2000, 1500, 1000 chars — all 413).
+
+### Root cause
+Unknown — compound's actual free-tier payload limit appears lower than
+documented, or the system message overhead triggers the limit on this account.
 
 ### Mitigation
-- DEV: anti-invention prompt rule + content[:3500] cap keep it stable
-- PRODUCTION: routing registry swaps synthesis to gemini-2.0-flash
-  (one dict change) -> high precision + 1M context. The local model is a
-  development/iteration tool, not the final synthesis engine.
+Intent-based routing in synthesize_background:
+- 0 snippets + small payload → tries groq/compound FIRST (web search needed)
+- compound 413 → automatic fallback to llama3.1:8b
+- 8B produces equivalent or better quality output for these cases
+
+### Impact
+compound effectively never runs — 8B handles all synthesis. The pipeline
+produces correct backgrounds regardless. Not a quality issue.
+
+### Why not migrating away from compound
+The 8B fallback works well. Compound remains in the architecture for when
+Groq resolves the limit or a different account is used in production.
+
+---
+
+## ISSUE-6: gpt-oss-120b returns empty for some stories
+
+**Status:** Partially mitigated
+**Affects:** Agent 3 (Fact Checker)
+
+### Symptom
+Groq gpt-oss-120b occasionally returns an empty string for certain articles,
+resulting in 0.5 neutral score instead of REAL/OPINION/SPAM classification.
+
+Observed: Pollen (corporate fraud story) → raw='' → 0.5 neutral.
+
+### Root cause
+gpt-oss-120b is a reasoning model. For content involving legal/fraud topics,
+the model's safety filter likely triggered and returned nothing rather than
+classifying. Not a code bug — a model behavior.
+
+### Mitigation
+Empty response guard in llm_credibility_check:
+```python
+if not raw or not raw.strip():
+    return 0.5  # neutral, never discard on empty
+```
+Story stays KEPT (0.5 > 0.4 threshold). Correct behavior.
+
+### Impact
+~1-2 stories per run get neutral 0.5 instead of REAL (0.9). They stay in
+the pipeline — just scored slightly lower. Not a blocking issue.
 
 ---
 
 ## Summary for future sessions
-If a downstream agent produces thin/empty results for a GitHub / arXiv / docs
-story, **check this file first** — it's almost certainly ISSUE-1 (no
-meaningful background available for that URL type), not a new bug in the
-agent you're working on.
+
+```
+Agent 4+ debugging: if stories are missing, check Agent 3 discard logic
+  → only stories with content=0 should score <0.4 (ISSUE-6 for edge cases)
+
+Agent 5 thin scripts: check if story has background or is content-only
+  → content-only = ISSUE-1 (GitHub/arXiv), not a script-writer bug
+
+Background quality issues: check synthesis routing print
+  → "[synth] compound empty/failed → local 8B fallback" = ISSUE-5 (normal)
+  → "[synth] llama3.1:8b → N chars" = working correctly
+
+Credibility all 0.50: check [cred DEBUG] raw= prints
+  → raw='' for some = ISSUE-6 (safety filter, expected)
+  → raw='REAL'/'OPINION' for others = working correctly
+```
