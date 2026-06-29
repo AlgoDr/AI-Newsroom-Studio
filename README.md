@@ -87,7 +87,10 @@ score<0.4   score≥0.4
 
 ### Agent 2 — Context Researcher (detailed)
 
-Agent 2 is the most complex agent built so far. It runs three internal stages for every story:
+Agent 2 is the most complex agent built so far. It runs three internal stages for every story.
+
+![Agent 2 Architecture](./docs/agent2_architecture.svg)
+
 
 ```
 STAGE 1 — Content Fetch (3-tier fallback)
@@ -110,6 +113,8 @@ STAGE 3 — Synthesis (intent-based routing)
 ```
 
 ### Agent 3 — Fact Checker (detailed)
+
+![Agent 3 Architecture](./docs/agent3_architecture.svg)
 
 ```
 source_score(url)              25% weight
