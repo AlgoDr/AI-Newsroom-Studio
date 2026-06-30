@@ -256,28 +256,20 @@ def synthesize_background(topic: str, content: str, snippets: list) -> str:
     return _synthesize_local(content[:3500], snippet_text)
 
 
+
 def _synthesize_grokapi_cloud(content: str, snippet_text: str) -> str:
-    """groq/compound — has built-in web search for 0-snippet stories.
-    Only called when payload is small enough to avoid 413."""
-    content_for_compound = content[:1000]
-    try:
-        resp = groq_client.chat.completions.create(
-            model="groq/compound",        # ← correct model ID
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a news researcher writing background context. "
-                        "Use web search ONLY to find background about the specific "
-                        "topic in the article. Never invent facts. Stay on-topic."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": f"""Write ONE tight background paragraph (4-6 sentences, MAX 120 words).
+    """Cloud synthesis for 0-snippet stories needing web search context.
+
+    Fallback chain (small boss → big boss):
+      1. groq/compound-mini  — single built-in search, 3x lighter than compound
+                               designed for exactly: one search → one answer
+      2. openai/gpt-oss-120b — 120B with explicit web_search tool via Responses API
+                               fallback if compound-mini also fails
+    """
+    prompt_user = f"""Write ONE tight background paragraph (4-6 sentences, MAX 120 words).
 
 THE ARTICLE:
-{content_for_compound}
+{content[:1000]}
 
 SEARCH SNIPPETS:
 {snippet_text}
@@ -286,17 +278,62 @@ Rules: ONE paragraph, no headers, no invented facts.
 If nothing relevant: INSUFFICIENT DATA
 
 Background paragraph:"""
-                }
+
+    prompt_system = (
+        "You are a news researcher writing background context. "
+        "Use web search ONLY to find background about the specific "
+        "topic in the article. Never invent facts. Stay on-topic."
+    )
+
+    # ── OPTION A: groq/compound-mini (small boss) ─────────────────────────
+    # Single built-in search per request, 3x lighter than groq/compound.
+    # Designed for exactly this use case: 0-snippet story needs one search.
+    try:
+        resp = groq_client.chat.completions.create(
+            model="groq/compound-mini",
+            messages=[
+                {"role": "system", "content": prompt_system},
+                {"role": "user",   "content": prompt_user},
             ],
             temperature=0.2,
             max_tokens=300,
         )
         raw = resp.choices[0].message.content
-        print(f"  [synth] groq/compound → {len(raw) if raw else 0} chars raw")
-        return _clean_synthesis(raw.strip() if raw else "")
+        print(f"  [synth] groq/compound-mini → {len(raw) if raw else 0} chars raw")
+        result = _clean_synthesis(raw.strip() if raw else "")
+        if result:
+            return result
+        print(f"  [synth] compound-mini returned empty → trying big boss")
     except Exception as e:
-        print(f"  [synth] groq/compound failed ({type(e).__name__}: {e})")
-        return ""
+        print(f"  [synth] compound-mini failed ({type(e).__name__}: {e}) → trying big boss")
+
+    # ── OPTION B: gpt-oss-120b with explicit web_search tool ──────────────
+    # 120B reasoning model + browser search via Groq Responses API.
+    # Already proven working in Agent 3 (credibility), now with search added.
+    # Uses the Responses API (different from chat.completions).
+    try:
+        from openai import OpenAI
+        responses_client = OpenAI(
+            base_url="https://api.groq.com/api/openai/v1",
+            api_key=os.getenv("GROQ_KEY")
+        )
+        resp = responses_client.responses.create(
+            model="openai/gpt-oss-120b",
+            input=f"{prompt_system}\n\n{prompt_user}",
+            tools=[{"type": "web_search_preview"}],
+            temperature=0.2,
+        )
+        raw = resp.output_text
+        print(f"  [synth] gpt-oss-120b + web_search → {len(raw) if raw else 0} chars raw")
+        result = _clean_synthesis(raw.strip() if raw else "")
+        if result:
+            return result
+        print(f"  [synth] big boss also returned empty → 8B fallback")
+    except Exception as e:
+        print(f"  [synth] gpt-oss-120b failed ({type(e).__name__}: {e}) → 8B fallback")
+
+    return ""   # both cloud options failed → caller falls through to _synthesize_local
+
 
 
 def _synthesize_local(content: str, snippet_text: str) -> str:
