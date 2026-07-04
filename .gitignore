@@ -13,4 +13,5 @@ multi-agent-env/
 .DS_Store
 
 # run outputs (optional — your audit JSONs)
-data/runs/
+data/runs/lastcommit.txt
+experiments/data/

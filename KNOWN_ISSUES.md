@@ -8,48 +8,72 @@ debugging (Agents 4-10) doesn't mistake them for new failures.
 
 ## ISSUE-1: GitHub / arXiv / docs URLs yield no meaningful background
 
-**Status:** Accepted limitation (not a bug)
+**Status:** Partially mitigated by compound-mini web search upgrade.
+Frequency significantly reduced. Honest-empty still occurs for truly
+new projects with zero web presence — correct behavior, not a bug.
 **Affects:** Agent 2 (Context Researcher), downstream Agents 4 & 5
 
-### Symptom
-Certain story URLs produce an EMPTY background even though content fetched fine:
-- **GitHub repos** → content is a README (code, install steps), not narrative news
-- **arXiv papers** → content is abstract + citation chrome
+### Original symptom
+Certain story URLs produced EMPTY backgrounds:
+- **GitHub repos** → README is code/install steps, not narrative news
+- **arXiv papers** → abstract + citation chrome, no news coverage
 - **Docs pages** → API reference, not news
 
-### Root cause
-1. DDG news returns 0 snippets for brand-new repos/papers (no coverage yet)
-2. When snippets exist but content is reference/code, the content-anchored
-   synthesizer correctly returns INSUFFICIENT DATA rather than fabricating backstory
+DDG returned 0 snippets for brand-new repos → synthesizer had nothing to work with.
 
-This is the **honest-empty principle working as designed**.
+### Current behavior after compound-mini upgrade
+compound-mini has built-in web search and fires for 0-snippet stories.
+It searches the web directly, bypassing the DDG gap entirely.
 
-### Downstream impact
-- **Agent 4 (Editorial):** rank stories with background higher than content-only
-- **Agent 5 (Script Writer):** scripts from content-only stories will be thinner
+Real run evidence:
+  GLM5.2 (github.com URL)     → 662-716 chars background ✅
+  Jamesob SOTA LLMs (github)  → 645 chars background ✅
+  SearXNG (github.com)        → 544 chars background ✅
+  arXiv stories               → 630-770 chars background ✅
 
-### Possible future fixes
-- GitHub README via GitHub API (structured extraction)
-- arXiv abstract via arXiv API
-- gemini-2.0-flash production swap: 1M context, no cap needed
+### When honest-empty still occurs
+Brand-new repos/papers with zero web presence (published hours ago,
+no coverage yet on any outlet). compound-mini finds nothing → correct
+honest-empty. This is intended behavior, not a failure.
+
+### Downstream impact (reduced)
+- **Agent 4 (Editorial):** still rank verified backgrounds higher
+- **Agent 5 (Script Writer):** very rare now to get content-only stories
+
+### Remaining improvement path
+- GitHub README via GitHub API (structured extraction for code repos)
+- arXiv abstract via arXiv API (for papers with no news coverage yet)
 
 ---
 
 ## ISSUE-2: Wikipedia keyword extraction occasionally off-target
 
-**Status:** Minor, accepted
+**Status:** Low impact, accepted. Impact further reduced by compound-mini upgrade.
 **Affects:** Agent 2
 
 ### Symptom
 `extract_wiki_keyword` (phi3.5) sometimes pulls a generic keyword, so Wikipedia
-returns off-topic content that the synthesizer rejects. Worst case: wasted fetch.
+returns off-topic content that the synthesizer rejects. Worst case: one wasted
+API call.
 
-### Why not blocking
+### Why not blocking (original reason, still valid)
 The content anchor catches it — wrong Wikipedia content gets filtered out, not
 included. DDG snippets + article content carry the story regardless.
 
+### Why even less impactful now
+The compound-mini upgrade made Wikipedia a bonus path, not a dependency.
+Even if Wikipedia returns nothing useful, compound-mini independently
+searches the web for 0-snippet stories and fills the gap. The pipeline
+is no longer reliant on Wikipedia for background quality.
+
+### Still technically present
+phi3.5 is still used for keyword extraction. The occasional off-target
+keyword still fires a wasted Wikipedia call. But the downstream quality
+impact is negligible given the compound-mini safety net.
+
 ### Possible future fix
-Use qwen2.5:3b for keyword extraction (better instruction following).
+Use qwen2.5:3b or a better instruction-following model for keyword extraction.
+Not urgent given current pipeline resilience.
 
 ---
 
@@ -166,8 +190,9 @@ the pipeline — just scored slightly lower. Not a blocking issue.
 
 ## ISSUE-7: Agent 2 big-boss model shares gpt-oss-120b quota with Agent 3
 
-**Status:** Known limitation — working but not quota-isolated. Fix in progress
-(local codebase already switched to gpt-oss-20b; UNTESTED for quality).
+**Status:** Quota isolation CONFIRMED in live runs. Three fully separate pools:
+gpt-oss-20b (Agent 2 big-boss), gpt-oss-120b (Agent 3 credibility),
+compound-mini (Agent 3 contradiction check). Each pool hit independent 429s.
 **Affects:** Agent 2 synthesis (_synthesize_grokapi_cloud), Agent 3 credibility
 
 **Tag: `till-agent3-completed`**
@@ -224,21 +249,18 @@ Agent 3 credibility (all stories):
 - Daily quota resets at midnight UTC (5:30 AM IST) — a same-day re-run
   after reset recovers full functionality with no code changes needed.
 
-### Fix in progress (local codebase, not yet pushed/verified)
-Local agent2.py has been switched: Agent 2's big-boss model changed from
-`openai/gpt-oss-120b` to `openai/gpt-oss-20b`, which Groq lists with its
-own separate 200K daily token pool, independent from the 120B pool
-Agent 3 uses.
+### Current architecture (quota-isolated)
+Three fully separate Groq quota pools:
+  Agent 2 big-boss:      openai/gpt-oss-20b   (own 200K daily pool)
+  Agent 3 credibility:   openai/gpt-oss-120b  (own 200K daily pool)
+  Agent 3 contradiction: groq/compound-mini   (own TPM pool, 8K/min)
 
-**This fix is UNVERIFIED for output quality** — no side-by-side test has
-been run comparing 20B vs 120B background-synthesis quality on Agent 2's
-specific task. Before treating this as production-ready, run a same-story
-comparison test:
-  1. Feed an identical 0-snippet story to both `gpt-oss-20b` and
-     `gpt-oss-120b` with `web_search_preview` enabled
-  2. Compare specificity, factual accuracy, and length of output
-  3. Only fully adopt 20B if quality holds up — do not assume it from
-     parameter count alone
+compound-mini TPM (per-minute) exhaustion fix: time.sleep(2) added
+before _check_contradiction call. Prevents 429 on rapid consecutive calls.
+
+20b quality for Agent 2 big-boss: still unverified vs 120b.
+See ISSUE-7 TODO checklist — milestone_tracker.py auto-logs every
+gpt-oss-20b firing; alert fires at 5 and 10 real calls.
 
 ### What NOT to do
 Do not assume compound-mini gives quota isolation "for free" — it does
@@ -261,11 +283,50 @@ git diff till-agent3-completed..HEAD -- experiments/agents/agent2.py
 
 ---
 
+---
+
+## ISSUE-8: False positive risk when LLM says REAL but cross-verify contradicts
+
+**Status:** Partially mitigated by dynamic reweighting. Known design gap.
+**Affects:** Agent 3 check_credibility()
+
+### Symptom
+When gpt-oss-120b classifies content as REAL (+0.9) but a credible source
+contradicts a specific fact, the LLM signal (60% weight) can dominate and
+keep a story that should be discarded.
+
+Example:
+  Story: "Company X raises $500M" (unknown blog, number fabricated)
+  cross_verify: Bloomberg says "$50M not $500M"
+  Standard weights: 0.0x0.20 + 0.9x0.60 + -0.6x0.20 = +0.42 -> KEEP (wrong)
+
+### Mitigation
+Dynamic reweighting shifts weights when contradiction detected:
+  llm: 0.60 -> 0.30 (reduced)
+  verify: 0.20 -> 0.50 (amplified)
+  Corrected: 0.0x0.20 + 0.9x0.30 + -0.6x0.50 = -0.03 -> DISCARD (correct)
+
+### Remaining risk
+Reweighting only fires if _check_contradiction() returns CONTRADICTS.
+If compound-mini returns CONSISTENT or UNRELATED (false negative on the
+contradiction), reweighting does not trigger and the false positive survives.
+
+### Frequency on HN
+Low — HN community pre-screens fabricated stories via downvotes.
+Primary risk: plausible-sounding misinformation with slightly inflated
+financial figures or misattributed technical claims.
+
+### Future improvement
+Run _check_contradiction twice (majority vote) for high-stakes stories.
+Use result_trust as a confidence multiplier on the contradiction signal.
+
+---
+
 ## Summary for future sessions
 
 ```
 Agent 4+ debugging: if stories are missing, check Agent 3 discard logic
-  → only stories with content=0 should score <0.4 (ISSUE-6 for edge cases)
+  → only stories with content=0 should score <0.0 in new design (ISSUE-6 for edge cases)
 
 Agent 5 thin scripts: check if story has background or is content-only
   → content-only = ISSUE-1 (GitHub/arXiv), not a script-writer bug

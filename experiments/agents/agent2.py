@@ -13,6 +13,17 @@ import requests
 groq_client = Groq(api_key=os.getenv("GROQ_KEY"))
 
 
+from agent_tools.milestone_tracker import MilestoneTracker
+
+# ISSUE-7 tracker — logs every real gpt-oss-20b firing
+# alerts at 5 and 10 hits via macOS popup + marker file
+oss20b_tracker = MilestoneTracker(
+    name="oss20b_bigboss",
+    milestone_at=[5, 10],
+    log_dir="data"
+)
+
+
 
 # when content is junk
 junk_markers = [
@@ -318,19 +329,43 @@ Background paragraph:"""
             api_key=os.getenv("GROQ_KEY")
         )
         resp = responses_client.responses.create(
-            model="openai/gpt-oss-120b",
+            model="openai/gpt-oss-20b",
             input=f"{prompt_system}\n\n{prompt_user}",
             tools=[{"type": "web_search_preview"}],
             temperature=0.2,
         )
         raw = resp.output_text
-        print(f"  [synth] gpt-oss-120b + web_search → {len(raw) if raw else 0} chars raw")
+        print(f"  [synth] gpt-oss-20b + web_search → {len(raw) if raw else 0} chars raw")
         result = _clean_synthesis(raw.strip() if raw else "")
+
+
+
+        # ── ISSUE-7 tracker: log every real 20b firing ──────────────────
+        oss20b_tracker.log_hit(
+            context=content[:150],
+            output=raw or "",
+            success=bool(result),
+        )
+        # ─────────────────────────────────────────────────────────────────
+
+
         if result:
             return result
-        print(f"  [synth] big boss also returned empty → 8B fallback")
+        print(f"  [synth] big boss(oss-20B) also returned empty → 8B fallback")
     except Exception as e:
-        print(f"  [synth] gpt-oss-120b failed ({type(e).__name__}: {e}) → 8B fallback")
+        print(f"  [synth] gpt-oss-20b failed ({type(e).__name__}: {e}) → 8B fallback")
+
+
+
+        # ── ISSUE-7 tracker: log failures too ───────────────────────────
+        oss20b_tracker.log_hit(
+            context=content[:150],
+            output="",
+            success=False,
+            error=f"{type(e).__name__}: {e}",
+        )
+        # ─────────────────────────────────────────────────────────────────
+
 
     return ""   # both cloud options failed → caller falls through to _synthesize_local
 

@@ -38,7 +38,7 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
 |-------|--------|-------------|
 | **Agent 1 — Trend Hunter** | ✅ Complete | HackerNews top stories with velocity scoring |
 | **Agent 2 — Context Researcher** | ✅ Complete | 3-tier content fetch + background synthesis |
-| **Agent 3 — Fact Checker** | ✅ Complete | Domain credibility + Groq 120B classification |
+| **Agent 3 — Fact Checker** | ✅ Complete | 3-signal scoring (-1 to +1): source + LLM + cross-verify |
 | Agent 4 — Editorial | 🔨 Next | Pick top 3, diversity, rank by background quality |
 | Agent 5 — Script Writer | ⏳ Planned | Hook → Context → Twist → CTA |
 | Agent 6 — Script QC | ⏳ Planned | APPROVE/REVISE loop, max 2 iterations |
@@ -116,27 +116,42 @@ STAGE 3 — Synthesis (intent-based routing)
 
 ![Agent 3 Architecture](./docs/agent3_architecture.svg)
 
-```
-source_score(url)              25% weight
-  Domain trust map (HN-tuned):
-    github.com, arxiv.org → 0.9
-    nature.com, science.org → 0.85
-    arstechnica.com, theverge.com, wired.com → 0.8
-    reuters.com, bbc.com, apnews.com → 0.75
-    unknown blogs → 0.5 (most HN traffic)
+Agent 3 v2 scores credibility on a **-1 to +1 scale**. Zero is the natural boundary — negative = discard, positive = keep.
 
-llm_credibility_check()        75% weight
-  Groq gpt-oss-120b classifies article as:
-    REAL    → 0.9  (genuine product/tech/event)
-    OPINION → 0.5  (essay, rant — legitimate but not news)
-    SPAM    → 0.2  (scam/clickbait/misinformation)
-  Guards:
-    empty content (<100 chars) → 0.3
-    thin content (<500 chars)  → 0.5 neutral
-    Groq failure               → 0.5 neutral (never discard on crash)
+**Three signals with dynamic reweighting:**
 
-combined = round(src×0.25 + llm×0.75, 2)
-score < 0.4 → story["discarded"] = True  (marked, NOT deleted)
+| Signal | Base Weight | Range | How |
+|--------|-------------|-------|-----|
+| `source_score` | 20% | 0.0 to +0.95 | 35-domain trust map (HN-tuned) |
+| `llm_credibility_check` | 60% | -0.7 to +0.9 | gpt-oss-120b → REAL/OPINION/SPAM |
+| `cross_verify` | 20% | -0.6 to +0.8 | Exa semantic search → DDG fallback |
+
+**Label scores:** REAL → +0.9 · OPINION → +0.1 · SPAM → -0.7
+
+**Dynamic reweighting** — shifts when cross_verify fires:
+- Contradiction detected: llm 60%→30%, verify 20%→50% (contradiction amplified)
+- Confirmation detected:  llm 60%→50%, verify 20%→30% (verify boosted)
+- Neutral (not found):    standard weights unchanged
+
+**Guards:**
+- content < 100 chars → 0.0 neutral (can't verify)
+- content < 500 chars → 0.0 neutral (too thin to judge)
+- Groq failure / empty response → 0.0 neutral (never discard on crash)
+
+**Cross-verification:**
+- Exa semantic search (primary) — finds story variants, HN-aware indexing
+- DDG news fallback — already in pipeline, free, real-time
+- Only sources with trust ≥ 0.70 can trigger verification signals
+- Contradiction check uses compound-mini (separate quota from 120b)
+
+**Quota isolation (three separate Groq pools):**
+- gpt-oss-120b: credibility classification (200K tokens/day)
+- gpt-oss-20b:  Agent 2 big-boss synthesis (200K tokens/day)
+- compound-mini: contradiction check (own TPM pool)
+
+```python
+combined = round(src×w_src + llm×w_llm + verify×w_verify, 2)
+score < 0.0 → story["discarded"] = True  (marked, NOT deleted — audit trail)
 ```
 
 ---
@@ -295,11 +310,14 @@ Trafiltura Success ✅  In Loading Content: 10217 characters
 - [x] Context bleed prevention (keep_alive=0)
 
 ### Phase 3 — Fact Checker (Agent 3) ✅
-- [x] HN-tuned domain SOURCE_TIERS map
+- [x] 35-domain SOURCE_TIERS map (HN-tuned, 0.0 to +0.95)
 - [x] REAL/OPINION/SPAM classification (Groq gpt-oss-120b)
-- [x] Combined credibility score (25/75 src/llm)
+- [x] -1 to +1 credibility range (zero = natural discard boundary)
+- [x] Cross-verification: Exa semantic search → DDG fallback
+- [x] Dynamic reweighting on contradiction/confirmation
+- [x] Quota isolation: 120b / 20b / compound-mini separate pools
 - [x] Soft discard marking (audit trail, not deletion)
-- [x] Defensive guards (empty, thin, crash → neutral)
+- [x] Defensive guards (empty, thin, crash → 0.0 neutral)
 
 ### Phase 4 — Editorial Agent 🔨 Next
 - [ ] Composite score: credibility × velocity × has_background
