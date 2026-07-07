@@ -322,6 +322,176 @@ Use result_trust as a confidence multiplier on the contradiction signal.
 
 ---
 
+
+---
+
+## ISSUE-9: phi3.5 deduplication returns malformed JSON (Agent 4)
+
+**Status:** Partially fixed — two-layer JSON cleaning in place.
+Whitespace compaction fix applied. Some edge cases may still occur.
+**Affects:** Agent 4 deduplicate_topics()
+
+### Symptom
+phi3.5 returns valid topic clusters but in malformed JSON format.
+Three observed variants across real runs:
+
+  Variant A — titles alongside numbers (Run 1):
+    [["1", "Fable turned reMarkable..."], ["2",]]
+    int("Fable turned...") → ValueError
+
+  Variant B — trailing commas (Run 2):
+    [["1", "7"], ["2",], ["3",]]
+    json.loads() → JSONDecodeError (trailing comma)
+
+  Variant C — spaces in outer brackets (Run 3):
+    [ [1,3], [2,5], [4], [6], [7], [8] ]
+    find("[[") fails on "[ [" → ValueError: no JSON array found
+
+### Root cause
+phi3.5 (3.8B) was trained on human-written text, not JSON schema compliance.
+When instructed "return ONLY integers", it tries to be helpful by:
+  - adding title text alongside numbers (so the reader knows which story)
+  - adding trailing commas (natural when listing items in human writing)
+  - adding spaces inside brackets (looks more readable to humans)
+
+This is not the model ignoring instructions — it is misunderstanding the task.
+phi3.5 hears "group these titles" as "show me the groups WITH titles".
+It does not understand that machine-readable integers only are required.
+
+This is a fundamental alignment gap between what the prompt says and what
+phi3.5 was trained to produce. The two-layer cleaning fix handles the
+symptoms; the root cause is a model capability ceiling for strict JSON output.
+llama3.1:8b follows JSON format instructions more reliably because it was
+trained on significantly more code and structured-data examples.
+
+### Fix applied (two-layer defense)
+Layer 1 — before json.loads (cleans malformed syntax):
+  raw_compact = re.sub(r',\s*]', ']', raw)   # trailing commas
+  raw_compact = raw_compact.replace(" ","").replace("\n","").replace("\t","")
+  # compaction: "[ [1,3] ]" → "[[1,3]]" fixes Variant C
+
+Layer 2 — after json.loads (handles text mixed with numbers):
+  for item in group:
+      if isinstance(item, int): nums.append(item)
+      else: m = re.match(r'\d+', str(item)); if m: nums.append(int(m.group()))
+  # extracts integers from ["1","title text"] → [1]
+
+### Safe fallback
+If both layers fail → every story treated as its own cluster → no
+deduplication → all stories eligible for selection. Pipeline never crashes.
+Selection still correct (just no topic diversity enforcement that run).
+
+### Remaining risk
+Variant B (trailing commas) + Variant C (spaces) may still co-occur in
+a single response that both layers can't fully clean. Low probability.
+
+### Future improvement
+Switch to llama3.1:8b for clustering (better JSON compliance) or use
+compound-mini with explicit JSON schema enforcement.
+
+---
+
+## ISSUE-10: Agent 5 word count enforcement overshoots on expand (Script Writer)
+
+**Status:** First-pass enforcement in Agent 5 (trim/expand, max 2 attempts).
+Definitive word count validation delegated to Agent 6 (QC) — not yet built.
+Agent 6 will enforce 150-225 surgically per section with targeted re-generation.
+**Affects:** Agent 5 _enforce_word_count(), Agent 6 (planned)
+
+### Symptom
+First draft too short (105 words, target 150-225).
+Expand correction prompt triggered.
+Second draft severely overshot (387 words, ~155 seconds).
+
+The expand prompt said "at least 150 words" with no upper limit.
+llama-3.3-70b expanded aggressively, ignoring the implicit ceiling.
+
+### Root cause
+Expand correction prompt lacked an explicit upper bound:
+  OLD: "Expand this script to at least 150 words"
+  → model interpreted as "expand as much as possible"
+
+### Fix applied
+  NEW: "Expand to between 150 and 225 words. Target 170 words exactly.
+        Add ONE specific detail to S1_CORE only. Do NOT add new sections."
+Explicit ceiling + exact target + constrained section = tighter control.
+
+### Why Agent 6 is the right fix, not Agent 5
+
+Agent 5 self-correction is blind — it re-generates the whole script without
+knowing which section caused the overrun. The result is unpredictable.
+
+Agent 6 correction is surgical:
+  - reads the script section by section
+  - identifies exactly which section is too long (S1_CORE, S2_CORE etc.)
+  - sends a targeted trim instruction for ONLY that section
+  - re-checks word count after targeted re-generation
+  - APPROVEs when 150-225 words confirmed
+
+This is cleaner separation of concerns:
+  Agent 5: GENERATE (focus on content quality and creativity)
+  Agent 6: VALIDATE + CORRECT (focus on format, length, rules)
+
+_enforce_word_count in Agent 5 is kept as a first-pass filter to catch
+obvious overcorrection early and save quota. Agent 6 is the authoritative
+validator.
+
+### Word count formula
+Target: 150-225 words = 60-90 seconds
+Speaking pace: 2.5 words/second
+est_duration = round(word_count / 2.5) seconds
+
+---
+
+## ISSUE-11: Agent 5 CTA not following allowed options (Script Writer)
+
+**Status:** Prompt hardened in Agent 5 (WORD-FOR-WORD copy instruction).
+CTA format validation is a primary Agent 6 responsibility — not yet built.
+Agent 6 will reject any non-standard CTA and force exact regeneration.
+**Affects:** Agent 5 _build_prompt(), Agent 6 (planned)
+
+### Symptom
+CTA generated as a custom 30+ word promotional paragraph:
+  "Follow us for daily tech news and stay up-to-date on the latest
+   developments in the world of technology. We'll keep you informed..."
+
+Required: exactly one of three options:
+  A: "Follow for daily tech news"
+  B: "Comment below with your thoughts"
+  C: "Link in bio for more"
+
+### Root cause
+Original prompt rule was too lenient:
+  "CTA must be exactly one of: 'Follow for daily tech news' or..."
+  → model treated this as a guideline and wrote a custom CTA instead
+
+### Fix applied
+Prompt now uses explicit copy instruction:
+  "CTA must be WORD-FOR-WORD one of these three — do NOT modify:
+   A: Follow for daily tech news
+   B: Comment below with your thoughts
+   C: Link in bio for more
+   Copy one exactly. No custom CTAs."
+
+### Why Agent 6 is the right fix
+
+CTA validation is a FORMAT check, not a creativity check.
+Agent 5 (generation) should focus on content quality.
+Agent 6 (QC) is purpose-built for exactly this kind of rule enforcement:
+
+Agent 6 CTA check:
+  □ Is CTA exactly one of the three allowed options?
+  □ NO → reject → send targeted instruction:
+         "Replace CTA with exactly: Follow for daily tech news"
+  □ Agent 5 regenerates ONLY the CTA line (not the full script)
+  □ Agent 6 re-checks → APPROVE if correct
+
+The prompt hardening in _build_prompt improves the first-draft hit rate.
+Agent 6 guarantees correct CTA on every final output regardless of
+what the first draft produced.
+
+---
+
 ## Summary for future sessions
 
 ```
