@@ -15,3 +15,7 @@ multi-agent-env/
 # run outputs (optional — your audit JSONs)
 data/runs/lastcommit.txt
 experiments/data/
+docs/agent3.png
+docs/updates.txt
+lastcommit.txt
+experiments/data/
