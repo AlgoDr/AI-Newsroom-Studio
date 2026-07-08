@@ -36,16 +36,16 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
 
 | Agent | Status | Description |
 |-------|--------|-------------|
-| **Agent 1 — Trend Hunter** | ✅ Complete | HackerNews top stories with velocity scoring |
-| **Agent 2 — Context Researcher** | ✅ Complete | 3-tier content fetch + background synthesis |
-| **Agent 3 — Fact Checker** | ✅ Complete | 3-signal scoring (-1 to +1): source + LLM + cross-verify |
-| **Agent 4 — Editorial** | ✅ Complete | Filter → score → deduplicate (qwen2.5:7b) → select top 3 |
-| **Agent 5 — Script Writer** | ✅ Complete | HOOK → CONTEXT → CORE → TWIST → CTA (llama-3.3-70b) |
-| Agent 6 — Script QC | 🔨 Next | APPROVE/REVISE loop, pacing annotations |
-| Agent 7 — Video Prompt | ⏳ Planned | Scene-by-scene cinematic prompts |
-| Agent 8 — Video Generator | ⏳ Planned | MOCK ffmpeg first, Fal.ai Wan later |
-| Agent 9 — SEO Optimizer | ⏳ Planned | Title, description, tags |
-| Agent 10 — Publisher | ⏳ Planned | YouTube Data API v3 |
+| **Agent 1 — Trend Hunter** | ✅ Complete | HackerNews top stories with velocity scoring |
+| **Agent 2 — Context Researcher** | ✅ Complete | 3-tier content fetch + background synthesis |
+| **Agent 3 — Fact Checker** | ✅ Complete | 3-signal scoring (-1 to +1): source + LLM + cross-verify |
+| **Agent 4 — Editorial** | ✅ Complete | Filter → score → deduplicate (qwen2.5:7b) → select top 3 |
+| **Agent 5 — Script Writer** | ✅ Complete | HOOK → CONTEXT → CORE → TWIST → CTA (llama-3.3-70b) |
+| Agent 6 — Script QC | 🔨 Next | APPROVE/REVISE loop, pacing annotations |
+| Agent 7 — Video Prompt | ⏳ Planned | Scene-by-scene cinematic prompts |
+| Agent 8 — Video Generator | ⏳ Planned | MOCK ffmpeg first, Fal.ai Wan later |
+| Agent 9 — SEO Optimizer | ⏳ Planned | Title, description, tags |
+| Agent 10 — Publisher | ⏳ Planned | YouTube Data API v3 |
 
 ---
 
@@ -107,12 +107,12 @@ Each agent's internal functions, formulas, and prompt-engineering decisions
 are documented in full in **[docs/AGENTS.md](./docs/AGENTS.md)** — including
 the real failure modes hit during development and the exact fixes applied.
 
-| Agent | One-line summary | Full detail |
-|---|---|---|
-| **Agent 2 — Context Researcher** | 3-tier content fetch (trafilatura→Jina→Tavily) → background synthesis (compound-mini/8B routing) | [→ docs/AGENTS.md#agent-2](./docs/AGENTS.md#agent-2--context-researcher-detailed) |
-| **Agent 3 — Fact Checker** | 3-signal credibility (-1 to +1): domain trust + LLM classification + Exa/DDG cross-verify, dynamically reweighted | [→ docs/AGENTS.md#agent-3](./docs/AGENTS.md#agent-3--fact-checker-detailed) |
-| **Agent 4 — Editorial** | Filter → weighted-addition score → qwen2.5:7b topic dedup → select top 3, LangGraph conditional edge | [→ docs/AGENTS.md#agent-4](./docs/AGENTS.md#agent-4--editorial-detailed) |
-| **Agent 5 — Script Writer** | One llama-3.3-70b call → HOOK/CONTEXT/CORE/TWIST/CTA × 3 stories, credibility-driven tone | [→ docs/AGENTS.md#agent-5](./docs/AGENTS.md#agent-5--script-writer-detailed) |
+| Agent | One-line summary |
+|---|---|
+| **[Agent 2 — Context Researcher](./docs/AGENTS.md#agent-2--context-researcher-detailed)** | 3-tier content fetch (trafilatura→Jina→Tavily) → background synthesis (compound-mini/8B routing) |
+| **[Agent 3 — Fact Checker](./docs/AGENTS.md#agent-3--fact-checker-detailed)** | 3-signal credibility (-1 to +1): domain trust + LLM classification + Exa/DDG cross-verify, dynamically reweighted |
+| **[Agent 4 — Editorial](./docs/AGENTS.md#agent-4--editorial-detailed)** | Filter → weighted-addition score → qwen2.5:7b topic dedup → select top 3, LangGraph conditional edge |
+| **[Agent 5 — Script Writer](./docs/AGENTS.md#agent-5--script-writer-detailed)** | One llama-3.3-70b call → HOOK/CONTEXT/CORE/TWIST/CTA × 3 stories, credibility-driven tone |
 
 ---
 
