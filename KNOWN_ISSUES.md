@@ -1,8 +1,13 @@
 # Known Issues — AI Newsroom Studio
 
-Documented limitations as of the Agent 1 + 2 + 3 milestone. These are
-**expected behaviors / accepted limitations**, not bugs. Recorded so future
-debugging (Agents 4-10) doesn't mistake them for new failures.
+Documented limitations as of the Agent 1-5 milestone (11 issues total).
+These are **expected behaviors / accepted limitations**, not bugs.
+Recorded so future debugging (Agents 6-10) doesn't mistake them for new
+failures.
+
+**Issue index:** ISSUE-1,2 (Agent 2 background gathering) · ISSUE-3,4,5
+(Agent 2 synthesis models) · ISSUE-6,7,8 (Agent 3 credibility) ·
+ISSUE-9 (Agent 4 deduplication) · ISSUE-10,11 (Agent 5 script writer)
 
 ---
 

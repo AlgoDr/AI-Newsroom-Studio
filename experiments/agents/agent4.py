@@ -173,33 +173,43 @@ def deduplicate_topics(stories: dict) -> dict:
         f"{i+1}. {title}" for i, (_, title) in enumerate(titles)
     )
 
-    prompt = f"""Group these news story titles by topic.
-    Stories about the same subject belong in the same group.
+    prompt = f"""You are a news editor grouping stories by topic for a YouTube channel.
 
-    Titles:
-    {numbered_titles}
-
-    RULES:
-    - Return ONLY a JSON array of arrays
-    - Each inner array contains ONLY integers (title numbers 1 to {len(titles)})
-    - NO title text, NO strings, ONLY integers
-    - NO trailing commas
-    - Every number 1 to {len(titles)} must appear exactly once
-
-CORRECT: [[1,3],[2,5],[4],[6],[7],[8]]
-WRONG:   [["1","title text"],["2",]]
-
-JSON:"""
+        Two stories belong in the SAME group ONLY if they are about the 
+        EXACT SAME news event, product release, or specific controversy.
+        
+        DIFFERENT topics — do NOT group these together:
+          - A story about building home storage ≠ a story about text-to-speech software
+          - A story about media accuracy ≠ a story about old computer science lectures
+          - A security vulnerability story ≠ a government policy story
+          - Two stories in the "tech" category does NOT make them the same topic
+        
+        SAME topic — only group if literally the same news:
+          - Two stories both covering the same product launch = same group
+          - Two stories both about the same CVE = same group
+          - Two stories both about the same court ruling = same group
+        
+        When in doubt → put stories in SEPARATE groups.
+        Prefer more groups over fewer groups.
+        
+        Titles:
+        {numbered_titles}
+        
+        Return ONLY a JSON array of arrays of integers.
+        Every number 1 to {len(titles)} must appear exactly once.
+        Default assumption: each story is its own group unless obviously the same news.
+        
+        JSON:"""
 
     try:
         resp = ollama.generate(
-            model="phi3.5",
-            prompt=prompt,
-            stream=False,
-            options={"temperature": 0.1, "num_ctx": 4096, "keep_alive": 0},
-        )
+        model="qwen2.5:7b",
+        prompt=prompt,
+        stream=False,
+        options={"temperature": 0.1, "num_ctx": 4096, "keep_alive": 0},)
+
         raw = resp["response"].strip()
-        print(f"  [deduplicate] phi3.5 raw: {raw[:120]}")
+        print(f"  [deduplicate] qwen2.5:7b raw output: {raw[:120]}")
 
         # ── LAYER 1: clean malformed JSON before parsing ──────────────
         # phi3.5 sometimes adds trailing commas → invalid JSON
@@ -272,7 +282,7 @@ JSON:"""
                           f"{stories[sid]['title'][:50]}")
 
     except Exception as e:
-        print(f"  [deduplicate] phi3.5 failed ({type(e).__name__}: {e}) "
+        print(f"  [deduplicate] qwen2.5:7b failed ({type(e).__name__}: {e}) "
               f"→ no deduplication, all stories eligible")
         # safe fallback: treat every story as its own cluster
         for i, (sid, story) in enumerate(stories.items()):

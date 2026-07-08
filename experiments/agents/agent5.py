@@ -162,7 +162,7 @@ def _build_prompt(selected: list) -> str:
         tone    = _tone_instruction(story.get("credibility_score", 0))
         title   = story.get("title", "")
         bg      = story.get("background", "")[:300]
-        content = story.get("content",    "")[:500]
+        content = story.get("content",    "")[:800]
 
         block = f"""STORY {rank} (rank {rank}, ~{target} words):
   Title:      {title}
@@ -190,19 +190,79 @@ Total target: {TARGET_MIN}-{TARGET_MAX} words (60-90 seconds at spoken pace).
 USE EXACTLY THESE LABELS — one per line, content immediately after the colon:
 {label_format}
 
-RULES:
-- HOOK must be punchy and under 15 words — grab attention immediately
-- S2_HOOK and S3_HOOK must include a natural transition
-  e.g. "Meanwhile...", "But that's not all...", "And finally..."
-- Spoken English only: short sentences, active voice, contractions
-  BAD: "Furthermore the implications are significant"
+═══ RULES ═══════════════════════════════════════════════════════
+
+HOOK — most important line in the script:
+  Must name ONE specific surprising fact from the top story.
+  Must make a scrolling viewer stop within 3 seconds.
+  Must NOT be generic — no channel names, no "today's news", no "big updates".
+  BAD:  "New tech updates daily"
+  BAD:  "Big news in tech today"
+  BAD:  "Here's what you missed"
+  GOOD: "Your router has a secret backdoor — and the vendor won't fix it"
+  GOOD: "You can build a crash-proof home server for under $500 — no Synology needed"
+  GOOD: "This 82-million-parameter model runs speech on a 12-year-old CPU"
+  Rule: if someone reads HOOK alone, they must know what the video is about.
+
+TWIST — second most important line per story:
+  Must reveal a CONSEQUENCE or IMPLICATION not already stated in CORE.
+  Must NOT restate the core fact — the core already said that.
+  BAD:  "This allows attackers to gain access" (restates CORE)
+  BAD:  "It's surprisingly simple to get started" (vague, adds nothing)
+  BAD:  "This is a major breakthrough" (tells viewer what to think, not what to know)
+  GOOD: "No patch exists — disable remote management on your Tenda router right now"
+  GOOD: "If your OS gets nuked, plug the drives into any machine and run zfs import"
+  GOOD: "Pair it with a local LLM and your entire AI stack never touches the internet"
+
+TRANSITIONS (S2_HOOK, S3_HOOK) — two-part rule:
+  Stories cover different topics — do NOT force a bridge between unrelated stories.
+  Each transition does exactly TWO things:
+
+  1. SIGNAL completion of the previous story (one short phrase):
+     GOOD: "And that's your storage sorted."
+     GOOD: "With that covered —"
+
+  2. OPEN the next story with tension or curiosity (NOT an explanation):
+     GOOD: "Now — what if your computer could speak with zero internet?"
+     GOOD: "But here's something that should scare every router owner."
+
+  BAD: "Meanwhile, local speech generation has become incredibly advanced..."
+       (no completion signal, explains before creating curiosity)
+  BAD: "But that's not all..." (filler — says nothing about what's next)
+  BAD: "In other news..." (kills momentum completely)
+  Rule: viewer must feel "story 1 is done, story 2 is coming, I want to know what it is."
+
+FACTS:
+  Never reference publication dates, video links, or "a guide was published on [date]".
+  Never say "as showcased in a video from [date]" — viewers don't care.
+  Use specific technical details from the content: model sizes, benchmark numbers,
+  CVE IDs, version numbers, command names, specs.
+  BAD:  "On August 23 2024, a guide was published..."
+  GOOD: "Debian 12, RAIDZ1, four drives, about an hour to set up."
+  Never invent facts not in Title, Background, or Content.
+  Follow the Tone instruction for each story exactly.
+
+SPOKEN ENGLISH:
+  Short sentences. Active voice. Contractions.
+  Read it aloud — if it sounds like an essay, rewrite it.
+  BAD:  "Furthermore the implications are significant"
   GOOD: "And here's why this matters"
-- Never invent facts not present in the Title, Background, or Content
-- Follow the Tone instruction for each story exactly
-- CTA must be exactly one of:
-  "Follow for daily tech news" or "Comment below" or "Link in bio"
-- Do not add any text outside the labelled sections
-- Count your words — stay between {TARGET_MIN} and {TARGET_MAX} total"""
+
+CTA — must be WORD-FOR-WORD one of these three, copied exactly:
+  A: Follow for daily tech news
+  B: Comment below with your thoughts
+  C: Link in bio for more
+  Do NOT write a custom CTA. Do NOT add words. Copy one option exactly.
+
+FORMAT:
+  CRITICAL — story order: Write S1 sections using STORY 1 content,
+  S2 sections using STORY 2 content, S3 sections using STORY 3 content.
+  Do NOT reorder stories for dramatic effect. The order was set editorially.
+  Do not add any text outside the labelled sections.
+  Count your words — stay between {TARGET_MIN} and {TARGET_MAX} total.
+  Each label on its own line, content immediately after the colon.
+
+═════════════════════════════════════════════════════════════════"""
 
     return prompt
 
@@ -384,7 +444,7 @@ def script_writer_node(state: dict) -> dict:
                     "content": prompt,
                 }
             ],
-            temperature=0.7,    # creative but not chaotic
+            temperature=0.4,    # reduced: prevents story reordering
             max_tokens=500,
         )
         raw = resp.choices[0].message.content.strip()
