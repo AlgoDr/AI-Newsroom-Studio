@@ -1,13 +1,14 @@
 # Known Issues — AI Newsroom Studio
 
-Documented limitations as of the Agent 1-5 milestone (11 issues total).
+Documented limitations as of the Agent 1-5 milestone (12 issues total).
 These are **expected behaviors / accepted limitations**, not bugs.
 Recorded so future debugging (Agents 6-10) doesn't mistake them for new
 failures.
 
 **Issue index:** ISSUE-1,2 (Agent 2 background gathering) · ISSUE-3,4,5
 (Agent 2 synthesis models) · ISSUE-6,7,8 (Agent 3 credibility) ·
-ISSUE-9 (Agent 4 deduplication) · ISSUE-10,11 (Agent 5 script writer)
+ISSUE-9 (Agent 4 deduplication) · ISSUE-10,11 (Agent 5 script writer) ·
+ISSUE-12 (voice-over — Kokoro/mlx-audio setup, pre-Agent 6.5)
 
 ---
 
@@ -496,6 +497,125 @@ Agent 6 guarantees correct CTA on every final output regardless of
 what the first draft produced.
 
 ---
+
+---
+
+## ISSUE-12: Kokoro TTS via mlx-audio — dependency chain hidden behind one generic error
+
+**Status:** Resolved. Documented here because a fresh machine or a reset venv
+will hit the same wall, and `mlx-audio`'s error message doesn't reveal the
+real cause.
+**Affects:** Voice-over generation (planned Agent 6.5/7, not yet built)
+
+### A nice bit of full-circle project history
+
+This entry exists because of a story **Agent 1 (Trend Hunter) itself
+surfaced** in a real pipeline run: *"Local, CPU-Friendly, High-Quality TTS
+with Kokoro"* — velocity 44.9, later confirmed by Agent 3 via cross-verify
+(github.com, trust=0.95) and selected by Agent 4 for scripting (editorial_score
+0.672, rank #2). Agent 5 wrote a script about Kokoro without knowing the
+project would end up using the exact model it was reporting on.
+
+That's the newsroom finding its own tools — a genuinely fun validation
+that the pipeline surfaces real, usable signal, not just noise.
+
+### Symptom
+
+```
+python3 -m mlx_audio.tts.generate --model mlx-community/Kokoro-82M-bf16 \
+  --text "..." --voice af_heart
+
+Import error: Kokoro requires the optional 'misaki' package for text
+processing. Install it with: pip install misaki
+```
+
+Running `pip install misaki` shows `Requirement already satisfied` —
+yet the exact same error repeats. The message is misleading: `misaki`
+IS installed, but one of *its* imports is failing, and `mlx_audio`
+wraps every exception inside `misaki` with this one generic string.
+
+### Root cause — a 4-layer dependency chain, each failure masked identically
+
+```
+mlx-audio
+  └─ misaki (text → phoneme processing)
+       ├─ num2words        (missing → ModuleNotFoundError, masked)
+       └─ phonemizer       (missing → ModuleNotFoundError, masked)
+            └─ espeak-ng   (system binary, NOT pip-installable, masked)
+```
+
+Every one of these three missing dependencies produced the *exact same*
+top-level error message. Standard `pip install misaki` cannot reveal
+which sub-dependency is actually missing — the traceback must be
+unwrapped manually.
+
+### How it was actually diagnosed
+
+`mlx_audio`'s wrapped error hides the real `ModuleNotFoundError`. Bypass
+the wrapper by importing the failing path directly and catching the
+raw traceback:
+
+```python
+python3 -c "
+try:
+    from misaki import espeak
+    print('espeak ok')
+except Exception:
+    import traceback; traceback.print_exc()
+"
+```
+
+This is what surfaced `ModuleNotFoundError: No module named 'phonemizer'`
+— the real error, three layers down from what `mlx_audio` printed.
+
+### Fix — full install sequence (in dependency order)
+
+```bash
+pip install mlx-audio        # pulls mlx, mlx-metal (Apple GPU backend)
+pip install misaki            # text/phoneme processing
+pip install num2words         # number → word spelling ("123" → "one hundred...")
+pip install phonemizer        # Python wrapper for espeak-ng
+brew install espeak-ng        # system-level binary — NOT a pip package
+```
+
+`spacy` + `en_core_web_sm` are pulled and installed automatically on
+first run — no manual step needed for those.
+
+### Verification, one layer at a time
+
+```bash
+python3 -c "from misaki import en; print('en ok')"
+python3 -c "from misaki import espeak; print('espeak ok')"
+python3 -m mlx_audio.tts.generate --model mlx-community/Kokoro-82M-bf16 \
+  --text "test" --voice af_heart
+```
+
+### Why MLX (not Docker) for Kokoro on Apple Silicon
+
+Docker Desktop on macOS has **no GPU passthrough for Metal** — this is a
+confirmed, unresolved Docker Desktop limitation as of mid-2026, true across
+M1 through M5. The commonly-suggested `kokoro-fastapi-gpu` Docker image is
+built for NVIDIA CUDA and cannot use Apple Silicon's GPU even if pulled.
+
+`mlx-audio` bypasses Docker entirely and runs natively against Apple's
+Metal API via the MLX framework — this is the only path to real GPU
+acceleration for Kokoro on a Mac. Confirmed working on M4 Pro (10-core GPU):
+clean generation, natural voice quality ("modern AI voice, like Siri"),
+fast inference.
+
+### Result
+
+```
+Model:   mlx-community/Kokoro-82M-bf16 (82M params, MLX-native port)
+Voice:   af_heart (one of ~50 available voices)
+Backend: Apple Metal via MLX — confirmed GPU-accelerated, not CPU fallback
+Cost:    $0 — fully local, no API key, no quota, no network dependency
+Output:  audio_000.wav — natural quality, fast generation
+```
+
+Free, local, GPU-accelerated, and already validated end-to-end. Candidate
+default for the not-yet-built voice-over agent (Agent 6.5/7) once Agent 6
+(Script QC) is complete.
 
 ## Summary for future sessions
 
