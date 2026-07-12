@@ -64,7 +64,13 @@ def looks_like_real_content(text: str) -> bool:
 
 
 
+import re
 
+def _strip_citation_artifacts(text: str) -> str:
+    """Remove gpt-oss-20b web_search citation markers like 【2†L10-L12】
+    before storing as background text. These are internal tool-use
+    references, never meant to reach end content."""
+    return re.sub(r'【[^】]*】', '', text).strip()
 
 
 
@@ -452,6 +458,8 @@ def fetch_trend_background(topic: str, content: str) -> str:
 
     print(f"  [background] {len(snippets)} snippets, synthesizing (content-anchored)...")
     result=synthesize_background(topic, content, snippets)
+
+    result=_strip_citation_artifacts(result)
     
     status = f"{len(result)} chars" if result else "EMPTY-No Data"
     print(f"  [bg] background: {status}")

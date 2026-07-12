@@ -206,7 +206,8 @@ def deduplicate_topics(stories: dict) -> dict:
         model="qwen2.5:7b",
         prompt=prompt,
         stream=False,
-        options={"temperature": 0.1, "num_ctx": 4096, "keep_alive": 0},)
+        keep_alive=0,
+        options={"temperature": 0.1, "num_ctx": 4096})
 
         raw = resp["response"].strip()
         print(f"  [deduplicate] qwen2.5:7b raw output: {raw[:120]}")

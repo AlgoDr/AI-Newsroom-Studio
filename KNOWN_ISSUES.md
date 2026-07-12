@@ -1,14 +1,20 @@
 # Known Issues — AI Newsroom Studio
 
-Documented limitations as of the Agent 1-5 milestone (12 issues total).
+Documented limitations as of the Agent 1-6 milestone (18 issues total).
 These are **expected behaviors / accepted limitations**, not bugs.
-Recorded so future debugging (Agents 6-10) doesn't mistake them for new
+Recorded so future debugging (Agents 7-10) doesn't mistake them for new
 failures.
 
 **Issue index:** ISSUE-1,2 (Agent 2 background gathering) · ISSUE-3,4,5
 (Agent 2 synthesis models) · ISSUE-6,7,8 (Agent 3 credibility) ·
 ISSUE-9 (Agent 4 deduplication) · ISSUE-10,11 (Agent 5 script writer) ·
-ISSUE-12 (voice-over — Kokoro/mlx-audio setup, pre-Agent 6.5)
+ISSUE-12 (voice-over — Kokoro/mlx-audio setup, pre-Agent 6.5) ·
+ISSUE-13 (voice-over — Kokoro pacing/emphasis markup, pre-Agent 6.5) ·
+ISSUE-14 (Agent 2 — citation artifacts in background text) ·
+ISSUE-15 (Agents 3/4/5/6 — keep_alive silently rejected by Ollama 0.24.0+) ·
+ISSUE-16 (Agent 6 — empty pipe-separated JUDGE reasons parsed as valid) ·
+ISSUE-17 (Agent 6 — no finish_reason visibility on live JUDGE path) ·
+ISSUE-18 (Agent 6 — final word count not re-validated after rewrites)
 
 ---
 
@@ -289,8 +295,6 @@ git diff till-agent3-completed..HEAD -- experiments/agents/agent2.py
 
 ---
 
----
-
 ## ISSUE-8: False positive risk when LLM says REAL but cross-verify contradicts
 
 **Status:** Partially mitigated by dynamic reweighting. Known design gap.
@@ -325,9 +329,6 @@ financial figures or misattributed technical claims.
 ### Future improvement
 Run _check_contradiction twice (majority vote) for high-stakes stories.
 Use result_trust as a confidence multiplier on the contradiction signal.
-
----
-
 
 ---
 
@@ -395,6 +396,12 @@ a single response that both layers can't fully clean. Low probability.
 Switch to llama3.1:8b for clustering (better JSON compliance) or use
 compound-mini with explicit JSON schema enforcement.
 
+Note (see ISSUE-15): Agent 4 subsequently switched its clustering model
+from phi3.5 to qwen2.5:7b after real testing (test_dedup_reliability.py,
+N=5 runs, 100% consistent, correctly beat gpt-oss-120b on real data too).
+The two-layer JSON cleaning above remains in place as defense-in-depth
+regardless of which local model is primary.
+
 ---
 
 ## ISSUE-10: Agent 5 word count enforcement overshoots on expand (Script Writer)
@@ -447,6 +454,10 @@ Target: 150-225 words = 60-90 seconds
 Speaking pace: 2.5 words/second
 est_duration = round(word_count / 2.5) seconds
 
+Note (see ISSUE-18): even after Agent 6 was built, its OWN final rewrite
+pass was found to be able to push word count back outside 150-225 without
+detection — see ISSUE-18 for that follow-on gap and its fix.
+
 ---
 
 ## ISSUE-11: Agent 5 CTA not following allowed options (Script Writer)
@@ -496,7 +507,13 @@ The prompt hardening in _build_prompt improves the first-draft hit rate.
 Agent 6 guarantees correct CTA on every final output regardless of
 what the first draft produced.
 
----
+Note: after real testing, the "3 fixed strings" constraint was loosened
+to 3 CATEGORIES (A=follow/subscribe, B=comment/engage, C=discover/link)
+with story-tailored wording allowed within each category — see agent6.py
+CTA prompt section for the current exact rule. The letter-label prefix
+("A: Follow...") was also removed from the prompt after gemma3:12b was
+observed copying the literal "A:" prefix into its output during Agent 5
+fallback testing.
 
 ---
 
@@ -617,6 +634,342 @@ Free, local, GPU-accelerated, and already validated end-to-end. Candidate
 default for the not-yet-built voice-over agent (Agent 6.5/7) once Agent 6
 (Script QC) is complete.
 
+---
+
+## ISSUE-13: Kokoro/mlx-audio has no markup support for pauses or emphasis
+
+**Status:** Confirmed via research + design decision made. Not a bug —
+a documented model/library limitation that shapes how Agent 6 (Script QC)
+must prepare text before sending it to Kokoro. Re-check this entry if a
+future Kokoro/mlx-audio release adds native markup support — the
+workaround below may become unnecessary.
+**Affects:** Agent 6 (Script QC, planned) → voice-over agent (planned
+Agent 6.5/7)
+
+### The design question that surfaced this
+
+Agent 6's pacing-annotation design initially assumed script text could
+carry inline markers like:
+```
+"No patch exists. [PAUSE] Disable remote management. [EMPHASIS: right now]"
+```
+with the expectation that these markers would guide delivery when the
+text is eventually converted to speech via Kokoro. This needed to be
+verified before building Agent 6, since a false assumption here would
+silently produce broken audio (Kokoro reading the bracket text aloud).
+
+### Confirmed: Kokoro does NOT understand bracket/SSML-style tags
+
+The base Kokoro model (what `mlx-audio` runs) has **no native SSML or
+custom-tag support**. Any article claiming "Kokoro supports SSML" is
+describing a third-party wrapper app (e.g. Kokoro Web, TTS.ai) that
+pre-processes those tags into plain punctuation/pauses **before** calling
+the underlying model — the model itself never sees the tags. `mlx-audio`
+is a bare interface to the model with no such wrapper layer.
+
+If `[PAUSE]` / `[BEAT]` / `[EMPHASIS: word]` were sent directly to Kokoro,
+it would attempt to pronounce the bracket characters and label words
+literally — broken, garbled audio.
+
+### Confirmed: what DOES reliably control pacing
+
+Punctuation is the only native pacing control:
+```
+comma (,)      → short pause
+period (.)     → natural full stop, longer pause
+ellipsis (...) → longest pause, dramatic beat
+new sentence   → natural reset point (functions as a "beat" boundary)
+```
+
+### Confirmed: there is no reliable emphasis mechanism
+
+No bold, no capitalization, no markup gives word-level stress in base
+Kokoro. A dedicated community project, `Kokoro-TTS-Pause`, exists
+specifically because *"most TTS ignores pauses or makes them
+unpredictable"* — confirming that even fine pause control beyond basic
+punctuation isn't native to the model; that project works by stitching
+separately-generated audio clips together with inserted silence, as a
+post-processing hack, not by the model interpreting markup.
+
+The only way to make a word land with vocal stress in Kokoro is to
+**restructure the sentence** so that word naturally falls at a stress
+position (end of a short clause) — not to tag it.
+
+### Design decision — two-output split, translation not tagging
+
+```
+state["script"]["annotated_text"]
+  Human/audit-readable version, KEEPS [PAUSE]/[BEAT]/[EMPHASIS] markers.
+  Never sent to Kokoro. Useful for: audit trail, future subtitle
+  bolding, a human narrator reading from a script, debugging.
+
+state["script"]["tts_ready_text"]
+  What actually gets sent to Kokoro. Tags are TRANSLATED, not passed through:
+    [PAUSE]           → "."
+    [BEAT]             → "..." or a fresh short sentence
+    [EMPHASIS: word]   → REMOVED. Instead, Agent 6's rewrite stage
+                         (Stage 2, llama-3.3-70b-versatile) must have
+                         already restructured the sentence so the key
+                         word/phrase sits at a natural stress point.
+```
+
+### Example — emphasis via restructuring, not tagging
+
+```
+BEFORE (tagged, wrong — would break if sent to Kokoro):
+  "Disable remote management on your Tenda router right now."
+  with [EMPHASIS: right now]
+
+REWRITE for natural stress (what Stage 2 actually produces):
+  "Disable remote management on your Tenda router. Right now."
+
+"Right now" as its own short sentence gets natural vocal weight from
+Kokoro purely through sentence-boundary placement — no tag needed.
+```
+
+### Why this belongs in Agent 6, not the voice-over agent
+
+Agent 6 already does semantic rewriting (human-voice polish, transition
+quality, twist quality) via the two-stage judge/rewrite model. Baking
+stress-aware restructuring into that same rewrite pass is free — the
+model is already touching the sentence for other reasons. Splitting this
+into a separate later step would mean re-processing already-approved
+text, risking new errors in text that already passed QC.
+
+### Future re-check trigger
+
+If a future Kokoro release, or a future `mlx-audio` version, adds native
+pause/emphasis markup support (SSML or otherwise), this workaround
+becomes unnecessary — Agent 6 could then emit tagged text directly.
+Check `mlx-audio` changelog / Kokoro model card before assuming this
+is still required.
+
+---
+
+## ISSUE-14: Citation artifacts leak into Agent 2 background text
+
+**Status:** Fixed.
+**Affects:** Agent 2 (`fetch_trend_background`, big-boss `gpt-oss-20b` path)
+
+### Symptom
+Background text for stories that escalated all the way to the
+`gpt-oss-20b + web_search` fallback tier contained raw citation
+markers, e.g.:
+```
+"Ant is a lightweight JavaScript runtime built from scratch that ships
+as a 9 MB binary...【2†L10-L12】. Its hand-written engine...【2†L13-L15】."
+```
+`【2†L10-L12】` is a document/line-range citation marker gpt-oss-20b's
+`web_search_preview` tool emits internally — never meant to reach
+end-user content.
+
+### Root cause
+Only observed on the big-boss (`gpt-oss-20b`) synthesis path, not on
+`groq/compound-mini` or `llama3.1:8b` — those two don't emit this
+citation format. `_clean_synthesis()` already strips `INSUFFICIENT
+DATA` markers but had no logic for these citation brackets.
+
+### Fix applied
+```python
+import re
+
+def _strip_citation_artifacts(text: str) -> str:
+    """Remove gpt-oss-20b web_search citation markers like 【2†L10-L12】
+    before storing as background text."""
+    return re.sub(r'【[^】]*】', '', text).strip()
+```
+Applied in `fetch_trend_background()`, after `synthesize_background()`
+returns — this is the single wrapper all three synthesis paths funnel
+through, so the fix catches artifacts regardless of which tier produced
+the result, without needing to be duplicated per-path.
+
+### Impact if unfixed
+Background text feeds directly into Agent 5's script-generation prompt.
+Citation brackets would appear as unexplained noise in the LLM's
+context — at minimum confusing, at worst the model could echo the
+literal bracket text into a script section.
+
+### Verification
+Cannot be tested from `till-agent4`/`till-agent5`/`till-agent6`
+checkpoints — background text is already baked in by the time those
+checkpoints exist. Requires a fresh Agent 1→2 run, watching for the
+`"[synth] gpt-oss-20b + web_search"` log line and confirming no
+`【...】` markers appear in that story's background.
+
+---
+
+## ISSUE-15: `keep_alive` silently rejected when passed inside `options{}` (Ollama 0.24.0+)
+
+**Status:** Fixed across all four affected files.
+**Affects:** Every local `ollama.generate()` call — `agent3.py`,
+`agent4.py`, `agent5.py`, `agent6.py`
+
+### Symptom
+```
+level=WARN source=types.go:992 msg="invalid option provided" option=keep_alive
+```
+Every local-fallback/local-primary `ollama.generate()` call across the
+pipeline logged this warning. The call still completed successfully —
+this is not a crash — but `keep_alive` was silently ignored, meaning
+local models stayed loaded for Ollama's default 5-minute window instead
+of unloading immediately after each call.
+
+### Root cause
+Ollama's server API changed between versions: `keep_alive` used to be
+accepted as a key inside the `options={}` dict. As of the installed
+version (0.24.0), the server rejects it there specifically — it must
+be passed as its own top-level keyword argument to `ollama.generate()`.
+
+### Why this mattered beyond just the warning noise
+`keep_alive=0` was originally added (see ISSUE-4) specifically to
+prevent context bleed between consecutive local-model calls on the
+same story batch. With it silently ignored, that protection may not
+have actually been applying during recent runs, even though the code
+looked correct at a glance.
+
+### Fix applied (all four files)
+```python
+# WRONG (previous pattern, everywhere):
+resp = ollama.generate(
+    model=model, prompt=prompt, stream=False,
+    options={"temperature": 0.1, "num_ctx": 4096, "keep_alive": 0},
+)
+
+# CORRECT:
+resp = ollama.generate(
+    model=model, prompt=prompt, stream=False,
+    keep_alive=0,
+    options={"temperature": 0.1, "num_ctx": 4096},
+)
+```
+Applied to: `agent3.py::_llm_credibility_check_local`,
+`agent4.py`'s dedup call, `agent5.py::_generate_script_local`,
+`agent6.py::_judge_script_local` and `_rewrite_flagged_local`.
+
+### Verification
+Confirmed fixed — subsequent real runs no longer show the
+`"invalid option provided"` warning for any of the four call sites.
+
+---
+
+## ISSUE-16: Agent 6 JUDGE — empty pipe-separated reasons parsed as valid blank reasons
+
+**Status:** Fixed.
+**Affects:** Agent 6 `_parse_judgment()`
+
+### Symptom
+When the JUDGE model (cloud or local fallback) returned
+`FLAGGED_REASONS: |` (a bare pipe, no actual reason text), the parser
+treated the resulting empty strings as legitimate reasons rather than
+falling back to a sensible default.
+
+```python
+reasons = [r.strip() for r in reasons_raw.split("|")] if reasons_raw else []
+# "|".split("|") -> ['', '']  -- two EMPTY STRINGS, not zero items
+```
+Since `0 < len(['',''])` and `1 < len(['',''])`, both empty strings
+passed the `i < len(reasons)` check and were used AS the reason for
+the first two flagged sections, instead of defaulting to
+`"flagged by QC judge"`.
+
+### Real, demonstrated impact
+This caused the REWRITE stage to receive a blank instruction for two
+of three flagged sections. With no real guidance, the rewrite model
+added filler phrasing instead of fixing the actual problem — e.g.
+`"This runtime is super lightweight, which is really nice"` was
+introduced where the original had no such filler, and
+`"That's interesting, but have you considered..."` replaced a clean
+transition with hedging language. Both are exactly the AI-voice/
+hedging patterns Agent 6 exists to remove, not add — the bug made
+output measurably worse in a real run, not just cosmetically odd.
+
+### Fix applied
+```python
+# FIND:
+reasons = [r.strip() for r in reasons_raw.split("|")] if reasons_raw else []
+
+# REPLACE:
+reasons = [r.strip() for r in reasons_raw.split("|") if r.strip()] if reasons_raw else []
+```
+Filters empty strings out before indexing, so `"|"` correctly produces
+`[]` instead of `['','']`, and every flagged section properly falls
+back to the default reason when the model gave none.
+
+### Related, not yet separately fixed
+A second failure mode was observed in the same run: the local fallback
+model sometimes writes reasons in a `"LABEL| reason"` per-line format
+instead of the single pipe-joined `FLAGGED_REASONS:` line the prompt
+requests. Since `_parse_judgment` only reads lines containing `:`,
+these alternate-format lines are silently skipped, losing real reasons
+the model did provide (e.g. `"too technical and vague"`,
+`"vague quality adjectives"`). Not yet fixed — documented here as a
+known remaining gap. A future fix could additionally scan for
+`"LABEL| reason"` patterns as a secondary parse path.
+
+---
+
+## ISSUE-17: Agent 6 JUDGE — no `finish_reason` visibility on the live path
+
+**Status:** Fixed.
+**Affects:** Agent 6 `_judge_script()`
+
+### Symptom
+`finish_reason` logging (which revealed, during earlier testing, that
+gpt-oss-120b can burn its entire `max_tokens` budget on internal
+reasoning before ever emitting content — see ISSUE-6's root-cause
+discussion) had only ever been added to throwaway test scripts, never
+to the actual production `_judge_script()` function. When JUDGE went
+empty on a real run, there was no way to tell whether it was
+token-budget truncation, a genuine empty response, or something else.
+
+### Fix applied
+```python
+# FIND:
+raw = (resp.choices[0].message.content or "").strip()
+except Exception as e:
+    print(f"  [qc] JUDGE (gpt-oss-120b) call failed: {e}")
+
+# REPLACE:
+raw = (resp.choices[0].message.content or "").strip()
+finish_reason = resp.choices[0].finish_reason
+if not raw:
+    print(f"  [qc] JUDGE empty content, finish_reason={finish_reason}")
+except Exception as e:
+    print(f"  [qc] JUDGE (gpt-oss-120b) call failed: {e}")
+```
+Any future empty-JUDGE event will now show `finish_reason` directly in
+the live pipeline log, without needing a separate diagnostic script.
+
+---
+
+## ISSUE-18: Agent 6 — final word count not re-validated after last rewrite iteration
+
+**Status:** Fixed.
+**Affects:** Agent 6 `script_qc_node()`
+
+### Symptom
+A real script started at 202 words (within the 150-225 target).
+Across 2 rewrite iterations — triggered by ISSUE-16's blank-reason bug,
+which caused unnecessary/unfocused rewrites — the script drifted to
+226 words, one word over `TARGET_MAX`. Nothing in `script_qc_node()`
+re-checked word count after the final iteration completed, so the
+script shipped as `approved: True` with no note that it had drifted
+out of range.
+
+### Fix applied
+```python
+# added immediately after: final_word_count = len(final_full_text.split())
+if not (TARGET_MIN <= final_word_count <= TARGET_MAX):
+    qc_notes.append(f"WARNING: final word count {final_word_count} outside "
+                     f"target range {TARGET_MIN}-{TARGET_MAX} after rewrites")
+    print(f"  [qc] WARNING: final word count {final_word_count} drifted outside target range")
+```
+Does not block the pipeline (matches the project's never-block
+philosophy throughout) — just ensures any post-rewrite drift is
+visible in `qc_notes` and the console log rather than silent.
+
+---
+
 ## Summary for future sessions
 
 ```
@@ -629,6 +982,7 @@ Agent 5 thin scripts: check if story has background or is content-only
 Background quality issues: check synthesis routing print
   → "[synth] compound-mini failed" → big boss → 8B fallback = ISSUE-7 (normal)
   → "[synth] llama3.1:8b → N chars" = working correctly
+  → citation brackets 【...】 in background = ISSUE-14, should be fixed now
 
 Credibility all 0.50 across every story in a run: check for 429 errors
   → "Rate limit reached... tokens per day (TPD)" = ISSUE-7 quota conflict
@@ -637,4 +991,17 @@ Credibility all 0.50 across every story in a run: check for 429 errors
 Credibility occasional 0.50 (1-2 stories, not all): check [cred DEBUG] raw=
   → raw='' for some = ISSUE-6 (safety filter, expected)
   → raw='REAL'/'OPINION' for others = working correctly
+
+Any local ollama.generate() call showing "invalid option provided
+option=keep_alive": this is ISSUE-15 — check the call actually has
+keep_alive as a top-level kwarg, not nested inside options{}
+
+Agent 6 rewrite producing blank/filler-heavy sections: check qc_notes
+for empty reason strings — this is ISSUE-16, confirm the reasons-list
+filter fix is present in _parse_judgment()
+
+Agent 6 approved script with word count outside 150-225: check qc_notes
+for the ISSUE-18 drift warning — this is expected visibility, not a
+new bug, but worth investigating why 2 rewrite iterations pushed it
+out of range (often traces back to ISSUE-16 if reasons were blank)
 ```

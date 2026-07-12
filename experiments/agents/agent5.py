@@ -1,15 +1,15 @@
 """
-agent5.py — Script Writer Agent
+agent5.py -- Script Writer Agent
 
 Role: "Turn the top 3 selected stories into a 60-90 second YouTube Shorts script."
 
 Responsibilities:
-  1. _get_selected_stories()  — extract top 3 from Agent 4's output
-  2. _tone_instruction()      — map credibility_score → tone string
-  3. _build_prompt()          — assemble full LLM prompt with all 3 stories
-  4. _parse_script()          — extract labelled sections from raw output
-  5. _enforce_word_count()    — trim/expand if outside 150-225 word target
-  6. script_writer_node()     — LangGraph node (orchestrates 1-5)
+  1. _get_selected_stories()  -- extract top 3 from Agent 4's output
+  2. _tone_instruction()      -- map credibility_score -> tone string
+  3. _build_prompt()          -- assemble full LLM prompt with all 3 stories
+  4. _parse_script()          -- extract labelled sections from raw output
+  5. _enforce_word_count()    -- trim/expand if outside 150-225 word target
+  6. script_writer_node()     -- LangGraph node (orchestrates 1-5)
 
 What Agent 5 does NOT do:
   - Does not re-fetch content (Agent 2 did that)
@@ -29,37 +29,45 @@ New state key added:
   }
 
 Model: llama-3.3-70b-versatile (Groq)
-  - Strong creative writing — better than 8B for generation tasks
+  - Strong creative writing -- better than 8B for generation tasks
   - Separate quota from gpt-oss-120b (Agent 3) and gpt-oss-20b (Agent 2)
   - 1-2 calls per pipeline run maximum
+
+Fallback: gemma3:12b (local, Ollama, Metal-accelerated)
+  - The main generation call had ZERO local fallback until this version --
+    confirmed real-world failure: Groq down -> Agent 5 produced 0 words,
+    cascading into Agent 6 having nothing to QC.
+  - Selected via A/B test against qwen3:8b, llama3.1:8b, and gemma2:9b
+    on real pipeline data (see test_agent5_generation_models.py):
+    best factual retention, best TWIST quality, and -- critically --
+    the only local candidate that did NOT bleed the prompt's own TWIST
+    example sentence into the wrong story's section (qwen3:8b and
+    llama3.1:8b both did this independently).
 """
 
 import os
 import re
 import dotenv
+import ollama
 from groq import Groq
 
 dotenv.load_dotenv(".env")
 
-# ─────────────────────────────────────────────────────────────────────────────
 # CONSTANTS
-# ─────────────────────────────────────────────────────────────────────────────
 
-MODEL       = "llama-3.3-70b-versatile"   # creative generation model
+MODEL          = "llama-3.3-70b-versatile"   # creative generation model
+FALLBACK_MODEL = "gemma3:12b"                # local fallback, confirmed via
+                                              # A/B test (see module docstring)
 TARGET_MIN  = 150    # minimum words (60 sec at 2.5 words/sec)
 TARGET_MAX  = 225    # maximum words (90 sec at 2.5 words/sec)
 MAX_ATTEMPTS = 2     # max word count correction attempts before accepting
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CLIENT — module level, instantiated once
-# ─────────────────────────────────────────────────────────────────────────────
+# CLIENT -- module level, instantiated once
 
 groq_client = Groq(api_key=os.getenv("GROQ_KEY"))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FUNCTION 1 — _get_selected_stories
-# ─────────────────────────────────────────────────────────────────────────────
+# FUNCTION 1 -- _get_selected_stories
 
 def _get_selected_stories(stories: dict) -> list:
     """Extract Agent 4's selected stories, sorted by selection_rank.
@@ -69,7 +77,7 @@ def _get_selected_stories(stories: dict) -> list:
 
     Returns list of story dicts, length 1-3.
     Returns empty list if Agent 4 selected nothing (pipeline should
-    have exited via route_after_editorial — this is a safety net).
+    have exited via route_after_editorial -- this is a safety net).
     """
     selected = [
         story for story in stories.values()
@@ -85,20 +93,18 @@ def _get_selected_stories(stories: dict) -> list:
     return selected
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FUNCTION 2 — _tone_instruction
-# ─────────────────────────────────────────────────────────────────────────────
+# FUNCTION 2 -- _tone_instruction
 
 def _tone_instruction(cred_score: float) -> str:
     """Map credibility_score to a tone instruction for the LLM.
 
-    Agent 3 scored stories — we use that score to calibrate language:
+    Agent 3 scored stories -- we use that score to calibrate language:
       High cred  (>0.5): state facts confidently, use specific numbers
       Mid cred (0.15-0.5): attribute clearly, avoid overstatement
       Low cred   (<0.15): cautious framing, signal uncertainty to viewer
 
     The LLM reads this instruction and adjusts its language accordingly.
-    We are NOT doing tone detection — we're injecting tone instructions
+    We are NOT doing tone detection -- we're injecting tone instructions
     based on a number we already have from Agent 3.
     """
     if cred_score > 0.5:
@@ -122,18 +128,16 @@ def _tone_instruction(cred_score: float) -> str:
         )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FUNCTION 3 — _build_prompt
-# ─────────────────────────────────────────────────────────────────────────────
+# FUNCTION 3 -- _build_prompt
 
 def _build_prompt(selected: list) -> str:
     """Build the complete LLM prompt for script generation.
 
-    Sends ALL selected stories in ONE prompt — one model call total.
+    Sends ALL selected stories in ONE prompt -- one model call total.
     Each story gets:
       - title (what it's about)
       - background[:300] (context paragraph from Agent 2)
-      - content[:500]    (article text from Agent 2)
+      - content[:800]    (article text from Agent 2)
       - tone instruction (derived from Agent 3 credibility score)
 
     Word allocation by rank:
@@ -142,16 +146,16 @@ def _build_prompt(selected: list) -> str:
       Rank 3: ~45 words (brief, leads to CTA)
 
     Section labels for parsing:
-      HOOK        → opens the whole video (story 1's grabber)
-      S1_CONTEXT  → background for story 1
-      S1_CORE     → key facts for story 1
-      S1_TWIST    → implication/surprise for story 1
-      S2_HOOK     → transition + grabber for story 2
-      S2_CORE     → key facts for story 2
-      S2_TWIST    → implication for story 2
-      S3_HOOK     → transition + grabber for story 3
-      S3_CORE     → key facts for story 3
-      CTA         → closes the whole video (one for all 3 stories)
+      HOOK        -> opens the whole video (story 1's grabber)
+      S1_CONTEXT  -> background for story 1
+      S1_CORE     -> key facts for story 1
+      S1_TWIST    -> implication/surprise for story 1
+      S2_HOOK     -> transition + grabber for story 2
+      S2_CORE     -> key facts for story 2
+      S2_TWIST    -> implication for story 2
+      S3_HOOK     -> transition + grabber for story 3
+      S3_CORE     -> key facts for story 3
+      CTA         -> closes the whole video (one for all 3 stories)
     """
     story_blocks = []
     word_targets = [75, 60, 45]
@@ -187,54 +191,54 @@ Total target: {TARGET_MIN}-{TARGET_MAX} words (60-90 seconds at spoken pace).
 
 {stories_text}
 
-USE EXACTLY THESE LABELS — one per line, content immediately after the colon:
+USE EXACTLY THESE LABELS -- one per line, content immediately after the colon:
 {label_format}
 
-═══ RULES ═══════════════════════════════════════════════════════
+=== RULES ===========================================================
 
-HOOK — most important line in the script:
+HOOK -- most important line in the script:
   Must name ONE specific surprising fact from the top story.
   Must make a scrolling viewer stop within 3 seconds.
-  Must NOT be generic — no channel names, no "today's news", no "big updates".
+  Must NOT be generic -- no channel names, no "today's news", no "big updates".
   BAD:  "New tech updates daily"
   BAD:  "Big news in tech today"
   BAD:  "Here's what you missed"
-  GOOD: "Your router has a secret backdoor — and the vendor won't fix it"
-  GOOD: "You can build a crash-proof home server for under $500 — no Synology needed"
+  GOOD: "Your router has a secret backdoor -- and the vendor won't fix it"
+  GOOD: "You can build a crash-proof home server for under $500 -- no Synology needed"
   GOOD: "This 82-million-parameter model runs speech on a 12-year-old CPU"
   Rule: if someone reads HOOK alone, they must know what the video is about.
 
-TWIST — second most important line per story:
+TWIST -- second most important line per story:
   Must reveal a CONSEQUENCE or IMPLICATION not already stated in CORE.
-  Must NOT restate the core fact — the core already said that.
+  Must NOT restate the core fact -- the core already said that.
   BAD:  "This allows attackers to gain access" (restates CORE)
   BAD:  "It's surprisingly simple to get started" (vague, adds nothing)
   BAD:  "This is a major breakthrough" (tells viewer what to think, not what to know)
-  GOOD: "No patch exists — disable remote management on your Tenda router right now"
+  GOOD: "No patch exists -- disable remote management on your Tenda router right now"
   GOOD: "If your OS gets nuked, plug the drives into any machine and run zfs import"
   GOOD: "Pair it with a local LLM and your entire AI stack never touches the internet"
 
-TRANSITIONS (S2_HOOK, S3_HOOK) — two-part rule:
-  Stories cover different topics — do NOT force a bridge between unrelated stories.
+TRANSITIONS (S2_HOOK, S3_HOOK) -- two-part rule:
+  Stories cover different topics -- do NOT force a bridge between unrelated stories.
   Each transition does exactly TWO things:
 
   1. SIGNAL completion of the previous story (one short phrase):
      GOOD: "And that's your storage sorted."
-     GOOD: "With that covered —"
+     GOOD: "With that covered --"
 
   2. OPEN the next story with tension or curiosity (NOT an explanation):
-     GOOD: "Now — what if your computer could speak with zero internet?"
+     GOOD: "Now -- what if your computer could speak with zero internet?"
      GOOD: "But here's something that should scare every router owner."
 
   BAD: "Meanwhile, local speech generation has become incredibly advanced..."
        (no completion signal, explains before creating curiosity)
-  BAD: "But that's not all..." (filler — says nothing about what's next)
+  BAD: "But that's not all..." (filler -- says nothing about what's next)
   BAD: "In other news..." (kills momentum completely)
   Rule: viewer must feel "story 1 is done, story 2 is coming, I want to know what it is."
 
 FACTS:
   Never reference publication dates, video links, or "a guide was published on [date]".
-  Never say "as showcased in a video from [date]" — viewers don't care.
+  Never say "as showcased in a video from [date]" -- viewers don't care.
   Use specific technical details from the content: model sizes, benchmark numbers,
   CVE IDs, version numbers, command names, specs.
   BAD:  "On August 23 2024, a guide was published..."
@@ -244,32 +248,33 @@ FACTS:
 
 SPOKEN ENGLISH:
   Short sentences. Active voice. Contractions.
-  Read it aloud — if it sounds like an essay, rewrite it.
+  Read it aloud -- if it sounds like an essay, rewrite it.
   BAD:  "Furthermore the implications are significant"
   GOOD: "And here's why this matters"
 
-CTA — must be WORD-FOR-WORD one of these three, copied exactly:
-  A: Follow for daily tech news
-  B: Comment below with your thoughts
-  C: Link in bio for more
-  Do NOT write a custom CTA. Do NOT add words. Copy one option exactly.
+CTA -- the CTA line must be WORD-FOR-WORD one of these three exact
+sentences, with nothing else added before or after:
+  "Follow for daily tech news"
+  "Comment below with your thoughts"
+  "Link in bio for more"
+  Copy one of these three sentences exactly as your CTA line. Do NOT
+  prefix it with a label, a letter, a number, or the word "Option".
+  Do NOT write a custom CTA. Do NOT add words.
 
 FORMAT:
-  CRITICAL — story order: Write S1 sections using STORY 1 content,
+  CRITICAL -- story order: Write S1 sections using STORY 1 content,
   S2 sections using STORY 2 content, S3 sections using STORY 3 content.
   Do NOT reorder stories for dramatic effect. The order was set editorially.
   Do not add any text outside the labelled sections.
-  Count your words — stay between {TARGET_MIN} and {TARGET_MAX} total.
+  Count your words -- stay between {TARGET_MIN} and {TARGET_MAX} total.
   Each label on its own line, content immediately after the colon.
 
-═════════════════════════════════════════════════════════════════"""
+======================================================================"""
 
     return prompt
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FUNCTION 4 — _parse_script
-# ─────────────────────────────────────────────────────────────────────────────
+# FUNCTION 4 -- _parse_script
 
 def _parse_script(raw: str) -> dict:
     """Extract labelled sections from raw LLM output.
@@ -297,14 +302,13 @@ def _parse_script(raw: str) -> dict:
         "HOOK",
         "S1_CONTEXT", "S1_CORE", "S1_TWIST",
         "S2_HOOK",    "S2_CORE", "S2_TWIST",
-        "S3_HOOK",    "S3_CORE",
-        "CTA",
-    ]
+        "S3_HOOK",    "S3_CORE", "S3_TWIST",
+        "CTA",]
 
     sections = {}
     pattern  = "|".join(re.escape(lbl) for lbl in known_labels)
 
-    # split on label markers — handles single-line and multi-line content
+    # split on label markers -- handles single-line and multi-line content
     parts = re.split(rf"({pattern}):", raw)
 
     # parts alternates: [pre_text, LABEL, content, LABEL, content, ...]
@@ -316,14 +320,20 @@ def _parse_script(raw: str) -> dict:
             sections[label] = content
         i += 2
 
+    # S3 has no twist section by design (rank-3 story goes straight
+    # to CTA, per _build_prompt's label_format). If the model writes
+    # one anyway (non-deterministic -- observed in real runs), merge
+    # its content into S3_CORE instead of silently dropping it.
+    if "S3_TWIST" in sections:
+        extra = sections.pop("S3_TWIST")
+        sections["S3_CORE"] = (sections.get("S3_CORE", "") + " " + extra).strip()
+
     found = list(sections.keys())
     print(f"  [script] parsed {len(found)} sections: {found}")
     return sections
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FUNCTION 5 — _enforce_word_count
-# ─────────────────────────────────────────────────────────────────────────────
+# FUNCTION 5 -- _enforce_word_count
 
 def _enforce_word_count(raw: str, attempt: int = 1) -> tuple:
     """Check word count and request trim/expand if needed.
@@ -331,11 +341,11 @@ def _enforce_word_count(raw: str, attempt: int = 1) -> tuple:
     Returns: (final_text, word_count, attempts_used)
 
     Three outcomes:
-      150-225 words → pass through, no second call
-      > 225 words   → trim call → re-check → accept result
-      < 150 words   → expand call → re-check → accept result
+      150-225 words -> pass through, no second call
+      > 225 words   -> trim call -> re-check -> accept result
+      < 150 words   -> expand call -> re-check -> accept result
 
-    Never blocks pipeline — if attempt 2 is still wrong, accepts
+    Never blocks pipeline -- if attempt 2 is still wrong, accepts
     and logs a warning. Agent 6 (QC) will review it.
 
     Uses the same model (llama-3.3-70b-versatile) for consistency.
@@ -344,12 +354,12 @@ def _enforce_word_count(raw: str, attempt: int = 1) -> tuple:
     print(f"  [script] word count after attempt {attempt}: {word_count} words")
 
     if TARGET_MIN <= word_count <= TARGET_MAX:
-        print(f"  [script] ✅ within target ({TARGET_MIN}-{TARGET_MAX})")
+        print(f"  [script] within target ({TARGET_MIN}-{TARGET_MAX})")
         return raw, word_count, attempt
 
     if attempt >= MAX_ATTEMPTS:
-        print(f"  [script] ⚠️ still {word_count} words after {attempt} attempts "
-              f"— accepting as-is (Agent 6 will review)")
+        print(f"  [script] still {word_count} words after {attempt} attempts "
+              f"-- accepting as-is (Agent 6 will review)")
         return raw, word_count, attempt
 
     if word_count > TARGET_MAX:
@@ -359,14 +369,14 @@ def _enforce_word_count(raw: str, attempt: int = 1) -> tuple:
             f"Cut filler words and shorten sentences. "
             f"Do not remove any story or section label.\n\n{raw}"
         )
-        print(f"  [script] {word_count} > {TARGET_MAX} → trimming...")
+        print(f"  [script] {word_count} > {TARGET_MAX} -> trimming...")
     else:
         correction_prompt = (
             f"Expand this YouTube Shorts script to at least {TARGET_MIN} words. "
             f"Keep ALL labelled sections. "
             f"Add one more specific detail to S1_CORE or S2_CORE.\n\n{raw}"
         )
-        print(f"  [script] {word_count} < {TARGET_MIN} → expanding...")
+        print(f"  [script] {word_count} < {TARGET_MIN} -> expanding...")
 
     try:
         resp = groq_client.chat.completions.create(
@@ -380,21 +390,56 @@ def _enforce_word_count(raw: str, attempt: int = 1) -> tuple:
         return _enforce_word_count(corrected, attempt + 1)
 
     except Exception as e:
-        print(f"  [script] word count correction failed ({e}) — accepting original")
+        print(f"  [script] word count correction failed ({e}) -- accepting original")
         return raw, word_count, attempt
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FUNCTION 6 — script_writer_node (LangGraph node)
-# ─────────────────────────────────────────────────────────────────────────────
+# FUNCTION 5b -- _generate_script_local (NEW -- Groq fallback for Step 3)
+
+def _generate_script_local(prompt: str) -> str:
+    """Local fallback for the PRIMARY script generation call -- gemma3:12b
+    via Ollama, Metal-accelerated. Used only when llama-3.3-70b-versatile
+    (Groq) returns empty or the API call fails.
+
+    Before this function existed, Agent 5's main generation call had
+    ZERO local fallback -- a real Groq outage during testing produced
+    0 words, cascading into Agent 6 having nothing to QC.
+
+    gemma3:12b was selected via a real A/B test against qwen3:8b,
+    llama3.1:8b, and gemma2:9b on this project's actual pipeline data
+    (see test_agent5_generation_models.py): best factual retention,
+    best TWIST quality, and the only local candidate that did NOT
+    bleed the prompt's own TWIST example sentence into the wrong
+    story's section (qwen3:8b and llama3.1:8b both did this
+    independently on the same real test).
+
+    Same prompt, same downstream parsing/enforcement -- the rest of
+    the pipeline treats this output identically to the cloud model's.
+    """
+    try:
+        resp = ollama.generate(
+            model=FALLBACK_MODEL,
+            prompt=prompt,
+            stream=False,
+            keep_alive=0,
+            options={"temperature": 0.4, "num_ctx": 4096},
+        )
+        return (resp.get("response") or "").strip()
+    except Exception as e:
+        print(f"  [script] local fallback also failed: {e}")
+        return ""
+
+
+# FUNCTION 6 -- script_writer_node (LangGraph node)
 
 def script_writer_node(state: dict) -> dict:
-    """LangGraph node — orchestrates the full Agent 5 pipeline.
+    """LangGraph node -- orchestrates the full Agent 5 pipeline.
 
     Calls functions 1-5 in sequence:
-      get_selected → build_prompt → LLM call → enforce_word_count → parse
+      get_selected -> build_prompt -> LLM call (cloud, then local
+      fallback if needed) -> enforce_word_count -> parse
 
-    Adds state["script"] — first TOP-LEVEL key added to NewsroomState.
+    Adds state["script"] -- first TOP-LEVEL key added to NewsroomState.
     (All previous agents enriched per-story inside state["stories"].)
 
     Returns updated state with script added at the top level.
@@ -409,7 +454,7 @@ def script_writer_node(state: dict) -> dict:
     selected = _get_selected_stories(stories)
 
     if not selected:
-        print("  [script] ❌ no selected stories — cannot generate script")
+        print("  [script] no selected stories -- cannot generate script")
         state["script"] = {
             "full_text":    "",
             "word_count":   0,
@@ -426,7 +471,12 @@ def script_writer_node(state: dict) -> dict:
     print(f"  [script] prompt built ({len(prompt)} chars, "
           f"{len(selected)} stories)")
 
-    # Step 3: call LLM — one call for all 3 stories
+    # Step 3: call LLM -- one call for all 3 stories.
+    # Cloud primary first; on empty/failure, fall back to a local
+    # model before giving up entirely (this fallback path is new --
+    # previously any Groq failure here produced 0 words with no
+    # recovery attempt).
+    raw = ""
     try:
         resp = groq_client.chat.completions.create(
             model=MODEL,
@@ -447,12 +497,22 @@ def script_writer_node(state: dict) -> dict:
             temperature=0.4,    # reduced: prevents story reordering
             max_tokens=500,
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = (resp.choices[0].message.content or "").strip()
         print(f"  [script] LLM response: {len(raw)} chars, "
               f"~{len(raw.split())} words (before enforcement)")
 
     except Exception as e:
         print(f"  [script] LLM call failed: {e}")
+
+    if not raw:
+        print(f"  [script] Groq empty/failed -> falling back to local {FALLBACK_MODEL}")
+        raw = _generate_script_local(prompt)
+        if raw:
+            print(f"  [script] local fallback response: {len(raw)} chars, "
+                  f"~{len(raw.split())} words (before enforcement)")
+
+    if not raw:
+        print("  [script] generation failed on both cloud and local -- no script generated")
         state["script"] = {
             "full_text":    "",
             "word_count":   0,
@@ -460,7 +520,7 @@ def script_writer_node(state: dict) -> dict:
             "sections":     {},
             "stories_used": [],
             "attempt":      0,
-            "error":        str(e),
+            "error":        "generation failed on both cloud and local models",
         }
         return state
 
@@ -484,7 +544,7 @@ def script_writer_node(state: dict) -> dict:
         "attempt":      attempts,
     }
 
-    print(f"\n  [script] ✅ script complete")
+    print(f"\n  [script] script complete")
     print(f"  [script]    words:    {word_count}")
     print(f"  [script]    duration: ~{est_duration}")
     print(f"  [script]    sections: {len(sections)}")
