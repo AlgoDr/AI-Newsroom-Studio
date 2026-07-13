@@ -523,6 +523,23 @@ the *voice* -- not the visuals -- feel more human:
         see [Why stock footage, not AI video generation?](#why-stock-footage-not-ai-video-generation))
   - [ ] Map each query to its story's section span in `tts_ready_text`
         so footage can later be timed against the right part of the audio
+- [x] Presenter/host visual layer -- **proof-of-concept built and tested**,
+      not yet wired into the pipeline. Reactive graphic (pulsing/glowing
+      abstract orb driven by the real audio's amplitude envelope, plus
+      a small waveform-bar indicator) rendered per-frame with pure
+      PIL + numpy, no ML model. Source-citation lower-thirds (title +
+      domain, fading in per story) burned in the same way. Chosen over
+      an AI-generated talking-head avatar after evaluating both cloud
+      APIs and local generation (Wan2.1 1.3B via mlx-video) -- see
+      [KNOWN_ISSUES ISSUE-20](docs/KNOWN_ISSUES.md#issue-20-agent-78----ai-videoavatar-generation-evaluated-and-deferred-research-log-not-a-bug)
+      for the full evaluation. Tested end-to-end against a real 83s
+      pipeline audio file: ~2 minutes total render time, pure CPU,
+      zero GPU/MPS dependency. Reuses `docs/audio-demo.html`'s existing
+      color/typography tokens for visual consistency across the project.
+  - [ ] Wire into the actual Agent 7/8 flow (currently a standalone script)
+  - [ ] Replace word-share-proportional story timing (current
+        approximation) with real per-section timestamps once
+        `beat_timestamps` exists (see Agent 6.1 dependency note below)
 - [ ] Agent 8 -- Pexels/Pixabay fetch + ffmpeg assembly timed to voice-over
   - [ ] Fetch candidate clips per query (Pexels primary, Pixabay fallback)
   - [ ] Select clip duration/count per story using Agent 6.1's
@@ -530,6 +547,9 @@ the *voice* -- not the visuals -- feel more human:
         natural pauses, not mid-sentence
   - [ ] ffmpeg assembly: concatenate + trim clips to the voice-over's
         total duration, mux with the final stitched `.wav`
+  - [ ] Compositing decision needed: presenter graphic + lower-thirds as
+        a foreground overlay on top of b-roll footage, vs. two separate
+        visual modes the video alternates between -- not yet decided
   - [ ] Fallback behavior if a story's search returns no usable footage
         (currently undecided -- likely a solid-color/title-card slide
         rather than blocking the whole video)

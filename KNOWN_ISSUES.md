@@ -1,6 +1,6 @@
 # Known Issues — AI Newsroom Studio
 
-Documented limitations as of the Agent 1-6 milestone (18 issues total).
+Documented limitations as of the Agent 1-6 milestone (20 issues total).
 These are **expected behaviors / accepted limitations**, not bugs.
 Recorded so future debugging (Agents 7-10) doesn't mistake them for new
 failures.
@@ -14,7 +14,10 @@ ISSUE-14 (Agent 2 — citation artifacts in background text) ·
 ISSUE-15 (Agents 3/4/5/6 — keep_alive silently rejected by Ollama 0.24.0+) ·
 ISSUE-16 (Agent 6 — empty pipe-separated JUDGE reasons parsed as valid) ·
 ISSUE-17 (Agent 6 — no finish_reason visibility on live JUDGE path) ·
-ISSUE-18 (Agent 6 — final word count not re-validated after rewrites)
+ISSUE-18 (Agent 6 — final word count not re-validated after rewrites) ·
+ISSUE-19 (Agent 6.1 — short final chunk silently dropped by mlx_audio,
+CTA lost) · ISSUE-20 (Video pipeline — local Wan2.1 text-to-video not
+viable on 16GB Apple Silicon; PIL-based approach adopted instead)
 
 ---
 
@@ -1027,6 +1030,174 @@ here specifically so it isn't lost.
 
 ---
 
+## ISSUE-20: Agent 7/8 -- AI video/avatar generation evaluated and deferred (research log, not a bug)
+
+**Status:** Resolved -- decision made, documented so it isn't re-investigated from scratch later.
+**Affects:** Agent 7/8 design (video assembly stage, not yet implemented)
+
+### Context
+While scoping Agent 7/8, considered building an AI-generated "host" or
+presenter (talking avatar, lip-synced to the existing `af_heart` Kokoro
+audio) rather than the originally-planned stock-footage b-roll
+approach. Spent real time (2026-07-13) researching whether this was
+newly viable given how fast video-gen models have moved, given the
+project's own hardware: **M4 Pro, 16GB unified memory, 10-core GPU.**
+Findings below, so a future session doesn't repeat this research.
+
+### Finding 1: no cloud provider offers genuinely free, automatable daily video generation
+Checked Synthesia, HeyGen, Canva, and Google Veo 3/3.1 specifically,
+since these keep appearing in "free AI video tools" roundups. All four
+turned out to have a meaningful gap between what SEO-style blog posts
+claim and what the providers' own docs/pricing pages say:
+- **Synthesia:** free tier is 10 min of video **per month**, watermarked,
+  no downloads without watermark, and **no API access on the free
+  tier at all** (API requires a paid Creator plan, ~$64-89/mo). 10
+  min/month is far short of a 1-2 videos/day cadence (~60+ min/month
+  minimum).
+- **HeyGen:** free web tier is 3 videos/month, 720p, watermarked.
+  HeyGen removed free API credits entirely as of Feb 2026 -- API is
+  pay-as-you-go from ~$1-5/minute. One real-world account of running
+  daily automated generation on HeyGen's API reported reaching ~$800/month.
+- **Canva:** avatar feature is a thin wrapper licensing D-ID/HeyGen
+  under the hood -- same underlying cost economics apply at volume.
+- **Google Veo 3/3.1:** Google's own pricing page lists the free tier
+  for Veo video generation as **"Not available"** as of March 2026;
+  paid API is $0.15-0.40/second. Sources claiming "50 free videos/day"
+  were conflating Gemini's genuinely-free *text* model tier with Veo
+  (video), or describing the Google AI Pro *consumer app* subscription
+  (3 videos/day, $19.99/mo), not a free API.
+
+**Conclusion:** every cloud path breaks the project's "$0 by design"
+principle from the very first video. Ruled out for a daily-automated
+pipeline, not just "too expensive to prefer."
+
+### Finding 2: local generation on 16GB unified memory is a genuine capability gap, not just slow
+Investigated `mlx-video` (native MLX ports of LTX-2 and Wan2.1/2.2) as
+the one path that could stay free, since Kokoro TTS already runs
+locally via `mlx-audio` on this same machine.
+- **LTX-2.3 / Wan2.2 14B:** multiple independent sources put the
+  realistic floor at 32GB+ unified memory, and even at 32GB one
+  real-Mac tester called them "difficult to run comfortably." Not
+  viable on this project's 16GB hardware -- not attempted.
+- **Wan2.1-T2V-1.3B:** the one model small enough to plausibly fit.
+  1.3B params, 4-bit quantized weights ≈ 800MB. Officially trained at
+  480p (832×480) -- 720p output is explicitly documented by Wan as
+  "less stable." Native output is 81 frames at 16fps (~5s per
+  generation call), not a continuous 90s video -- a full video would
+  need ~18 separate stitched generations, with no built-in mechanism
+  for keeping a consistent character/face across separate calls (that
+  needs LoRA fine-tuning, a separate project on top of this).
+  **Official VRAM requirement: 8.19GB** -- this is the number that
+  matters, not the 800MB weight size. The gap is activation memory:
+  a diffusion video model holds its *entire* spatio-temporal latent
+  tensor (all frames × height × width × channels) in memory
+  simultaneously across every denoising step, unlike an LLM which only
+  holds one token's hidden state at a time regardless of output length.
+  This is why a 12B *language* model (e.g. gemma3:12b, runs fine on
+  this machine at ~6-7GB via Ollama's Q4 quantization) is not a fair
+  comparison to a 1.3B *video* model -- parameter count alone doesn't
+  predict memory footprint across these two model types.
+  All published VRAM figures are from CUDA/NVIDIA benchmarks; MLX/Apple
+  Silicon overhead is not accounted for and could be materially higher.
+- On Apple Silicon specifically, exceeding unified memory capacity
+  tends to cause **swapping (severe slowdown), not a clean OOM crash**
+  the way CUDA typically fails -- meaning a bad fit shows up as the
+  whole system becoming unresponsive for an extended period, rather
+  than a fast, clear error.
+
+### Finding 3: download eventually succeeded; first generation attempt crashed on VAE decode
+Downloading Wan2.1-T2V-1.3B (~17.6GB) via `hf download` stalled twice
+at an identical 8.7GB (confirmed via `du -sh` checks 20-30s apart
+showing zero byte growth), likely a network/ISP or HF-server-side
+issue. A third attempt, unassisted, completed successfully at
+12.7-66.2MB/s -- the stalls were transient, not a fundamental blocker.
+
+Converted to MLX format cleanly (transformer: 825 tensors; T5 encoder:
+242 tensors, required installing `torch` as a one-time loader
+dependency for the original `.pth` weights, not a runtime dependency;
+VAE: 194 tensors; then 4-bit quantization: 300 layers / 1426 tensors).
+
+First generation attempt (480x480, 33 frames/~2s, 20 steps, default
+`--tiling auto`):
+- T5 text encoding: 124.8s
+- Denoising: 484.2s (8.1 min) -- **completed successfully**, all 20 steps
+- VAE decode: **crashed**
+  ```
+  RuntimeError: [metal::malloc] Attempting to allocate 11324620800 bytes
+  which is greater than the maximum allowed buffer size of 9534832640 bytes.
+  ```
+  Root cause: VAE decode needs one *contiguous* ~10.5GB Metal buffer to
+  materialize the full spatio-temporal video tensor from latents in a
+  single operation. macOS's Metal API hard-caps any single allocation
+  at ~8.9GB, independent of total system RAM -- this is an OS/GPU-driver
+  ceiling, not a "not enough memory" condition. A Mac with 128GB RAM
+  would hit the identical wall for the identical operation. Confirmed
+  via `mlx-video`'s own DeepWiki troubleshooting docs and multiple
+  independent GitHub issues across the wider Wan ecosystem (Wan2.1
+  upstream, Wan2.2/diffusers, stable-diffusion.cpp/ggml) reporting the
+  same VAE-decode-needs-one-giant-buffer problem back to at least
+  February 2025 -- not specific to this project's setup or `mlx-video`.
+- Memory monitor during this run: peak 13.37GB used, **peak swap
+  22.25GB** (exceeding total physical RAM), average 7.40GB used.
+
+### Finding 4: forcing explicit `--tiling aggressive` avoided the crash -- but exposed the real cost
+`mlx-video`'s Wan generate script does expose `--tiling
+{auto,none,default,aggressive,conservative,spatial,temporal}` --
+tiling support exists. Its `auto` mode did not select an aggressive
+enough tile size to avoid the crash above; forcing `aggressive`
+explicitly did:
+- Same 480x480/33-frame/20-step test, `--tiling aggressive`:
+- Denoising: 461.4s (7.7 min, consistent with the first attempt)
+- VAE decode: **succeeded**, `Tiling (aggressive): spatial=256px,
+  temporal=32f` -- 65.9s, no crash
+- Total: 643.4s (10.7 min) for 2 seconds of output video
+- Memory monitor: peak 13.34GB used, **peak swap 20.29GB** -- still
+  swapping over the entire physical RAM even in the successful run
+- Real, sustained thermal load (fan audibly working hard for the
+  duration) -- not just a memory number, a genuine hardware stress test
+
+**Critically: the test prompt was a deliberately generic smoke-test**
+("a simple animated news anchor icon, minimalist style, blue glow"),
+not real story content -- written to check "does this run without
+crashing," not to represent achievable output quality. The resulting
+video was an abstract blue/white icon-like blob with no
+anchor/face/scene quality whatsoever -- confirming the pipeline
+*mechanically completes* end-to-end when tiling is forced, but saying
+nothing about whether real-content prompts would produce genuinely
+usable output.
+
+### Decision
+**Deferred, not abandoned -- but with a real cost baseline now
+established rather than a guess.** Even in the successful, non-crashing
+configuration: **~10.7 minutes and sustained heavy swap/thermal load
+per 2-second clip**, on the smallest possible test case (lowest
+resolution, fewest frames, shortest prompt). A real 60-90s video needs
+several clips per story across 3 stories -- scaling this honestly
+implies 30-60+ minutes of sustained heavy-swap, hot-running generation
+per video, every day, before even attempting the separate unsolved
+problem of keeping an "anchor" character visually consistent across
+those separately-generated clips (no built-in mechanism for this in
+Wan2.1 T2V; would need LoRA fine-tuning, its own project).
+
+Proceeding instead with a lightweight, non-ML-model alternative for
+Agent 7/8's visual layer: a pure PIL/numpy-rendered reactive graphic
+(pulsing/glowing abstract "anchor" orb driven by the real audio's
+amplitude envelope, plus ffmpeg-burned source-citation lower-thirds).
+Already prototyped and tested against a real 83s pipeline audio file
+(`voiceover_20260713_084836.wav`) -- renders in ~2 minutes total, pure
+CPU, zero MPS/CUDA dependency, zero swap, zero thermal concern, and
+directly reuses `docs/audio-demo.html`'s existing color/typography
+tokens for visual consistency with the rest of the project.
+
+Revisit Wan2.1 (or a future, better-suited model) later only if: (a) a
+faster VAE-decode path emerges upstream (e.g. `mlx-video` improving
+its default `auto` tiling heuristics, or a lower-memory decode
+algorithm), and (b) there's appetite to also solve character
+consistency across stitched clips. Until then, this is off the
+Agent 7/8 critical path.
+
+---
+
 ## Summary for future sessions
 
 ```
@@ -1068,4 +1239,19 @@ the CTA (and possibly the closing sentence) is silently missing from
 the shipped audio. This is ISSUE-19, currently open/deferred. Print
 the skipped chunk's text (already logged) to see exactly what was lost
 before deciding whether that sample is still usable as-is.
+
+Considering an AI-generated host/avatar for Agent 7/8 instead of stock
+footage: this was already researched AND real-hardware-tested in depth
+— see ISSUE-20 before re-investigating. Short version: no cloud
+provider offers genuinely free automatable video generation (checked
+Synthesia, HeyGen, Canva, Veo — all either cap far below daily use or
+have no free API at all). Local generation (Wan2.1 1.3B via
+mlx-video) was fully tested end-to-end on this project's actual 16GB
+M4 Pro: it *can* complete without crashing if `--tiling aggressive` is
+forced explicitly (default `auto` tiling crashes on VAE decode), but
+even the smallest possible test (480x480, 2s) took ~10.7 minutes with
+peak swap over 20GB and sustained heavy thermal load. Not viable for
+daily automated use. Current approach is a PIL/ffmpeg reactive-graphic
+renderer instead — already built and tested, see docs/samples/ for
+output.
 ```
