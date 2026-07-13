@@ -13,6 +13,9 @@
 
 [Overview](#overview) - [What's Built](#whats-built-so-far) - [Architecture](#agent-architecture) - [Tech Stack](#tech-stack) - [Setup](#getting-started) - [Roadmap](#development-roadmap)
 
+
+🔊 **[Listen to real generated voice-over samples](https://algodr.github.io/AI-Newsroom-Studio/audio-demo.html)** — actual pipeline output, zero human editing
+
 </div>
 
 ---
@@ -205,13 +208,6 @@ NewsStudio/
 |   |   |-- pipeline_cache.py   # Persist Agent 4+ full state (data/checkpoints/)
 |   |   `-- milestone_tracker.py # macOS alerts at N function-hit milestones
 |   |
-|   |-- test_dedup_reliability.py               # Agent 4 dedup, N=5 multi-run test
-|   |-- test_agent3_credibility_reliability.py  # Agent 3 credibility, N=15 multi-run test
-|   |-- test_agent5_generation_models.py        # Agent 5 fallback A/B test (4 models)
-|   |-- test_rewrite_fallback_models.py         # Agent 6 REWRITE fallback A/B test
-|   |-- test_rewrite_gemma3_check.py            # Agent 6 REWRITE gemma3:12b re-check
-|   |-- precompute_sfx_embeddings.py            # Agent 6.2 -- one-time CLAP embedding precompute
-|   |
 |   |-- workflow.ipynb          # Main pipeline notebook (A1->A2->A3->A4->A5->A6->A6.1)
 |   `-- __init__.py
 |
@@ -231,7 +227,9 @@ NewsStudio/
 |   |-- agent2_architecture.svg
 |   |-- agent3_architecture.svg
 |   |-- agent4_architecture.svg
-|   `-- agent5_architecture.svg
+|   |-- agent5_architecture.svg
+|   |-- agent6_architecture.svg
+|   `-- agent6_1_architecture.svg
 |
 |-- multi-agent-env/             # main venv -- everything except CLAP
 |-- clap-env/                    # SEPARATE venv -- msclap only (dependency isolation)

@@ -1,0 +1,141 @@
+<svg viewBox="0 0 1000 1180" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a5568"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#38a169"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c53030"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title       { font-size: 26px; font-weight: 700; fill: #1a202c; }
+    .subtitle    { font-size: 14px; fill: #718096; }
+    .box         { stroke-width: 2; rx: 8; }
+    .boxLabel    { font-size: 14px; font-weight: 600; fill: #1a202c; }
+    .boxSub      { font-size: 11.5px; fill: #4a5568; }
+    .stagePython { fill: #f0fff4; stroke: #38a169; }
+    .stageCloud  { fill: #ebf8ff; stroke: #3182ce; }
+    .stageOutput { fill: #faf5ff; stroke: #805ad5; }
+    .flowArrow   { stroke: #4a5568; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    .exitArrow   { stroke: #38a169; stroke-width: 2.5; fill: none; marker-end: url(#arrowGreen); }
+    .loopArrow   { stroke: #c53030; stroke-width: 2; fill: none; marker-end: url(#arrowRed); }
+    .loopLabel   { font-size: 12px; fill: #c53030; font-weight: 600; }
+    .exitLabel   { font-size: 12px; fill: #38a169; font-weight: 600; }
+    .sectionLabel{ font-size: 13px; font-weight: 700; fill: #2d3748; letter-spacing: 0.5px; }
+    .legendText  { font-size: 12px; fill: #4a5568; }
+  </style>
+
+  <!-- HEADER -->
+  <text x="500" y="40" text-anchor="middle" class="title">Agent 6 — Script QC</text>
+  <text x="500" y="62" text-anchor="middle" class="subtitle">Two-stage JUDGE / REWRITE loop · max 2 iterations · never blocks the pipeline</text>
+
+  <!-- INPUT -->
+  <rect x="330" y="85" width="340" height="50" class="box stageOutput"/>
+  <text x="500" y="106" text-anchor="middle" class="boxLabel">Input: Agent 5's script</text>
+  <text x="500" y="122" text-anchor="middle" class="boxSub">state["script"]["sections"] — 10 labelled sections</text>
+  <path d="M 500 135 L 500 160" class="flowArrow"/>
+
+  <!-- DATE HUMANIZATION -->
+  <rect x="300" y="162" width="400" height="50" class="box stagePython"/>
+  <text x="500" y="183" text-anchor="middle" class="boxLabel">_humanize_dates()</text>
+  <text x="500" y="199" text-anchor="middle" class="boxSub">pure Python · "August 23, 2024" → "last year"</text>
+  <path d="M 500 212 L 500 238" class="flowArrow"/>
+
+  <!-- LOOP CONTAINER -->
+  <rect x="60" y="240" width="880" height="620" rx="12" fill="none" stroke="#a0aec0" stroke-width="2" stroke-dasharray="8,5"/>
+  <text x="90" y="266" class="sectionLabel">ITERATION LOOP — max 2 passes</text>
+
+  <!-- JUDGE box -->
+  <rect x="120" y="285" width="760" height="90" class="box stageCloud"/>
+  <text x="500" y="308" text-anchor="middle" class="boxLabel">_judge_script()  —  finds problems, one call covers the whole script</text>
+  <text x="500" y="328" text-anchor="middle" class="boxSub">PRIMARY: gpt-oss-120b   →   FALLBACK (on empty/failure): qwen2.5:7b via _judge_script_local()</text>
+  <text x="500" y="346" text-anchor="middle" class="boxSub">checks: human-voice phrasing · transition quality · twist quality (consequence vs restating) · CTA category</text>
+  <text x="500" y="364" text-anchor="middle" class="boxSub" font-style="italic">empty response → finish_reason logged before falling back</text>
+
+  <path d="M 500 375 L 500 400" class="flowArrow"/>
+
+  <!-- Python merge box -->
+  <rect x="120" y="402" width="760" height="90" class="box stagePython"/>
+  <text x="500" y="425" text-anchor="middle" class="boxLabel">Pure Python merge — never asked of any LLM</text>
+  <text x="500" y="444" text-anchor="middle" class="boxSub">word_count_ok = TARGET_MIN &lt;= n &lt;= TARGET_MAX  (arithmetic, overrides whatever the model said)</text>
+  <text x="500" y="462" text-anchor="middle" class="boxSub">_scan_tts_readiness() — dense identifiers / markdown, merged into flagged_sections</text>
+  <text x="500" y="480" text-anchor="middle" class="boxSub">_parse_judgment() — filters hallucinated labels + empty pipe-separated reasons</text>
+
+  <path d="M 500 492 L 500 517" class="flowArrow"/>
+
+  <!-- Decision diamond -->
+  <path d="M 500 519 L 610 560 L 500 601 L 390 560 Z" fill="#fefcbf" stroke="#d69e2e" stroke-width="2"/>
+  <text x="500" y="556" text-anchor="middle" class="boxLabel" font-size="13">Any issues</text>
+  <text x="500" y="572" text-anchor="middle" class="boxLabel" font-size="13">flagged?</text>
+
+  <!-- YES -> down into REWRITE -->
+  <text x="500" y="618" text-anchor="middle" class="loopLabel">YES</text>
+  <path d="M 500 601 L 500 638" class="flowArrow"/>
+
+  <!-- REWRITE box -->
+  <rect x="120" y="640" width="760" height="90" class="box stageCloud"/>
+  <text x="500" y="663" text-anchor="middle" class="boxLabel">_rewrite_flagged()  —  fixes ONLY flagged sections, never the whole script</text>
+  <text x="500" y="683" text-anchor="middle" class="boxSub">PRIMARY: llama-3.3-70b-versatile   →   FALLBACK: gemma3:12b via _rewrite_flagged_local()</text>
+  <text x="500" y="701" text-anchor="middle" class="boxSub">_parse_rewrite_output() strips a stray "SECTION " prefix, ignores unknown labels</text>
+  <text x="500" y="719" text-anchor="middle" class="boxSub" font-style="italic">stress restructuring: "Disable X now. Right now." — not [EMPHASIS] tags</text>
+
+  <!-- Loop back to JUDGE, routed on the right inside the dashed box -->
+  <path d="M 880 685 L 920 685 L 920 330 L 880 330" class="loopArrow"/>
+  <text x="948" y="510" class="loopLabel" transform="rotate(90, 948, 510)">re-judge (iteration 2 of 2 max)</text>
+
+  <!-- NO -> exits loop: plain trunk line (no arrowhead), then two markered
+       branches land cleanly on each post-loop box's top edge -->
+  <text x="660" y="550" text-anchor="middle" class="exitLabel">NO</text>
+  <path d="M 610 560 L 720 560 L 720 870" stroke="#38a169" stroke-width="2.5" fill="none"/>
+  <text x="730" y="700" class="exitLabel" transform="rotate(90, 730, 700)">approved — exit loop</text>
+
+  <!-- POST-LOOP SECTION -->
+  <text x="90" y="890" class="sectionLabel">AFTER LOOP EXITS</text>
+
+  <rect x="120" y="900" width="380" height="80" class="box stagePython"/>
+  <text x="310" y="925" text-anchor="middle" class="boxLabel">Final word-count re-check</text>
+  <text x="310" y="943" text-anchor="middle" class="boxSub">if drifted outside 150-225 after rewrites:</text>
+  <text x="310" y="961" text-anchor="middle" class="boxSub">logs WARNING to qc_notes (does not block)</text>
+
+  <rect x="520" y="900" width="380" height="80" class="box stagePython"/>
+  <text x="710" y="925" text-anchor="middle" class="boxLabel">Final TTS-readiness re-check</text>
+  <text x="710" y="943" text-anchor="middle" class="boxSub">any unresolved dense-ID issues</text>
+  <text x="710" y="961" text-anchor="middle" class="boxSub">logged to qc_notes as "(unresolved)"</text>
+
+  <path d="M 720 870 L 310 900" class="exitArrow"/>
+  <path d="M 720 870 L 710 900" class="exitArrow"/>
+
+  <!-- Build annotated/tts text -->
+  <path d="M 310 980 L 500 1010" class="flowArrow"/>
+  <path d="M 710 980 L 500 1010" class="flowArrow"/>
+
+  <rect x="270" y="1012" width="460" height="90" class="box stageOutput"/>
+  <text x="500" y="1035" text-anchor="middle" class="boxLabel">_build_annotated_and_tts_text()</text>
+  <text x="500" y="1053" text-anchor="middle" class="boxSub">pure Python, derived from final sections — never an LLM</text>
+  <text x="500" y="1071" text-anchor="middle" class="boxSub">annotated_text (audit) · tts_ready_text (sent to Agent 6.1)</text>
+  <text x="500" y="1089" text-anchor="middle" class="boxSub" font-style="italic">Kokoro sees zero markup — see KNOWN_ISSUES ISSUE-13</text>
+
+  <!-- LEGEND -->
+  <text x="90" y="1128" class="sectionLabel">LEGEND</text>
+
+  <rect x="90" y="1138" width="22" height="16" class="box stageCloud"/>
+  <text x="120" y="1150" class="legendText">Cloud primary + local fallback</text>
+
+  <rect x="330" y="1138" width="22" height="16" class="box stagePython"/>
+  <text x="360" y="1150" class="legendText">Pure Python, no LLM</text>
+
+  <rect x="540" y="1138" width="22" height="16" class="box stageOutput"/>
+  <text x="570" y="1150" class="legendText">I/O</text>
+
+  <path d="M 650 1146 L 690 1146" class="loopArrow"/>
+  <text x="700" y="1150" class="legendText">Iteration loop-back</text>
+
+  <path d="M 830 1146 L 870 1146" class="exitArrow"/>
+  <text x="880" y="1150" class="legendText">Exit</text>
+
+</svg>

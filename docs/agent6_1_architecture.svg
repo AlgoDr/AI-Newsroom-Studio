@@ -1,0 +1,135 @@
+<svg viewBox="0 0 1000 1080" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a5568"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#38a169"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c53030"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title       { font-size: 26px; font-weight: 700; fill: #1a202c; }
+    .subtitle    { font-size: 14px; fill: #718096; }
+    .box         { stroke-width: 2; rx: 8; }
+    .boxLabel    { font-size: 14px; font-weight: 600; fill: #1a202c; }
+    .boxSub      { font-size: 11.5px; fill: #4a5568; }
+    .stagePython { fill: #f0fff4; stroke: #38a169; }
+    .stageLocal  { fill: #fffaf0; stroke: #dd6b20; }
+    .stageOutput { fill: #faf5ff; stroke: #805ad5; }
+    .stageGate   { fill: #fff5f5; stroke: #c53030; }
+    .flowArrow   { stroke: #4a5568; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    .exitArrow   { stroke: #38a169; stroke-width: 2.5; fill: none; marker-end: url(#arrowGreen); }
+    .loopArrow   { stroke: #c53030; stroke-width: 2; fill: none; marker-end: url(#arrowRed); }
+    .loopLabel   { font-size: 12px; fill: #c53030; font-weight: 600; }
+    .exitLabel   { font-size: 12px; fill: #38a169; font-weight: 600; }
+    .sectionLabel{ font-size: 13px; font-weight: 700; fill: #2d3748; letter-spacing: 0.5px; }
+    .legendText  { font-size: 12px; fill: #4a5568; }
+  </style>
+
+  <!-- HEADER -->
+  <text x="500" y="40" text-anchor="middle" class="title">Agent 6.1 — Voice-Over Generator</text>
+  <text x="500" y="62" text-anchor="middle" class="subtitle">Kokoro TTS via mlx-audio, Apple Metal GPU · $0 cost, fully local</text>
+
+  <!-- GATE -->
+  <rect x="330" y="85" width="340" height="55" class="box stageGate"/>
+  <text x="500" y="108" text-anchor="middle" class="boxLabel">Gate: script["approved"] == True?</text>
+  <text x="500" y="126" text-anchor="middle" class="boxSub">skip if not — all output keys still .setdefault()</text>
+  <path d="M 500 140 L 500 165" class="flowArrow"/>
+
+  <!-- SETUP: find python + sanitize + split -->
+  <rect x="250" y="167" width="500" height="110" class="box stagePython"/>
+  <text x="500" y="190" text-anchor="middle" class="boxLabel">Setup (module load + pre-processing)</text>
+  <text x="500" y="210" text-anchor="middle" class="boxSub">_find_venv_python() — verifies mlx_audio importable, not just sys.executable</text>
+  <text x="500" y="228" text-anchor="middle" class="boxSub">_sanitize_for_tts() — em-dashes/quotes → ASCII, "GPT-5.6" → "GPT-5 point 6"</text>
+  <text x="500" y="246" text-anchor="middle" class="boxSub">_split_text_for_tts() — ~40 words/chunk, split on sentence boundaries only</text>
+  <text x="500" y="264" text-anchor="middle" class="boxSub" font-style="italic">never trusts Kokoro's own internal chunking — it's unreliable beyond ~60-70 words</text>
+
+  <path d="M 500 277 L 500 302" class="flowArrow"/>
+
+  <!-- PER-CHUNK LOOP CONTAINER -->
+  <rect x="60" y="304" width="880" height="420" rx="12" fill="none" stroke="#a0aec0" stroke-width="2" stroke-dasharray="8,5"/>
+  <text x="90" y="330" class="sectionLabel">PER-CHUNK LOOP — one pass per ~40-word chunk</text>
+
+  <!-- clear + generate -->
+  <rect x="120" y="345" width="760" height="105" class="box stageLocal"/>
+  <text x="500" y="368" text-anchor="middle" class="boxLabel">_generate_one_call()</text>
+  <text x="500" y="388" text-anchor="middle" class="boxSub">clears stray audio_*.wav files first (prevents filename collision between chunks)</text>
+  <text x="500" y="406" text-anchor="middle" class="boxSub">runs mlx_audio.tts.generate — Kokoro-82M-bf16 on Metal GPU</text>
+  <text x="500" y="424" text-anchor="middle" class="boxSub">produced file(s) immediately renamed to chunk_NNN_MM.wav</text>
+  <text x="500" y="442" text-anchor="middle" class="boxSub" font-style="italic">on failure: retries once with additional sanitization before giving up</text>
+
+  <path d="M 500 450 L 500 475" class="flowArrow"/>
+
+  <!-- Decision diamond -->
+  <path d="M 500 477 L 610 518 L 500 559 L 390 518 Z" fill="#fefcbf" stroke="#d69e2e" stroke-width="2"/>
+  <text x="500" y="514" text-anchor="middle" class="boxLabel" font-size="13">Chunk produced</text>
+  <text x="500" y="530" text-anchor="middle" class="boxLabel" font-size="13">a file (after retry)?</text>
+
+  <!-- YES -> centered box directly below the diamond -->
+  <text x="500" y="590" text-anchor="middle" class="exitLabel">YES</text>
+  <path d="M 500 559 L 500 610" class="exitArrow"/>
+
+  <rect x="320" y="612" width="300" height="55" class="box stagePython"/>
+  <text x="470" y="635" text-anchor="middle" class="boxLabel" font-size="13">Add to all_audio_files</text>
+  <text x="470" y="651" text-anchor="middle" class="boxSub">this chunk is done, in order</text>
+
+  <!-- NO -> routes right and down to a box positioned on the right, matching the diamond's right-side exit -->
+  <text x="700" y="500" text-anchor="middle" class="loopLabel">NO — retry also failed</text>
+  <path d="M 610 518 L 800 518 L 800 612" class="loopArrow"/>
+
+  <rect x="700" y="612" width="180" height="55" class="box stageGate"/>
+  <text x="790" y="631" text-anchor="middle" class="boxLabel" font-size="12.5">chunks_skipped += 1</text>
+  <text x="790" y="647" text-anchor="middle" class="boxSub" font-size="10">log chunk text, continue</text>
+
+  <!-- both outcomes converge at a shared trunk line, then loop back up
+       the right side for the next chunk -->
+  <path d="M 470 667 L 470 690 L 920 690 L 920 397 L 880 397" class="flowArrow"/>
+  <path d="M 790 667 L 790 690 L 920 690" stroke="#4a5568" stroke-width="2" fill="none"/>
+  <text x="936" y="550" class="legendText" transform="rotate(90, 936, 550)">next chunk (loop repeats)</text>
+
+  <!-- exit the loop: simple continuation once the for-loop over all
+       chunks is exhausted (a plain Python for-loop, not a data-dependent
+       exit condition, so no separate decision diamond is needed here) -->
+  <text x="90" y="765" class="sectionLabel">AFTER ALL CHUNKS PROCESSED</text>
+  <path d="M 500 724 L 500 780" class="exitArrow"/>
+
+  <!-- STITCH -->
+  <rect x="270" y="782" width="460" height="75" class="box stagePython"/>
+  <text x="500" y="807" text-anchor="middle" class="boxLabel">_concatenate_wavs()</text>
+  <text x="500" y="825" text-anchor="middle" class="boxSub">pure Python, stdlib wave module — one continuous file</text>
+  <text x="500" y="843" text-anchor="middle" class="boxSub" font-style="italic">skipped if only 1 chunk survived (direct rename instead)</text>
+
+  <path d="M 500 857 L 500 882" class="flowArrow"/>
+
+  <!-- VERIFY -->
+  <rect x="270" y="884" width="460" height="75" class="box stagePython"/>
+  <text x="500" y="909" text-anchor="middle" class="boxLabel">_get_audio_duration() + _verify_duration()</text>
+  <text x="500" y="927" text-anchor="middle" class="boxSub">actual duration vs word_count/2.5 estimate, +/-50% tolerance</text>
+  <text x="500" y="945" text-anchor="middle" class="boxSub" font-style="italic">logged only — verified=False never blocks the pipeline</text>
+
+  <path d="M 500 959 L 500 984" class="flowArrow"/>
+
+  <!-- OUTPUT -->
+  <rect x="230" y="986" width="540" height="60" class="box stageOutput"/>
+  <text x="500" y="1010" text-anchor="middle" class="boxLabel">Output: audio_path · audio_duration · audio_chunks</text>
+  <text x="500" y="1028" text-anchor="middle" class="boxSub">duration_verified · voice_used · chunks_skipped</text>
+
+  <!-- LEGEND -->
+  <rect x="90" y="1052" width="22" height="16" class="box stageLocal"/>
+  <text x="120" y="1064" class="legendText">Local model call (Kokoro/mlx-audio)</text>
+
+  <rect x="360" y="1052" width="22" height="16" class="box stagePython"/>
+  <text x="390" y="1064" class="legendText">Pure Python, no model call</text>
+
+  <rect x="600" y="1052" width="22" height="16" class="box stageOutput"/>
+  <text x="630" y="1064" class="legendText">I/O</text>
+
+  <path d="M 720 1060 L 760 1060" class="loopArrow"/>
+  <text x="770" y="1064" class="legendText">Retry-exhausted → skip chunk</text>
+
+</svg>

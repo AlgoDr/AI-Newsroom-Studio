@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Newsroom Studio — Voice-Over Samples</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --card: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --text-dim: #8b949e;
+            --accent: #58a6ff;
+            --accent-soft: #1f6feb22;
+            --green: #3fb950;
+            --mono: 'SF Mono', 'Consolas', 'Liberation Mono', Menlo, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        .wrap {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 56px 24px 80px;
+        }
+
+        header {
+            margin-bottom: 48px;
+        }
+
+        .eyebrow {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--accent);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0 0 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: var(--text-dim);
+            font-size: 16px;
+            max-width: 560px;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 14px;
+            font-family: var(--mono);
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .sample-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px;
+            margin-bottom: 24px;
+        }
+
+        .sample-meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+            font-family: var(--mono);
+            font-size: 12.5px;
+            color: var(--text-dim);
+        }
+
+        .meta-pill {
+            background: var(--accent-soft);
+            color: var(--accent);
+            padding: 3px 10px;
+            border-radius: 100px;
+            border: 1px solid #1f6feb44;
+        }
+
+        .sample-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 16px;
+        }
+
+        audio {
+            width: 100%;
+            height: 40px;
+            margin-bottom: 20px;
+        }
+
+        /* Style the native audio player as closely as cross-browser CSS allows */
+        audio::-webkit-media-controls-panel {
+            background-color: #0d1117;
+        }
+
+        .script-toggle {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--accent);
+            cursor: pointer;
+            user-select: none;
+            display: inline-block;
+            margin-bottom: 0;
+        }
+
+        .script-text {
+            display: none;
+            margin-top: 16px;
+            padding: 16px 18px;
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: var(--mono);
+            font-size: 13.5px;
+            line-height: 1.7;
+            color: var(--text-dim);
+            white-space: pre-wrap;
+        }
+
+        .script-text.open {
+            display: block;
+        }
+
+        .stat-row {
+            display: flex;
+            gap: 28px;
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            font-family: var(--mono);
+            font-size: 12.5px;
+        }
+
+        .stat-label {
+            color: var(--text-dim);
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .stat-value {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .stat-value.good {
+            color: var(--green);
+        }
+
+        footer {
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            font-size: 13px;
+            color: var(--text-dim);
+            font-family: var(--mono);
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .empty-note {
+            color: var(--text-dim);
+            font-size: 14px;
+            font-family: var(--mono);
+            padding: 20px;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+        }
+
+        .placeholder-flag {
+            display: inline-block;
+            background: #f85149;
+            color: #fff;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: 8px;
+            letter-spacing: 0.03em;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="wrap">
+
+        <header>
+            <div class="eyebrow">AI Newsroom Studio</div>
+            <h1>Voice-Over Samples</h1>
+            <p class="subtitle">
+                Real audio output from Agent 6.1, generated end-to-end by the
+                pipeline — Kokoro TTS running locally on Apple Metal GPU, from a
+                script that was researched, fact-checked, edited, written, and
+                quality-checked by the earlier agents with zero human editing.
+            </p>
+            <a class="back-link" href="https://github.com/AlgoDr/AI-Newsroom-Studio">&larr; back to the main repo</a>
+        </header>
+
+        <!-- ============================================================
+       SAMPLE CARD — duplicate this whole <div class="sample-card">
+       block for each additional sample you want to add.
+       ============================================================ -->
+
+        <div class="sample-card">
+            <div class="sample-meta">
+                <span class="meta-pill">Real pipeline output</span>
+                <span>3 stories · one continuous script</span>
+            </div>
+
+            <h2 class="sample-title">Sample #1 — Ant runtime, weightlifting research, RISCBoy console</h2>
+
+            <audio controls preload="metadata">
+                <source src="./samples/voiceover_20260709_044200.wav" type="audio/wav">
+                Your browser does not support the audio element.
+                <a href="./samples/voiceover_20260709_044200.wav">Download the audio file</a> instead.
+            </audio>
+
+            <span class="script-toggle" onclick="this.nextElementSibling.classList.toggle('open')">
+                ▸ show the script this audio was generated from
+            </span>
+            <div class="script-text">HOOK: Ant, a new JavaScript runtime, starts up in just 5.4 milliseconds, outpacing
+                Deno and Node.
+                S1_CONTEXT: This lightweight runtime is built from scratch and ships as a 9 MB binary, making it perfect
+                for CLI tools and small Docker images.
+                S1_CORE: The Ant Silver engine is hand-built, not a wrapper around V8, JSC, or SpiderMonkey, and uses a
+                MIR-based JIT.
+                S1_TWIST: This means developers can run real npm packages instantly, without the need for a 50 MB
+                download or complex toolchain setup.
+                S2_HOOK: With that covered, what if weightlifting could control blood sugar better than running?
+                S2_CORE: Researchers at Virginia Tech's Fralin Biomedical Research Institute found that resistance
+                training outperforms endurance exercise in improving insulin sensitivity.
+                S2_TWIST: This discovery could change the way we approach obesity and Type 2 diabetes prevention, with
+                weightlifting being a more effective option.
+                S3_HOOK: But here's something that combines tech and gaming - RISCBoy, an open-source portable games
+                console.
+                S3_CORE: RISCBoy features a RISC-V compatible CPU, a raster graphics pipeline, and a display controller,
+                all designed from scratch.
+                S3_TWIST: This custom console is a love letter to classic handheld consoles, with a unique design that
+                fits onto an iCE40-HX8k FPGA.
+                CTA: Follow for daily tech news</div>
+
+            <div class="stat-row">
+                <div class="stat">
+                    <span class="stat-label">Word count</span>
+                    <span class="stat-value">202</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Duration</span>
+                    <span class="stat-value">~81s</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">QC iterations</span>
+                    <span class="stat-value">1 (clean pass)</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Voice</span>
+                    <span class="stat-value">af_heart (Kokoro-82M)</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Cost</span>
+                    <span class="stat-value good">$0 — fully local</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+       Add more <div class="sample-card">...</div> blocks here as
+       you generate more real pipeline runs worth showcasing.
+       ============================================================ -->
+
+        <div class="sample-card">
+            <div class="sample-meta">
+                <span class="meta-pill">Real pipeline output</span>
+                <span>3 stories · one continuous script</span>
+                <span class="placeholder-flag">FILL IN</span>
+            </div>
+
+            <h2 class="sample-title">Sample #2 — <em style="color:var(--text-dim); font-style:italic;">replace with the
+                    actual story titles this script covers</em></h2>
+
+            <audio controls preload="metadata">
+                <source src="./samples/voiceover_20260710_103110.wav" type="audio/wav">
+                Your browser does not support the audio element.
+                <a href="./samples/voiceover_20260710_103110.wav">Download the audio file</a> instead.
+            </audio>
+
+            <span class="script-toggle" onclick="this.nextElementSibling.classList.toggle('open')">
+                ▸ show the script this audio was generated from
+            </span>
+            <div class="script-text">PLACEHOLDER -- paste the real tts_ready_text or full_text from
+                this run's checkpoint here. It should read like the 10-section
+                HOOK / S1_CONTEXT / S1_CORE / S1_TWIST / S2_HOOK / S2_CORE /
+                S2_TWIST / S3_HOOK / S3_CORE / CTA structure, same as Sample #1
+                above -- pull it straight from your saved checkpoint or terminal
+                output for this run.</div>
+
+            <div class="stat-row">
+                <div class="stat">
+                    <span class="stat-label">Word count</span>
+                    <span class="stat-value">?</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Duration</span>
+                    <span class="stat-value">?</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">QC iterations</span>
+                    <span class="stat-value">?</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Voice</span>
+                    <span class="stat-value">af_heart (Kokoro-82M)</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Cost</span>
+                    <span class="stat-value good">$0 — fully local</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sample-card">
+            <div class="sample-meta">
+                <span class="meta-pill">Real pipeline output</span>
+                <span>3 stories · one continuous script</span>
+                <span class="placeholder-flag">FILL IN</span>
+            </div>
+
+            <h2 class="sample-title">Sample #3 — <em style="color:var(--text-dim); font-style:italic;">replace with the
+                    actual story titles this script covers</em></h2>
+
+            <audio controls preload="metadata">
+                <source src="./samples/voiceover_20260712_003811.wav" type="audio/wav">
+                Your browser does not support the audio element.
+                <a href="./samples/voiceover_20260712_003811.wav">Download the audio file</a> instead.
+            </audio>
+
+            <span class="script-toggle" onclick="this.nextElementSibling.classList.toggle('open')">
+                ▸ show the script this audio was generated from
+            </span>
+            <div class="script-text">PLACEHOLDER -- paste the real tts_ready_text or full_text from
+                this run's checkpoint here.</div>
+
+            <div class="stat-row">
+                <div class="stat">
+                    <span class="stat-label">Word count</span>
+                    <span class="stat-value">?</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Duration</span>
+                    <span class="stat-value">?</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">QC iterations</span>
+                    <span class="stat-value">?</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Voice</span>
+                    <span class="stat-value">af_heart (Kokoro-82M)</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Cost</span>
+                    <span class="stat-value good">$0 — fully local</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+       Add a 4th, 5th... sample-card block here the same way if
+       you generate more real runs worth showcasing later.
+       ============================================================ -->
+
+        <footer>
+            Generated by a 10-agent LangGraph pipeline — HackerNews trend
+            detection through fact-checking, editorial selection, script
+            writing, QC, and voice-over, entirely autonomous.
+            <br><br>
+            <a href="https://github.com/AlgoDr/AI-Newsroom-Studio">View the full project on GitHub</a>
+        </footer>
+
+    </div>
+
+</body>
+
+</html>

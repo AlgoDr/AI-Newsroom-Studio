@@ -265,6 +265,8 @@ Agent 6 -- Agent 5 doesn't know today's date, Agent 6 will.
 
 ### Agent 6 -- Script QC (detailed)
 
+![Agent 6 Architecture](./agent6_architecture.svg)
+
 Agent 6 validates and polishes Agent 5's script until it is genuinely
 ready for voice-over generation -- fixing format violations surgically
 and adding the human voice Agent 5 was never asked to have. It never
@@ -380,6 +382,8 @@ order (Agent 5 already enforces this).
 ---
 
 ### Agent 6.1 -- Voice-Over Generator (detailed)
+
+![Agent 6.1 Architecture](./agent6_1_architecture.svg)
 
 Agent 6.1 was **not in the original 10-agent roadmap** -- it was added
 after Agent 1 itself surfaced an HN story about Kokoro, a small local
