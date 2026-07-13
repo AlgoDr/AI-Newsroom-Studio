@@ -37,22 +37,22 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
 
 ---
 
-## What's Built So Far
+## ✅ What's Built So Far
 
 | Agent | Status | Description |
 |-------|--------|-------------|
-| **Agent 1 -- Trend Hunter** | Complete | HackerNews top stories with velocity scoring |
-| **Agent 2 -- Context Researcher** | Complete | 3-tier content fetch + background synthesis |
-| **Agent 3 -- Fact Checker** | Complete | 3-signal scoring (-1 to +1): source + LLM + cross-verify |
-| **Agent 4 -- Editorial** | Complete | Filter -> score -> deduplicate (qwen2.5:7b) -> select top 3 |
-| **Agent 5 -- Script Writer** | Complete | HOOK -> CONTEXT -> CORE -> TWIST -> CTA (llama-3.3-70b-versatile) |
-| **Agent 6 -- Script QC** | Complete | Two-stage JUDGE/REWRITE loop, TTS-readiness scan, date humanization |
-| **Agent 6.1 -- Voice-Over Generator** | Complete | Kokoro TTS via mlx-audio, pre-chunked + sanitized + stitched |
-| Agent 6.2 -- Sound Design | In Progress | CLAP-based semantic transition/music matching over voice-over audio |
-| Agent 7 -- Video Assembly Prompt | Planned | Per-story stock-footage search queries (pivoted from AI video generation -- see [Why stock footage, not AI video generation?](#why-stock-footage-not-ai-video-generation)) |
-| Agent 8 -- Video Assembler | Planned | Pexels/Pixabay fetch + ffmpeg timed assembly against voice-over |
-| Agent 9 -- SEO Optimizer | Planned | Title, description, tags |
-| Agent 10 -- Publisher | Planned | YouTube Data API v3 |
+| **Agent 1 -- Trend Hunter** | ✅ Complete | HackerNews top stories with velocity scoring |
+| **Agent 2 -- Context Researcher** | ✅ Complete | 3-tier content fetch + background synthesis |
+| **Agent 3 -- Fact Checker** | ✅ Complete | 3-signal scoring (-1 to +1): source + LLM + cross-verify |
+| **Agent 4 -- Editorial** | ✅ Complete | Filter -> score -> deduplicate (qwen2.5:7b) -> select top 3 |
+| **Agent 5 -- Script Writer** | ✅ Complete | HOOK -> CONTEXT -> CORE -> TWIST -> CTA (llama-3.3-70b-versatile) |
+| **Agent 6 -- Script QC** | ✅ Complete | Two-stage JUDGE/REWRITE loop, TTS-readiness scan, date humanization |
+| **Agent 6.1 -- Voice-Over Generator** | ✅ Complete | Kokoro TTS via mlx-audio, pre-chunked + sanitized + stitched |
+| Agent 6.2 -- Sound Design | 🔨 In Progress | CLAP-based semantic transition/music matching over voice-over audio |
+| Agent 7 -- Video Assembly Prompt | ⏳ Planned | Per-story stock-footage search queries (pivoted from AI video generation -- see [Why stock footage, not AI video generation?](#why-stock-footage-not-ai-video-generation)) |
+| Agent 8 -- Video Assembler | ⏳ Planned | Pexels/Pixabay fetch + ffmpeg timed assembly against voice-over |
+| Agent 9 -- SEO Optimizer | ⏳ Planned | Title, description, tags |
+| Agent 10 -- Publisher | ⏳ Planned | YouTube Data API v3 |
 
 ---
 
@@ -482,23 +482,59 @@ Kokoro HN story; see KNOWN_ISSUES ISSUE-12.)*
 - [x] Retry-then-skip on chunk failure -- partial audio over total failure
 - [x] Duration verification against word-count estimate
 
-### Phase 6.2 -- Sound Design (in progress)
+### Phase 6.2 -- Sound Design (paused)
 - [x] Design decision: curated local sound pool (Mixkit/Pixabay/Freesound),
       not live API calls or AI-generated SFX -- consistency + zero cost + zero latency
 - [x] Design decision: numpy-based mixing, not pydub (Python 3.13 removed
       `audioop`, which pydub's mixing operations depend on)
 - [x] CLAP (MS-CLAP 2023) selected for genuine audio-text semantic matching --
       not just LLM-judged text tags
+- [x] `clap-env/` virtual environment created and isolated (see
+      [Why separate venvs](#why-two-separate-venvs-multi-agent-env-and-clap-env))
 - [ ] Offline embedding precompute script
 - [ ] Agent 6.1 chunking updated to track exact per-story timestamps
       (`beat_timestamps`) -- required before SFX can be placed precisely
 - [ ] Runtime mood-matching + numpy-based audio mixing
 
-### Phase 7-10 -- Video Pipeline (planned)
+**Paused, not abandoned** -- deliberately deferred in favor of Phase
+7-10 (Video Pipeline). Getting one complete video artifact end-to-end
+(trend -> script -> voice-over -> assembled video) is a stronger
+milestone right now than further polishing an intermediate audio-only
+stage. Sound design resumes once video assembly is working.
+
+**Also deferred alongside 6.2:** two open script/voice quality items
+worth tackling together in a future pass, since both are about making
+the *voice* -- not the visuals -- feel more human:
+- Agent 6 / Agent 6.1: humanize phrasing further and reduce reliance
+  on the current two-stage JUDGE/REWRITE loop producing occasional
+  stiff or repeated-restatement sections (see QC notes pattern in real
+  runs, e.g. "restates the core fact" firing on the same section type
+  across multiple iterations)
+- **[ISSUE-19](docs/KNOWN_ISSUES.md#issue-19-agent-61----short-final-chunk-silently-dropped-by-mlx_audio-cta-lost)**
+  -- a short final TTS chunk (the CTA, in a real run) can be silently
+  dropped by `mlx_audio` with no audio produced and no hard error;
+  the pipeline currently ships the truncated audio anyway rather than
+  flagging that the CTA specifically was lost. Logged, not yet fixed.
+
+### Phase 7-10 -- Video Pipeline (current focus)
 - [ ] Agent 7 -- per-story stock-footage search query extraction
+  - [ ] Extract 1-2 concrete visual search terms per story from
+        `content`/`background` (not a cinematic AI-video prompt --
+        see [Why stock footage, not AI video generation?](#why-stock-footage-not-ai-video-generation))
+  - [ ] Map each query to its story's section span in `tts_ready_text`
+        so footage can later be timed against the right part of the audio
 - [ ] Agent 8 -- Pexels/Pixabay fetch + ffmpeg assembly timed to voice-over
-- [ ] Agent 9 -- SEO Optimizer
-- [ ] Agent 10 -- YouTube Publisher
+  - [ ] Fetch candidate clips per query (Pexels primary, Pixabay fallback)
+  - [ ] Select clip duration/count per story using Agent 6.1's
+        `beat_timestamps` (or per-chunk durations) so cuts land on
+        natural pauses, not mid-sentence
+  - [ ] ffmpeg assembly: concatenate + trim clips to the voice-over's
+        total duration, mux with the final stitched `.wav`
+  - [ ] Fallback behavior if a story's search returns no usable footage
+        (currently undecided -- likely a solid-color/title-card slide
+        rather than blocking the whole video)
+- [ ] Agent 9 -- SEO Optimizer (title, description, tags)
+- [ ] Agent 10 -- YouTube Publisher (YouTube Data API v3)
 
 #### Why stock footage, not AI video generation?
 

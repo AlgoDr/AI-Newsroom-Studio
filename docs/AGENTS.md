@@ -417,6 +417,7 @@ order discovered):**
 | Chunk 2 of 7 failed silently once pre-chunking was added -- no error, no exception, the before/after file-diff just came back empty | `mlx_audio` resets its own internal file counter (`audio_000.wav`) on every fresh subprocess invocation; chunk 1's leftover output file was still present when chunk 2 ran, so chunk 2 silently overwrote it under the same name | Clear any stray `audio_*.wav` files BEFORE each chunk call; immediately rename the result to a unique `chunk_NNN_MM.wav` right after |
 | Chunk 5 of 8 (23 words, well under the 40-word limit) caused `mlx_audio` to exit 0 with no output file and no error message | Kokoro's phonemizer crashes on certain content: Unicode typographic characters (em dashes, smart quotes) AND decimal-separated version numbers like `"GPT-5.6"` -- confirmed via direct reproduction: `"GPT-5.6 is a new model."` throws a `broadcast_shapes` ValueError deep inside `istftnet.py` (an F0-tensor shape mismatch), caught internally, no file written | `_sanitize_for_tts()`: replaces em-dashes/smart-quotes/ellipses with ASCII equivalents, and converts `X.Y` decimal patterns to spoken form (`"GPT-5.6"` -> `"GPT-5 point 6"`) in a repeating pass (handles chained versions like `"v1.2.0"`); retries once after sanitizing; if still failing, SKIPS the chunk rather than aborting the whole pipeline -- partial audio beats no audio |
 | The subprocess call intermittently invoked the wrong Python interpreter (system Python without `mlx_audio` installed) rather than the active venv's Python | `sys.executable` inside a Jupyter-spawned subprocess does not reliably resolve to the active venv | `_find_venv_python()` runs once at module load, checks several candidate paths (relative to the agents directory, `$VIRTUAL_ENV`, then `sys.executable` as last resort), verifying each candidate actually has `mlx_audio` importable before accepting it |
+| **(open, not yet fixed)** A real 201-word/7-chunk run's final chunk -- 8 words, containing the CTA ("Check them out. Follow for daily tech news") -- exited cleanly with no output file, and the existing retry-with-sanitization step also produced nothing | Not yet confirmed. Text contained none of the known Bug-3 trigger characters, so the previous fix doesn't apply here -- suspected but unconfirmed cause is `mlx_audio`/Kokoro struggling with very short isolated chunks specifically. Not yet reproduced in isolation | None yet -- retry-then-skip correctly prevented a total pipeline failure, but silently shipped audio missing its CTA. See [KNOWN_ISSUES ISSUE-19](../KNOWN_ISSUES.md#issue-19-agent-61----short-final-chunk-silently-dropped-by-mlx_audio-cta-lost) for candidate fixes under consideration |
 
 **Why the fix is retry-then-SKIP, not retry-then-abort:**
 A script covering 3 stories that loses one chunk to an unfixable content
@@ -448,3 +449,50 @@ already baked into `tts_ready_text`'s punctuation and sentence structure
 by Agent 6). Does not decide video scene timing (a future agent's job,
 though it will consume this agent's `audio_duration` output). Does not
 run at all if Agent 6 has not approved the script.
+
+---
+
+### Agent 7 -- Video Assembly Prompt (design, not yet implemented)
+
+**Status:** Planned, current development focus. Nothing below is built
+yet -- this section documents design decisions made so far, so the
+reasoning isn't lost between sessions. Update this section as real
+implementation choices are made and tested, following the same
+evidence-first standard as every other agent in this file.
+
+**Role:** convert each of the 3 selected stories into concrete,
+searchable visual queries that Agent 8 can hand directly to Pexels/
+Pixabay -- not a cinematic AI-video prompt (see README's
+[Why stock footage, not AI video generation?](../README.md#why-stock-footage-not-ai-video-generation)
+for why the project pivoted away from generated video entirely).
+
+**Inputs available to Agent 7** (already present on `state` by this
+point in the pipeline, confirmed from Agent 5/6's real output):
+- `story["title"]`, `story["content"]`, `story["background"]` per
+  selected story (Agents 1-4)
+- `state["script"]["sections"]` -- the 10 labeled HOOK/S1_CONTEXT/.../CTA
+  sections, so a query can be tied to the specific section it should
+  appear alongside, not just the story as a whole
+- `state["script"]["tts_ready_text"]` and `audio_duration` -- for
+  eventually timing clip changes against the actual spoken audio
+
+**Open design questions, not yet decided:**
+- One search query per story, or one per section (up to ~3 per story)?
+  More queries = more precise visual matches but more Pexels/Pixabay
+  calls and more room for an irrelevant result to slip through.
+- How literal should queries be? A story about a CVE/kernel exploit
+  has no natural stock-footage equivalent -- likely needs a fallback
+  category (e.g. generic "coding" / "server room" / "cybersecurity"
+  b-roll) rather than a literal query built from the story's specific
+  technical content.
+- Whether query generation should be a small local model (matching the
+  project's existing local-first pattern for classification-style
+  tasks, e.g. Agent 4's phi3.5 topic clustering) or pure keyword
+  extraction with no LLM call at all, given how mechanical the task is.
+
+**Known constraint from Agent 6.1:** exact per-chunk/per-section timing
+(`beat_timestamps`) is not yet tracked -- flagged as a Phase 6.2
+dependency in the README roadmap, but it's actually a dependency for
+precise Agent 7/8 clip-timing too, not just sound design. Worth
+revisiting whether that timing work should be pulled forward rather
+than treated as Phase 6.2-only.

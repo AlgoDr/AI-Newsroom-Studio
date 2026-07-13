@@ -970,6 +970,63 @@ visible in `qc_notes` and the console log rather than silent.
 
 ---
 
+## ISSUE-19: Agent 6.1 — short final chunk silently dropped by mlx_audio (CTA lost)
+
+**Status:** Open, deferred — logged for future fix, not blocking pipeline.
+**Affects:** Agent 6.1 `_generate_one_call()` / `_generate_audio()`
+
+### Symptom
+Real run on 2026-07-13 (`voiceover_20260713_084836.wav`, 201-word
+script, 7 TTS-safe chunks): chunk 7/7 — the final chunk, only 8 words
+(`"Check them out. Follow for daily tech news"`) — failed silently.
+`mlx_audio` exited cleanly (returncode 0) but produced no
+`audio_*.wav` file. The existing retry-with-extra-sanitization step
+(Bug 3 fix, see module docstring) also produced no file. Per the
+documented skip-not-abort design, the pipeline correctly continued and
+stitched the remaining 6 chunks — but the shipped audio
+(83.0s, `duration_verified: True`) is missing its final sentence and,
+critically, **the entire CTA**. Every video this happens to ships
+without a call-to-action, silently, since `duration_verified` only
+sanity-checks total duration against word count and has no way to
+know a specific sentence — especially the CTA — was the one dropped.
+
+### Suspected cause (not yet confirmed)
+The chunk that failed was short (8 words) relative to the ~30-40 word
+chunks that succeeded in the same run. Bug 3's original fix targeted
+Unicode/typographic characters (em-dashes, smart quotes, markdown
+artifacts) tripping `espeak-ng`'s phonemizer — this chunk's text has
+none of those, so the root cause is likely different: possibly
+`mlx_audio`/Kokoro producing near-zero-length or empty output for
+very short inputs, rather than a text-sanitization problem. Not yet
+reproduced in isolation — needs a standalone test generating just an
+8-word chunk repeatedly to confirm whether short length is the actual
+trigger, or if this run was a one-off.
+
+### Why deferred rather than fixed now
+Project focus is shifting to Agent 7/8 (video assembly) to get a
+complete end-to-end video artifact working, rather than continuing to
+harden the audio stage in isolation. This is a real, user-facing bug
+(silent CTA loss on every affected run) and should be revisited before
+the pipeline is trusted for daily unattended publishing — flagging
+here specifically so it isn't lost.
+
+### Candidate fixes to evaluate later
+1. Detect a failed chunk that's disproportionately short (e.g. <15
+   words) and merge its text into the previous chunk before retrying,
+   rather than retrying it alone — avoids ever asking Kokoro to
+   generate from a very short isolated string.
+2. Add a specific alert/log line when the **last** chunk in a script
+   is skipped, since losing the CTA is a materially worse outcome than
+   losing an arbitrary mid-script chunk — current logging treats all
+   skipped chunks identically.
+3. Verify final `tts_ready_text` coverage post-stitch: compare the
+   word count of chunks that actually produced audio against the
+   original `tts_ready_text` word count, and surface a clear
+   "X words missing from final audio, including CTA: <text>" warning
+   distinct from the current generic `chunks_skipped` count.
+
+---
+
 ## Summary for future sessions
 
 ```
@@ -1004,4 +1061,11 @@ Agent 6 approved script with word count outside 150-225: check qc_notes
 for the ISSUE-18 drift warning — this is expected visibility, not a
 new bug, but worth investigating why 2 rewrite iterations pushed it
 out of range (often traces back to ISSUE-16 if reasons were blank)
+
+Agent 6.1 "chunks_skipped" > 0 in the final printout: check WHICH
+chunk index was skipped, not just the count — if it's the LAST chunk,
+the CTA (and possibly the closing sentence) is silently missing from
+the shipped audio. This is ISSUE-19, currently open/deferred. Print
+the skipped chunk's text (already logged) to see exactly what was lost
+before deciding whether that sample is still usable as-is.
 ```
