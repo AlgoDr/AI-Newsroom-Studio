@@ -6,7 +6,7 @@
 ![LangGraph](https://img.shields.io/badge/LangGraph-In_Progress-FF6B6B?style=for-the-badge)
 ![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-black?style=for-the-badge)
 ![Groq](https://img.shields.io/badge/Groq-Cloud_Inference-F55036?style=for-the-badge)
-![Status](https://img.shields.io/badge/Status-Agents_1--6.1_Complete-brightgreen?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Agents_1--8_Complete-brightgreen?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 **A fully autonomous, multi-agent AI pipeline that researches trending tech news, fact-checks it, writes engaging scripts, generates voice-over audio, and (soon) assembles and publishes short-form videos to YouTube -- all without human intervention.**
@@ -49,10 +49,13 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
 | **Agent 6 -- Script QC** | ✅ Complete | Two-stage JUDGE/REWRITE loop, TTS-readiness scan, date humanization |
 | **Agent 6.1 -- Voice-Over Generator** | ✅ Complete | Kokoro TTS via mlx-audio, pre-chunked + sanitized + stitched |
 | Agent 6.2 -- Sound Design | 🔨 In Progress | CLAP-based semantic transition/music matching over voice-over audio |
-| Agent 7 -- Video Assembly Prompt | ⏳ Planned | Per-story stock-footage search queries (pivoted from AI video generation -- see [Why stock footage, not AI video generation?](#why-stock-footage-not-ai-video-generation)) |
-| Agent 8 -- Video Assembler | ⏳ Planned | Pexels/Pixabay fetch + ffmpeg timed assembly against voice-over |
+| **Agent 7 -- Video Assembly Prompt** | ✅ Complete | Per-section stock-footage queries + timing (qwen2.5:7b)[^1] |
+| **Agent 8 -- Video Assembler** | ✅ Complete (`reactive`) | PIL/ffmpeg presenter graphic + lower-thirds, 1080x1920[^2] |
 | Agent 9 -- SEO Optimizer | ⏳ Planned | Title, description, tags |
 | Agent 10 -- Publisher | ⏳ Planned | YouTube Data API v3 |
+
+[^1]: Agent 7 originally targeted writing a cinematic AI-video-generation prompt. That was dropped for cost reasons before ever being tested -- see [Why stock footage, not AI video generation?](#why-stock-footage-not-ai-video-generation). Agent 7 now extracts a stock-footage search query per script section instead.
+[^2]: Agent 8's `reactive` mode (the PIL presenter graphic) is what's actually running today. Before building it, **Wan2.1 1.3B (a real local text-to-video model, via mlx-video) was downloaded, converted, quantized, and genuinely test-run end-to-end on this project's own M4 Pro** -- not just researched. It technically completed once `--tiling aggressive` was forced, but took **10.7 minutes and 20GB+ of swap for 2 seconds of unusable output**. That real result is what led to switching to the current PIL/ffmpeg approach. Full test log: [KNOWN_ISSUES ISSUE-20](docs/KNOWN_ISSUES.md#issue-20-agent-78----ai-videoavatar-generation-evaluated-and-deferred-research-log-not-a-bug). A `broll` mode (real Pexels/Pixabay stock footage) is scaffolded in the code but not yet tested end-to-end -- no API key was available during development.
 
 ---
 
@@ -200,41 +203,61 @@ NewsStudio/
 |   |   |-- agent5.py          # Script Writer -- HOOK->CORE->TWIST->CTA + local fallback
 |   |   |-- agent6.py          # Script QC -- JUDGE/REWRITE loop + local fallbacks
 |   |   |-- agent6_1.py        # Voice-Over Generator -- Kokoro TTS
-|   |   `-- agent6_2.py        # Sound Design -- CLAP semantic matching (in progress)
+|   |   |-- agent6_2.py        # Sound Design -- CLAP semantic matching (paused, see README)
+|   |   |-- agent7.py          # Video Assembly Prompt -- per-section stock-footage queries
+|   |   `-- agent8.py          # Video Assembler -- PIL reactive presenter + ffmpeg mux
 |   |
 |   |-- agent_tools/
 |   |   |-- __init__.py
-|   |   |-- story_cache.py      # Persist Agent 1-3 output (data/stories_cache.json)
-|   |   |-- pipeline_cache.py   # Persist Agent 4+ full state (data/checkpoints/)
-|   |   `-- milestone_tracker.py # macOS alerts at N function-hit milestones
+|   |   |-- story_cache.py             # Persist Agent 1-3 output (data/stories_cache.json)
+|   |   |-- pipeline_cache.py          # Persist Agent 4+ full state (data/checkpoints/)
+|   |   |-- output_organization.py     # output/{timestamp}_{slug}/ + metadata.json + pruning
+|   |   |-- generate_showcase_pages.py # Regenerates docs/*-showcase.html from output/ (manual)
+|   |   `-- milestone_tracker.py       # macOS alerts at N function-hit milestones
 |   |
-|   |-- workflow.ipynb          # Main pipeline notebook (A1->A2->A3->A4->A5->A6->A6.1)
+|   |-- workflow.ipynb          # Main pipeline notebook (A1->A2->...->A7->A8)
 |   `-- __init__.py
 |
-|-- data/                        # gitignored -- local cache + checkpoints
+|-- data/                        # gitignored -- local cache + working files
 |   |-- stories_cache.json
 |   |-- checkpoints/
 |   |   |-- till-agent4.json
 |   |   |-- till-agent5.json
-|   |   `-- till-agent6.json
+|   |   |-- till-agent6.json
+|   |   |-- till-agent6_1.json
+|   |   |-- till-agent7.json
+|   |   `-- till-agent8.json
 |   |-- audio/                   # Agent 6.1 output -- final voice-over .wav files
-|   |-- sfx/                     # curated transition sounds (Mixkit/Pixabay/Freesound)
-|   |   `-- embeddings.json      # precomputed CLAP embeddings for the pool
-|   `-- music/                   # curated background music loops
+|   |-- video/                   # Agent 8 output -- final assembled .mp4 files
+|   |-- sfx/                     # curated transition sounds (Mixkit/Pixabay/Freesound, paused)
+|   `-- music/                   # curated background music loops (paused)
 |
-|-- docs/
+|-- output/                      # gitignored -- finished per-run deliverables only
+|   `-- {YYYYMMDD_HHMMSS}_{story-slug}/
+|       |-- final_video.mp4      # copy, not moved -- data/video/ keeps its own
+|       |-- {name}.wav           # copy, not moved -- data/audio/ keeps its own
+|       `-- metadata.json        # titles, script text, word count, QC iterations, durations
+|                                 # kept capped at 5 runs via output_organization.prune_old_runs()
+|
+|-- docs/                        # served by GitHub Pages
 |   |-- AGENTS.md                # detailed per-agent technical reference
 |   |-- agent2_architecture.svg
 |   |-- agent3_architecture.svg
 |   |-- agent4_architecture.svg
 |   |-- agent5_architecture.svg
 |   |-- agent6_architecture.svg
-|   `-- agent6_1_architecture.svg
+|   |-- agent6_1_architecture.svg
+|   |-- agent7_architecture.svg
+|   |-- agent8_architecture.svg
+|   |-- audio-showcase.html      # auto-generated -- do not hand-edit, see generate_showcase_pages.py
+|   |-- video-showcase.html      # auto-generated -- do not hand-edit
+|   |-- samples/                 # audio files copied in by the showcase generator
+|   `-- video-samples/           # video files copied in by the showcase generator
 |
 |-- multi-agent-env/             # main venv -- everything except CLAP
 |-- clap-env/                    # SEPARATE venv -- msclap only (dependency isolation)
 |
-|-- KNOWN_ISSUES.md              # 18 documented limitations (not bugs)
+|-- KNOWN_ISSUES.md              # 24 documented limitations (not bugs)
 |-- .gitignore
 |-- LICENSE
 `-- README.md
@@ -517,57 +540,131 @@ the *voice* -- not the visuals -- feel more human:
   flagging that the CTA specifically was lost. Logged, not yet fixed.
 
 ### Phase 7-10 -- Video Pipeline (current focus)
-- [ ] Agent 7 -- per-story stock-footage search query extraction
-  - [ ] Extract 1-2 concrete visual search terms per story from
-        `content`/`background` (not a cinematic AI-video prompt --
-        see [Why stock footage, not AI video generation?](#why-stock-footage-not-ai-video-generation))
-  - [ ] Map each query to its story's section span in `tts_ready_text`
-        so footage can later be timed against the right part of the audio
-- [x] Presenter/host visual layer -- **proof-of-concept built and tested**,
-      not yet wired into the pipeline. Reactive graphic (pulsing/glowing
-      abstract orb driven by the real audio's amplitude envelope, plus
-      a small waveform-bar indicator) rendered per-frame with pure
-      PIL + numpy, no ML model. Source-citation lower-thirds (title +
-      domain, fading in per story) burned in the same way. Chosen over
-      an AI-generated talking-head avatar after evaluating both cloud
-      APIs and local generation (Wan2.1 1.3B via mlx-video) -- see
-      [KNOWN_ISSUES ISSUE-20](docs/KNOWN_ISSUES.md#issue-20-agent-78----ai-videoavatar-generation-evaluated-and-deferred-research-log-not-a-bug)
-      for the full evaluation. Tested end-to-end against a real 83s
-      pipeline audio file: ~2 minutes total render time, pure CPU,
-      zero GPU/MPS dependency. Reuses `docs/audio-demo.html`'s existing
-      color/typography tokens for visual consistency across the project.
-  - [ ] Wire into the actual Agent 7/8 flow (currently a standalone script)
-  - [ ] Replace word-share-proportional story timing (current
-        approximation) with real per-section timestamps once
-        `beat_timestamps` exists (see Agent 6.1 dependency note below)
-- [ ] Agent 8 -- Pexels/Pixabay fetch + ffmpeg assembly timed to voice-over
-  - [ ] Fetch candidate clips per query (Pexels primary, Pixabay fallback)
-  - [ ] Select clip duration/count per story using Agent 6.1's
-        `beat_timestamps` (or per-chunk durations) so cuts land on
-        natural pauses, not mid-sentence
-  - [ ] ffmpeg assembly: concatenate + trim clips to the voice-over's
-        total duration, mux with the final stitched `.wav`
-  - [ ] Compositing decision needed: presenter graphic + lower-thirds as
-        a foreground overlay on top of b-roll footage, vs. two separate
-        visual modes the video alternates between -- not yet decided
+- [x] Agent 7 -- per-story stock-footage search query extraction --
+      **built and tested against real pipeline data**
+      (`experiments/agents/agent7.py`, wired into `workflow.ipynb`
+      with `till-agent7` checkpoint)
+  - [x] Extract 1-2 concrete visual search terms per section via
+        `qwen2.5:7b` (not a cinematic AI-video prompt -- see
+        [Why stock footage, not AI video generation?](#why-stock-footage-not-ai-video-generation)),
+        with keyword-sniffed category fallback
+        (security/hardware/software/research/generic) if extraction
+        fails or is malformed
+  - [x] Maps each script section to its story (`S1_*`/`S2_*`/`S3_*` ->
+        `selection_rank`; `HOOK`/`CTA` treated as whole-video bookends)
+        and computes word-count-proportional timing per section --
+        output is `state["shot_list"]`, consumed directly by Agent 8
+  - [x] Defensive checks: raises loudly if a section references a
+        story rank missing from `state["stories"]`, and if
+        `word_count` doesn't match the real sum of section words
+        (guards against the exact drift ISSUE-18 already documented
+        elsewhere in the pipeline)
+- [x] Agent 8 -- Video Assembler, **`reactive` mode built, tested, and
+      wired into the pipeline** (`experiments/agents/agent8.py`, wired
+      into `workflow.ipynb` with `till-agent8` checkpoint)
+  - [x] Reactive presenter graphic: pulsing/glowing abstract orb
+        driven by the real audio's amplitude envelope, waveform-bar
+        indicator, source-citation lower-thirds fading in per story
+        using Agent 7's real per-section timing. Pure PIL + numpy, no
+        ML model. Chosen over an AI-generated talking-head avatar
+        after evaluating both cloud APIs and local generation (Wan2.1
+        1.3B via mlx-video) -- see
+        [KNOWN_ISSUES ISSUE-20](docs/KNOWN_ISSUES.md#issue-20-agent-78----ai-videoavatar-generation-evaluated-and-deferred-research-log-not-a-bug)
+        for the full evaluation
+  - [x] Output resolution upgraded to 1080x1920 -- YouTube's actual
+        *recommended* Shorts resolution, not just the 720x1280 minimum
+        used in the earliest prototype
+  - [x] **Font rendering fixed for macOS** -- an earlier version's
+        `_load_font()` only checked a Linux font path, silently fell
+        back to a size-ignoring bitmap font on the actual target Mac,
+        and produced unreadably small text no matter how large a size
+        was requested. See
+        [KNOWN_ISSUES ISSUE-21](docs/KNOWN_ISSUES.md#issue-21-agent-8-_load_font-silently-used-a-tiny-fallback-font-on-macos----requested-size-was-ignored-entirely)
+        for the root cause and the fix (real macOS font paths checked
+        first; raises loudly instead of silently degrading if no
+        usable font is found on any platform)
+  - [ ] `broll` mode -- Pexels/Pixabay fetch, scaffolded in
+        `agent8.py` but **not tested end-to-end** (no API key
+        available during initial development; `fetch_pexels_clip()`
+        is written against Pexels' documented API shape but unverified,
+        and `assemble_broll_mode()` deliberately raises
+        `NotImplementedError` past the fetch step rather than pretend
+        to work)
+  - [ ] Replace word-count-proportional story timing (current
+        approximation, computed in Agent 7) with real per-section
+        timestamps once `beat_timestamps` exists (see Agent 6.1
+        dependency note below)
+  - [ ] Compositing decision needed once `broll` mode is validated:
+        presenter graphic + lower-thirds as a foreground overlay on
+        top of b-roll footage, vs. two separate visual modes the video
+        alternates between -- not yet decided
   - [ ] Fallback behavior if a story's search returns no usable footage
         (currently undecided -- likely a solid-color/title-card slide
         rather than blocking the whole video)
+- [ ] **Agent 8.1 -- Video QA (idea, not built)**: once `broll` mode
+      exists, verify a fetched stock-footage clip's first frame
+      actually matches its search query before Agent 8 commits to
+      using it, via **Moondream** (a small vision-language model,
+      already installed locally via Ollama on this project's machine --
+      `ollama list` confirms `moondream:latest`, 1.7GB). Concretely:
+      caption the candidate clip's thumbnail, compare against the
+      query, reject and try the next candidate if there's an obvious
+      mismatch. Deliberately scoped as a **quality-improvement pass on
+      top of a working `broll` mode**, not a prerequisite for it --
+      building verification logic before the thing it verifies exists
+      is the same mistake as chasing AI video generation before
+      confirming stock footage even worked (see the two-stage decision
+      above). Not started.
 - [ ] Agent 9 -- SEO Optimizer (title, description, tags)
 - [ ] Agent 10 -- YouTube Publisher (YouTube Data API v3)
 
-#### Why stock footage, not AI video generation?
+#### Why stock footage, not AI video generation? And why PIL, not stock footage (yet)?
 
-Originally planned as AI-generated video (Fal.ai Wan, or similar).
-Revisited given the project's actual budget constraint (near-free,
-2 videos/day sustainably): true AI video generation costs $0.50-$5+
-per clip across every provider checked (Runway, Veo, Kling, Luma) --
-incompatible with near-free at scale. Pexels and Pixabay both offer
-genuinely free, blanket-licensed stock video APIs with no per-clip
-cost. Agent 7's job changed from "write a cinematic AI video prompt"
-to "extract 1-2 concrete visual search queries per story"; Agent 8's
-job changed from "call a video-generation model" to "fetch and
-assemble matching clips via ffmpeg."
+This was a two-stage decision, and the second stage was made from a
+**real, completed hardware test**, not just a cost estimate.
+
+**Stage 1 -- ruling out AI video generation.** Originally planned as
+AI-generated video (Fal.ai Wan, or similar). Revisited given the
+project's actual budget constraint (near-free, 1-2 videos/day
+sustainably):
+- Every cloud provider checked (Runway, Veo, Kling, Luma, Synthesia,
+  HeyGen, Grok Imagine) charges $0.05-$5+ per clip or per second, with
+  no free tier suitable for automated daily use -- confirmed by
+  actually reading each provider's current pricing, not assumed.
+- **Local generation was then actually attempted, not just ruled out
+  on paper.** Wan2.1 1.3B (a real open-weight text-to-video model) was
+  downloaded (~17.6GB), converted to MLX format, and 4-bit quantized
+  on this project's own M4 Pro / 16GB machine via `mlx-video`. The
+  first real generation attempt **crashed** on VAE decode (a Metal
+  buffer-size limit, not a memory shortage -- see
+  [KNOWN_ISSUES ISSUE-20](docs/KNOWN_ISSUES.md#issue-20-agent-78----ai-videoavatar-generation-evaluated-and-deferred-research-log-not-a-bug)
+  for the exact error). Forcing `--tiling aggressive` made it complete
+  without crashing, but the smallest possible test (480x480, 2 seconds
+  of output) took **10.7 minutes and pushed swap usage past 20GB**,
+  with sustained real thermal load. That result -- not a projection --
+  is what ruled out local AI video generation for daily automated use.
+
+**Stage 2 -- what's actually running today.** Agent 7 extracts a
+stock-footage search query per script section (Pexels/Pixabay have
+genuinely free, blanket-licensed video APIs). Agent 8, however,
+currently ships with a **PIL/ffmpeg-rendered reactive presenter
+graphic** as its default (`reactive`) mode -- a pulsing/glowing
+abstract orb driven by the real audio's amplitude envelope, plus
+source-citation lower-thirds -- not real stock footage. This was a
+practical choice made while building Agent 8: it's provably fast
+(~65-75s wall time for a full ~85s video, confirmed across multiple
+real runs), needs no API key, and has zero swap/thermal risk. A
+`broll` mode that actually fetches Pexels/Pixabay clips is scaffolded
+in `agent8.py` (`fetch_pexels_clip()`, `assemble_broll_mode()`) but
+**deliberately left unfinished and untested** -- no Pexels API key was
+available during development, and the code raises
+`NotImplementedError` past the fetch step rather than pretend the
+ffmpeg assembly logic works without ever having been run.
+
+Net effect: Agent 7's job is "extract concrete visual search queries,"
+matching the original stock-footage plan. Agent 8's job today is "render
+a reactive graphic locally," not yet "fetch and assemble real stock
+footage" -- that's the next real gap to close, not a finished feature.
 
 ---
 
@@ -642,7 +739,7 @@ to resolve Python-version differences for Kokoro's own subprocess call.
 
 ## Known Limitations
 
-See [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for all 18 documented limitations. Highlights:
+See [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for all 24 documented limitations. Highlights:
 
 - **ISSUE-1:** GitHub/arXiv/docs URLs -- background frequency issue, largely mitigated by compound-mini web search
 - **ISSUE-4:** llama3.1:8b context bleed between stories (fixed -- `keep_alive=0`, correctly passed)
@@ -654,6 +751,11 @@ See [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for all 18 documented limitations. High
 - **ISSUE-15:** `keep_alive` silently rejected when passed inside `options{}` on Ollama 0.24.0+ -- fixed across all 4 affected files
 - **ISSUE-16:** Empty pipe-separated JUDGE reasons parsed as valid blank reasons, causing REWRITE to add filler instead of fixing real issues -- fixed
 - **ISSUE-18:** Final word count not re-validated after QC's last rewrite iteration -- fixed
+- **ISSUE-19 / ISSUE-23:** Agent 6.1 can silently drop a short, late-script TTS chunk (mlx_audio exits cleanly, no output file) -- occurred twice on real runs, losing the CTA both times; open, root cause not yet confirmed
+- **ISSUE-20:** AI video generation (cloud and local) evaluated and ruled out with a real hardware test, not just research -- see [Why stock footage, not AI video generation?](#why-stock-footage-not-ai-video-generation-and-why-pil-not-stock-footage-yet)
+- **ISSUE-21:** Agent 8's font loader only checked a Linux path, silently rendering unreadably tiny text on macOS regardless of the requested size -- fixed
+- **ISSUE-22:** Agent 7 crashed with `KeyError: 'selection_rank'` on any run where Agent 3 discarded a story -- fixed
+- **ISSUE-24:** Agent 8 lower-third titles could silently lose text past 2 lines -- fixed via font auto-shrink; text/audio timing sync is still an open approximation pending real `beat_timestamps`
 
 ---
 

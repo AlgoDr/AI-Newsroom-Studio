@@ -1,0 +1,133 @@
+<svg viewBox="0 0 1000 1150" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a5568"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#38a169"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c53030"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title       { font-size: 26px; font-weight: 700; fill: #1a202c; }
+    .subtitle    { font-size: 14px; fill: #718096; }
+    .box         { stroke-width: 2; rx: 8; }
+    .boxLabel    { font-size: 14px; font-weight: 600; fill: #1a202c; }
+    .boxSub      { font-size: 11.5px; fill: #4a5568; }
+    .stagePython { fill: #f0fff4; stroke: #38a169; }
+    .stageLocal  { fill: #fffaf0; stroke: #dd6b20; }
+    .stageOutput { fill: #faf5ff; stroke: #805ad5; }
+    .stageGate   { fill: #fff5f5; stroke: #c53030; }
+    .stagePlanned{ fill: #f7fafc; stroke: #a0aec0; stroke-dasharray: 6,4; }
+    .flowArrow   { stroke: #4a5568; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    .exitArrow   { stroke: #38a169; stroke-width: 2.5; fill: none; marker-end: url(#arrowGreen); }
+    .loopArrow   { stroke: #c53030; stroke-width: 2; fill: none; marker-end: url(#arrowRed); }
+    .loopLabel   { font-size: 12px; fill: #c53030; font-weight: 600; }
+    .exitLabel   { font-size: 12px; fill: #38a169; font-weight: 600; }
+    .sectionLabel{ font-size: 13px; font-weight: 700; fill: #2d3748; letter-spacing: 0.5px; }
+    .legendText  { font-size: 12px; fill: #4a5568; }
+  </style>
+
+  <!-- HEADER -->
+  <text x="500" y="40" text-anchor="middle" class="title">Agent 8 — Video Assembler</text>
+  <text x="500" y="62" text-anchor="middle" class="subtitle">PIL/ffmpeg reactive presenter graphic · $0 cost, fully local, no GPU dependency</text>
+
+  <!-- INPUT -->
+  <rect x="230" y="85" width="540" height="55" class="box stageOutput"/>
+  <text x="500" y="108" text-anchor="middle" class="boxLabel">Input: state["shot_list"] (Agent 7) + audio_path (Agent 6.1)</text>
+  <text x="500" y="126" text-anchor="middle" class="boxSub">1080x1920 target — YouTube's recommended Shorts resolution</text>
+  <path d="M 500 140 L 500 165" class="flowArrow"/>
+
+  <!-- MODE GATE -->
+  <rect x="330" y="167" width="340" height="55" class="box stageGate"/>
+  <text x="500" y="190" text-anchor="middle" class="boxLabel">mode = "reactive" or "broll"?</text>
+  <text x="500" y="208" text-anchor="middle" class="boxSub">reactive: proven · broll: scaffolded, untested</text>
+
+  <path d="M 420 222 L 350 250" class="exitArrow"/>
+  <text x="330" y="245" text-anchor="end" class="exitLabel">reactive</text>
+  <path d="M 580 222 L 750 250" class="loopArrow"/>
+  <text x="770" y="245" text-anchor="start" class="loopLabel">broll</text>
+
+  <!-- BROLL BRANCH (dashed, not built) -->
+  <rect x="620" y="252" width="330" height="110" class="box stagePlanned"/>
+  <text x="785" y="276" text-anchor="middle" class="boxLabel">assemble_broll_mode()</text>
+  <text x="785" y="294" text-anchor="middle" class="boxSub">fetch_pexels_clip() written against</text>
+  <text x="785" y="310" text-anchor="middle" class="boxSub">Pexels' documented API shape</text>
+  <text x="785" y="330" text-anchor="middle" class="boxSub" font-style="italic">raises NotImplementedError past the</text>
+  <text x="785" y="346" text-anchor="middle" class="boxSub" font-style="italic">fetch step — no API key to test against</text>
+
+  <!-- REACTIVE BRANCH -->
+  <text x="90" y="380" class="sectionLabel">REACTIVE MODE (assemble_reactive_mode)</text>
+
+  <!-- ENVELOPE -->
+  <rect x="50" y="392" width="450" height="70" class="box stagePython"/>
+  <text x="275" y="416" text-anchor="middle" class="boxLabel">get_amplitude_envelope()</text>
+  <text x="275" y="434" text-anchor="middle" class="boxSub">RMS per video frame (30fps), smoothed</text>
+  <text x="275" y="450" text-anchor="middle" class="boxSub" font-style="italic">drives the orb's pulse + waveform bars</text>
+
+  <path d="M 275 462 L 275 487" class="flowArrow"/>
+
+  <!-- SECTION LOOP -->
+  <text x="50" y="510" class="sectionLabel">FOR EACH VIDEO FRAME (shot_for_frame maps to Agent 7's shot_list)</text>
+
+  <!-- RENDER FRAME -->
+  <rect x="50" y="522" width="450" height="115" class="box stagePython"/>
+  <text x="275" y="546" text-anchor="middle" class="boxLabel">render_reactive_frame()</text>
+  <text x="275" y="564" text-anchor="middle" class="boxSub">orb pulse + glow (amplitude-driven)</text>
+  <text x="275" y="580" text-anchor="middle" class="boxSub">scrolling waveform bars</text>
+  <text x="275" y="596" text-anchor="middle" class="boxSub">branding + source lower-third</text>
+  <text x="275" y="612" text-anchor="middle" class="boxSub" font-style="italic">no ML model, pure PIL + numpy</text>
+
+  <path d="M 275 637 L 275 662" class="flowArrow"/>
+
+  <!-- TITLE AUTOFIT -->
+  <rect x="50" y="664" width="450" height="115" class="box stageGate"/>
+  <text x="275" y="688" text-anchor="middle" class="boxLabel">_fit_title_to_two_lines()</text>
+  <text x="275" y="706" text-anchor="middle" class="boxSub">shrinks font 92px to 56px floor until title</text>
+  <text x="275" y="722" text-anchor="middle" class="boxSub">wraps into 2 lines or fewer</text>
+  <text x="275" y="740" text-anchor="middle" class="boxSub" font-style="italic">fixes ISSUE-24: old fixed-size + [:2] slice</text>
+  <text x="275" y="756" text-anchor="middle" class="boxSub" font-style="italic">silently DROPPED overflow text — no error, nothing</text>
+
+  <path d="M 275 779 L 275 804" class="flowArrow"/>
+  <rect x="50" y="806" width="450" height="55" class="box stageOutput"/>
+  <text x="275" y="829" text-anchor="middle" class="boxLabel" font-size="13">Save frame PNG</text>
+  <text x="275" y="845" text-anchor="middle" class="boxSub">frame_00000.png ... frame_NNNNN.png</text>
+
+  <text x="936" y="600" class="legendText" transform="rotate(90, 936, 600)">next frame (loop repeats)</text>
+  <path d="M 500 833 L 920 833 L 920 405 L 900 405" class="flowArrow"/>
+
+  <!-- AFTER ALL FRAMES -->
+  <text x="50" y="895" class="sectionLabel">AFTER ALL FRAMES RENDERED</text>
+  <path d="M 275 861 L 275 886" class="exitArrow"/>
+
+  <!-- FFMPEG MUX -->
+  <rect x="50" y="898" width="900" height="80" class="box stagePython"/>
+  <text x="500" y="924" text-anchor="middle" class="boxLabel">ffmpeg: concat PNG sequence @ 30fps + mux against real audio</text>
+  <text x="500" y="942" text-anchor="middle" class="boxSub">libx264, yuv420p, aac, -shortest, +faststart — real ~65-75s wall time on this hardware</text>
+  <text x="500" y="960" text-anchor="middle" class="boxSub" font-style="italic">confirmed: no swap, no thermal risk (contrast with ISSUE-20's Wan2.1 test: 10+ min / 20GB+ swap for 2s of video)</text>
+
+  <path d="M 500 978 L 500 1003" class="flowArrow"/>
+
+  <!-- SANITY CHECK -->
+  <rect x="150" y="1005" width="700" height="65" class="box stageGate"/>
+  <text x="500" y="1029" text-anchor="middle" class="boxLabel" font-size="13">Notebook sanity check: file exists, size, duration match</text>
+  <text x="500" y="1047" text-anchor="middle" class="boxSub" font-style="italic">catches silent truncation (ISSUE-19/23-style chunk drops) before trusting a sample</text>
+
+  <path d="M 500 1070 L 500 1090" class="exitArrow"/>
+
+  <!-- OUTPUT -->
+  <rect x="230" y="1092" width="540" height="50" class="box stageOutput"/>
+  <text x="500" y="1122" text-anchor="middle" class="boxLabel">Output: state["video_path"] · state["video_stats"]</text>
+
+  <!-- LEGEND -->
+  <rect x="90" y="72" width="22" height="16" class="box stagePlanned"/>
+  <text x="120" y="84" class="legendText" font-size="11">Scaffolded, untested</text>
+
+  <rect x="700" y="72" width="22" height="16" class="box stagePython"/>
+  <text x="730" y="84" class="legendText" font-size="11">Pure Python</text>
+
+</svg>

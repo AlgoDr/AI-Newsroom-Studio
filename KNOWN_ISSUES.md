@@ -1,8 +1,8 @@
 # Known Issues — AI Newsroom Studio
 
-Documented limitations as of the Agent 1-6 milestone (20 issues total).
+Documented limitations as of the Agent 1-8 milestone (24 issues total).
 These are **expected behaviors / accepted limitations**, not bugs.
-Recorded so future debugging (Agents 7-10) doesn't mistake them for new
+Recorded so future debugging (Agents 9-10) doesn't mistake them for new
 failures.
 
 **Issue index:** ISSUE-1,2 (Agent 2 background gathering) · ISSUE-3,4,5
@@ -17,7 +17,16 @@ ISSUE-17 (Agent 6 — no finish_reason visibility on live JUDGE path) ·
 ISSUE-18 (Agent 6 — final word count not re-validated after rewrites) ·
 ISSUE-19 (Agent 6.1 — short final chunk silently dropped by mlx_audio,
 CTA lost) · ISSUE-20 (Video pipeline — local Wan2.1 text-to-video not
-viable on 16GB Apple Silicon; PIL-based approach adopted instead)
+viable on 16GB Apple Silicon; PIL-based approach adopted instead) ·
+ISSUE-21 (Agent 8 — `_load_font()` silently used a size-ignoring
+fallback font on macOS; fixed with real cross-platform font paths +
+loud failure instead of silent degradation) · ISSUE-22 (Agent 7 —
+`KeyError: 'selection_rank'` on any run with an Agent-3-discarded
+story; fixed) · ISSUE-23 (Agent 6.1 — ISSUE-19 recurred, 2 chunks
+dropped instead of 1, same short/late-chunk pattern; still open) ·
+ISSUE-24 (Agent 8 — long lower-third titles silently lost text, fixed
+via font auto-shrink; text/audio timing sync still open, needs real
+beat_timestamps)
 
 ---
 
@@ -1005,13 +1014,22 @@ reproduced in isolation — needs a standalone test generating just an
 8-word chunk repeatedly to confirm whether short length is the actual
 trigger, or if this run was a one-off.
 
+### Recurrence
+This issue recurred on a second real run (2026-07-14) with a stronger
+pattern: 2 chunks dropped instead of 1, both again short and at/near
+the end of the script. See
+[ISSUE-23](#issue-23-agent-61-chunk-drop-issue-19-recurred-dropping-2-chunks-instead-of-1)
+for the full second occurrence and what it adds to the evidence here.
+
 ### Why deferred rather than fixed now
-Project focus is shifting to Agent 7/8 (video assembly) to get a
-complete end-to-end video artifact working, rather than continuing to
-harden the audio stage in isolation. This is a real, user-facing bug
-(silent CTA loss on every affected run) and should be revisited before
-the pipeline is trusted for daily unattended publishing — flagging
-here specifically so it isn't lost.
+Agent 7/8 (video assembly) were prioritized and are now complete --
+see their sections in [AGENTS.md](docs/AGENTS.md). This audio-stage
+issue remains open and deferred, not because of competing priorities
+anymore, but because it hasn't yet been revisited with dedicated
+attention. This is a real, user-facing bug (silent CTA loss on every
+affected run, now confirmed on 2 of 2 runs where a short chunk landed
+near the script's end) and should be fixed before the pipeline is
+trusted for daily unattended publishing.
 
 ### Candidate fixes to evaluate later
 1. Detect a failed chunk that's disproportionately short (e.g. <15
@@ -1032,8 +1050,8 @@ here specifically so it isn't lost.
 
 ## ISSUE-20: Agent 7/8 -- AI video/avatar generation evaluated and deferred (research log, not a bug)
 
-**Status:** Resolved -- decision made, documented so it isn't re-investigated from scratch later.
-**Affects:** Agent 7/8 design (video assembly stage, not yet implemented)
+**Status:** Resolved -- decision made, documented so it isn't re-investigated from scratch later. Agent 7 and Agent 8 (`reactive` mode) are now fully implemented and tested using the decision documented here.
+**Affects:** Agent 7/8 design (video assembly stage)
 
 ### Context
 While scoping Agent 7/8, considered building an AI-generated "host" or
@@ -1198,6 +1216,255 @@ Agent 7/8 critical path.
 
 ---
 
+## ISSUE-21: Agent 8 `_load_font()` silently used a tiny fallback font on macOS -- requested size was ignored entirely
+
+**Status:** Fixed. Confirmed via before/after pixel measurement, not just visual inspection.
+**Affects:** Agent 8 (`_load_font()`, used by `_draw_source_lowerthird()` and `_draw_branding()`)
+
+### Symptom
+Lower-third title/source text and branding text rendered as tiny,
+barely-legible text on the actual target machine (macOS, M4 Pro) despite
+the font `size` parameter being repeatedly increased across several
+iterations (38px -> 56px -> 72px -> 88px -> 130px) with **no visible
+change at any step**. Each iteration was verified to render correctly
+in the dev sandbox (Linux) before being handed off, yet every real
+render on the actual Mac still showed unreadably small text, leading to
+several rounds of "still too small" reports that looked like a tuning
+problem but were actually a single silent failure repeating itself.
+
+### Root cause
+```python
+def _load_font(size: int, bold: bool = False):
+    candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold
+        else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    for c in candidates:
+        if Path(c).exists():
+            return ImageFont.truetype(c, size)
+    return ImageFont.load_default()
+```
+The only font path checked was Linux-specific
+(`/usr/share/fonts/truetype/dejavu/...`). That path does not exist on
+macOS, so `Path(c).exists()` was always `False` on the actual target
+machine, and every call silently fell through to
+`ImageFont.load_default()` -- PIL's built-in bitmap font, which **completely
+ignores the `size` argument**. The requested size was never wrong; it
+was never being used at all on macOS. This is why increasing the point
+size repeatedly produced identical output: the number was discarded
+before it could have any effect.
+
+The dev sandbox used to test each iteration is Linux and genuinely has
+the DejaVu path, so every test there passed silently, masking the bug
+until it was checked against a real render from the actual Mac.
+
+### Why this was hard to catch
+- No exception was raised -- `ImageFont.load_default()` is a legitimate
+  fallback path in PIL, not an error condition, so nothing crashed.
+- Visual inspection of cropped preview images (zoomed into just the
+  text region) made the tiny bitmap font *look* like a legitimate,
+  if small, rendering choice rather than an obviously broken one.
+- The bug is platform-specific and silent -- it can only be caught by
+  either testing on the actual target OS, or by objectively measuring
+  rendered output rather than eyeballing it.
+
+### Fix
+`_load_font()` now checks real macOS system font paths
+(`/System/Library/Fonts/Supplemental/Arial*.ttf`,
+`/System/Library/Fonts/Helvetica.ttc`, etc.) before Linux paths, and
+**raises `RuntimeError` instead of silently falling back** if no real
+scalable font is found anywhere on the candidate list -- a crashed
+render with a clear error message is strictly better than a silently
+wrong one. Each candidate is also sanity-checked after loading (measured
+glyph height compared against the requested size) to catch a font that
+loads "successfully" but doesn't actually scale, rather than trusting
+`ImageFont.truetype()`'s return value blindly.
+
+### How this was actually confirmed fixed (not just claimed)
+Rendered the same frame before and after the fix, then measured actual
+text pixel height programmatically (numpy: threshold for bright pixels
+in the known lower-third region, measure contiguous band height) rather
+than relying on visual inspection a second time:
+- Before fix: tallest text band = **9px = 0.47% of frame height**
+- After fix: tallest text band = **126px = 6.56% of frame height**,
+  matching the requested 130px font size almost exactly
+
+### Lesson for future agent/rendering work in this project
+When a visual fix is "verified" only in a dev sandbox that may differ
+from the real target machine (different OS, different fonts, different
+GPU backend -- see ISSUE-20's MPS-vs-CUDA distinction for the same
+category of issue), treat that verification as provisional until
+confirmed against real output from the actual target hardware. Prefer
+an objective, measurable check (pixel measurements, file sizes, output
+duration -- see the Agent 8 notebook cell's sanity-check block) over
+visual inspection alone, since visual inspection of a small crop or a
+scaled-down preview can look "fine" even when the underlying value is
+completely wrong.
+
+---
+
+## ISSUE-22: Agent 7 `build_shot_list()` crashed with `KeyError: 'selection_rank'` on any run with an Agent-3-discarded story
+
+**Status:** Fixed.
+**Affects:** Agent 7 (`build_shot_list()`)
+
+### Symptom
+A real second pipeline run (2026-07-14, Climate.gov / Apple
+SpeechAnalyzer / Linux-0.11-in-Rust) crashed Agent 7 outright:
+```
+KeyError: 'selection_rank'
+```
+The first run that day (Beavis Ultrasound / Cyberpunk Comics / Tiny
+Emulators) had worked fine with identical code.
+
+### Root cause
+`state["stories"]` holds **every** story seen that run (6-8 typically),
+not just the 3 ultimately selected. The original code assumed every
+story dict in `state["stories"]` had a `selection_rank` key:
+```python
+stories_by_rank = {s["selection_rank"]: s for s in state["stories"].values()}
+```
+This is false for a story that Agent 3 discarded (contradicted/low
+credibility) -- a discarded story never reaches Agent 4's editorial
+scoring step at all, so it has **no `selection_rank` key whatsoever**,
+not `None`. Confirmed via a real checkpoint inspection: the discarded
+story ("Building and Shipping Mac and iOS Apps Without Ever Opening
+Xcode", contradicted per Agent 3's cross-verify) had a visibly shorter
+key list than every selected/scored story, missing `editorial_score`,
+`selection_rank`, `selection_reason`, and every other Agent 4+ field.
+
+The first run that day happened not to have any Agent-3 discards in
+its batch, so the missing-key case was never exercised -- this bug
+existed from Agent 7's first version but wasn't triggered until a run
+with a genuine discard occurred.
+
+### Fix
+```python
+stories_by_rank = {
+    s["selection_rank"]: s for s in all_stories
+    if "selection_rank" in s and s.get("selection_rank") is not None
+}
+```
+Now explicitly checks for key presence before access, rather than
+assuming every story in `state["stories"]` was scored. Verified against
+a reconstruction of the exact real checkpoint shape that crashed (7
+stories, one missing the key entirely) -- no crash, correct 3-story
+mapping.
+
+### Lesson
+`state["stories"]` is best understood as "every story this run ever
+looked at, at any stage," not "the 3 selected stories" -- any code
+touching it needs to filter explicitly, not assume uniform shape across
+entries. This is the same category of assumption-not-checked bug as
+ISSUE-18 (word_count not re-validated) -- worth grep'ing other
+downstream code for similar unguarded key access into `state["stories"]`
+before it surfaces the same way.
+
+---
+
+## ISSUE-23: Agent 6.1 chunk-drop (ISSUE-19) recurred, dropping 2 chunks instead of 1
+
+**Status:** Open, same root cause as ISSUE-19, new supporting evidence.
+**Affects:** Agent 6.1 (`voice_over_node`)
+
+### Symptom
+The 2026-07-14 Climate.gov/Apple/Linux run dropped **two** consecutive
+chunks (chunks 8 and 9 of 9), not just the final one as in ISSUE-19's
+original occurrence:
+```
+[voiceover] chunk 8: mlx_audio exited cleanly but produced no audio_*.wav file
+[voiceover] chunk 8 text: 'The Linux 0.11 kernel has been rewritten in idiomatic Rust,
+  allowing it to boot on emulated i386 hardware and run a full init shell
+  coreutils stack.' (26 words)
+[voiceover] chunk 9: mlx_audio exited cleanly but produced no audio_*.wav file
+[voiceover] chunk 9 text: "This Rust rewrite preserves the original kernel's semantics
+  while rethinking its expression, making it an interesting project for
+  developers and researchers. Follow for daily tech news" (26 words)
+```
+Result: the shipped audio/video for this run is missing S3_CORE,
+S3_TWIST, and the entire CTA -- ends abruptly right after the Linux
+0.11 hook sentence. Decision made to accept this run as-is (see
+conversation log) rather than block on re-generating, since the goal
+was validating the full pipeline end-to-end, not a perfect sample.
+
+### New evidence toward root cause
+Both occurrences now share a specific pattern: the dropped chunk(s) are
+**short (8 and 26 words respectively) and near the end of the script**.
+This is now two independent data points, not one, supporting candidate
+fix #1 already listed in ISSUE-19 ("detect a failed chunk that's
+disproportionately short and merge its text into the previous chunk
+before retrying"). Still not confirmed as the actual mechanism --
+worth testing directly (generate several short, late-script chunks in
+isolation) before committing to that fix, but the pattern is no longer
+a single anecdote.
+
+### Not yet done
+No code change made for this issue yet -- still deferred per ISSUE-19's
+original reasoning (project focus is Agent 7/8, not further hardening
+Agent 6.1 in isolation). Logged here specifically to preserve the
+second data point before it's forgotten, since it materially
+strengthens the case for candidate fix #1 whenever this is revisited.
+
+---
+
+## ISSUE-24: Agent 8 lower-third text can visually overlap/desync from spoken content; long titles needed a follow-up fix
+
+**Status:** Partially fixed (silent truncation resolved), timing-sync misalignment still open.
+**Affects:** Agent 8 (`_draw_source_lowerthird()`, section-to-frame timing)
+
+### Symptom 1 (fixed): long titles silently lost text
+A real render (`"Climate.gov was destroyed. Open data saved it"` as the
+lower-third title) needed 3 lines to fit at the fixed 92px font size,
+but the code only rendered `title_lines[:2]` -- the third line ("data
+saved it") was silently dropped with no error, no log, nothing to
+indicate content was lost. Confirmed via screenshot and reproduced
+exactly in a standalone render.
+
+**Fix:** `_fit_title_to_two_lines()` now auto-shrinks the font (92px
+down to a 56px floor, in 4px steps) until the title genuinely fits in
+2 lines, instead of truncating at a fixed size. Verified three ways:
+the exact broken title now renders at 60px with zero words dropped
+(checked by diffing the word set of the original title against the
+wrapped lines, not just visually); short titles ("Tiny Emulators")
+are confirmed unaffected, still rendering at the full 92px; a
+medium-length title shrinks modestly (72px) as expected. See
+`AGENT8_VERSION = "v7-title-autofit-2026-07-14"`.
+
+### Symptom 2 (open, not yet fixed): lower-third text doesn't reliably line up with what's being said at that moment
+Observed directly by the project owner across multiple real renders:
+the on-screen title/source for a section can appear noticeably before
+or after the corresponding audio actually starts discussing that
+story. This is a **known, expected consequence of the current timing
+approximation**, not a new surprise -- Agent 7's per-section timing is
+word-count-proportional against total `audio_duration`
+(`start_share = start_words / total_words`), which assumes constant
+speaking pace throughout the script. Real speech doesn't have constant
+pace: pauses, emphasis, and natural rhythm variation mean a
+word-count-proportional estimate will drift from the true audio
+timing, more so for later sections (error accumulates) and more so
+when TTS chunk boundaries don't line up with sentence/section
+boundaries in the actual audio waveform.
+
+**Root fix (not yet built):** this requires real per-section
+timestamps (`beat_timestamps`), not a proportional estimate -- already
+flagged as an open dependency from Agent 6.1 in both README's Phase
+7-10 checklist and AGENTS.md's Agent 7 section, going back to before
+Agent 7 was even implemented. This issue is the concrete, observed
+consequence of not having built that yet, not a new root cause.
+Options worth evaluating when this gets prioritized:
+1. Modify Agent 6.1 to record each TTS chunk's actual rendered
+   duration (Kokoro/mlx_audio should know this per-chunk) and map that
+   back to section boundaries, rather than relying purely on word
+   count.
+2. A lighter-weight partial fix: extend the existing fade-in logic so
+   the lower-third fades in more conservatively (later, with a longer
+   fade) to reduce the visual jarring of a mistimed transition, without
+   solving the underlying timing accuracy -- treats the symptom, not
+   the cause, but may be a reasonable stop-gap given real
+   `beat_timestamps` is a larger piece of work.
+
+---
+
 ## Summary for future sessions
 
 ```
@@ -1254,4 +1521,34 @@ peak swap over 20GB and sustained heavy thermal load. Not viable for
 daily automated use. Current approach is a PIL/ffmpeg reactive-graphic
 renderer instead — already built and tested, see docs/samples/ for
 output.
+
+Agent 8 text renders tiny/unreadable no matter how much you increase a
+font size parameter: this is ISSUE-21 — check `_load_font()` is
+actually finding a real scalable font on the current machine (it now
+raises loudly if not, rather than silently falling back to a
+size-ignoring bitmap font). If you see this again on a new machine/OS,
+add that platform's real font path to the candidate list rather than
+assuming the size number itself needs to change.
+
+Agent 7 crashes with KeyError: 'selection_rank': this is ISSUE-22 —
+happens on any run where Agent 3 discarded a story, since a discarded
+story never reaches Agent 4's scoring and has no selection_rank key at
+all (not None, genuinely absent). Fixed by filtering on key presence
+before access; if you see a similar KeyError elsewhere touching
+state["stories"], assume the same "not every story has every field"
+shape rather than a fluke.
+
+Agent 6.1 dropped 2 consecutive chunks (not just 1) near the end of a
+script: this is ISSUE-23, the same root cause as ISSUE-19 with a
+second, stronger data point — both occurrences were short, late-script
+chunks. Still open/deferred; the pattern is worth acting on next time
+Agent 6.1 gets real attention, not just re-logging a third occurrence.
+
+Agent 8 lower-third title text doesn't match what's currently being
+said, or a long title gets cut off: two separate things under
+ISSUE-24. The cutoff (silent 3rd-line drop) is fixed — check
+AGENT8_VERSION says v7-title-autofit or later. The timing mismatch is
+NOT fixed — it's the expected result of Agent 7's word-count-
+proportional timing estimate, not a new bug; the real fix is
+per-section beat_timestamps, still an open dependency from Agent 6.1.
 ```

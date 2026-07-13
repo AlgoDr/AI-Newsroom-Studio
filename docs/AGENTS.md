@@ -417,7 +417,7 @@ order discovered):**
 | Chunk 2 of 7 failed silently once pre-chunking was added -- no error, no exception, the before/after file-diff just came back empty | `mlx_audio` resets its own internal file counter (`audio_000.wav`) on every fresh subprocess invocation; chunk 1's leftover output file was still present when chunk 2 ran, so chunk 2 silently overwrote it under the same name | Clear any stray `audio_*.wav` files BEFORE each chunk call; immediately rename the result to a unique `chunk_NNN_MM.wav` right after |
 | Chunk 5 of 8 (23 words, well under the 40-word limit) caused `mlx_audio` to exit 0 with no output file and no error message | Kokoro's phonemizer crashes on certain content: Unicode typographic characters (em dashes, smart quotes) AND decimal-separated version numbers like `"GPT-5.6"` -- confirmed via direct reproduction: `"GPT-5.6 is a new model."` throws a `broadcast_shapes` ValueError deep inside `istftnet.py` (an F0-tensor shape mismatch), caught internally, no file written | `_sanitize_for_tts()`: replaces em-dashes/smart-quotes/ellipses with ASCII equivalents, and converts `X.Y` decimal patterns to spoken form (`"GPT-5.6"` -> `"GPT-5 point 6"`) in a repeating pass (handles chained versions like `"v1.2.0"`); retries once after sanitizing; if still failing, SKIPS the chunk rather than aborting the whole pipeline -- partial audio beats no audio |
 | The subprocess call intermittently invoked the wrong Python interpreter (system Python without `mlx_audio` installed) rather than the active venv's Python | `sys.executable` inside a Jupyter-spawned subprocess does not reliably resolve to the active venv | `_find_venv_python()` runs once at module load, checks several candidate paths (relative to the agents directory, `$VIRTUAL_ENV`, then `sys.executable` as last resort), verifying each candidate actually has `mlx_audio` importable before accepting it |
-| **(open, not yet fixed)** A real 201-word/7-chunk run's final chunk -- 8 words, containing the CTA ("Check them out. Follow for daily tech news") -- exited cleanly with no output file, and the existing retry-with-sanitization step also produced nothing | Not yet confirmed. Text contained none of the known Bug-3 trigger characters, so the previous fix doesn't apply here -- suspected but unconfirmed cause is `mlx_audio`/Kokoro struggling with very short isolated chunks specifically. Not yet reproduced in isolation | None yet -- retry-then-skip correctly prevented a total pipeline failure, but silently shipped audio missing its CTA. See [KNOWN_ISSUES ISSUE-19](../KNOWN_ISSUES.md#issue-19-agent-61----short-final-chunk-silently-dropped-by-mlx_audio-cta-lost) for candidate fixes under consideration |
+| **(open, not yet fixed)** A real 201-word/7-chunk run's final chunk -- 8 words, containing the CTA -- exited cleanly with no output file. **Recurred on a second real run** (2026-07-14, 260-word/9-chunk script): this time chunks 8 AND 9 (26 words each) both dropped, again the last two chunks in the script, again losing the CTA | Not yet confirmed, but now supported by two independent data points rather than one: both failures were short chunks (8 and 26 words) positioned at or near the very end of the script. Text in both cases contained none of the known Bug-3 trigger characters, so that fix doesn't apply here. Suspected but unconfirmed cause is `mlx_audio`/Kokoro struggling with short isolated chunks specifically -- still not reproduced in a standalone/isolated test | None yet -- retry-then-skip correctly prevented a total pipeline failure both times, but silently shipped audio missing its CTA on both real runs. See [KNOWN_ISSUES ISSUE-19](../KNOWN_ISSUES.md#issue-19-agent-61----short-final-chunk-silently-dropped-by-mlx_audio-cta-lost) and [ISSUE-23](../KNOWN_ISSUES.md#issue-23-agent-61-chunk-drop-issue-19-recurred-dropping-2-chunks-instead-of-1) for the full history and candidate fixes under consideration |
 
 **Why the fix is retry-then-SKIP, not retry-then-abort:**
 A script covering 3 stories that loses one chunk to an unfixable content
@@ -452,43 +452,90 @@ run at all if Agent 6 has not approved the script.
 
 ---
 
-### Agent 7 -- Video Assembly Prompt (design, not yet implemented)
+### Agent 7 -- Video Assembly Prompt (implemented, tested)
 
-**Status:** Planned, current development focus. Nothing below is built
-yet -- this section documents design decisions made so far, so the
-reasoning isn't lost between sessions. Update this section as real
-implementation choices are made and tested, following the same
-evidence-first standard as every other agent in this file.
+![Agent 7 Architecture](./agent7_architecture.svg)
 
-**Role:** convert each of the 3 selected stories into concrete,
-searchable visual queries that Agent 8 can hand directly to Pexels/
-Pixabay -- not a cinematic AI-video prompt (see README's
+**Status:** Complete. Built as `experiments/agents/agent7.py`, wired
+into `workflow.ipynb` (`till-agent7` checkpoint), tested against real
+pipeline data (the 2026-07-13 Beavis Ultrasound / Cyberpunk Comics /
+Tiny Emulators run).
+
+**Role:** convert each script section into a concrete, searchable
+stock-footage query and a timing window -- not a cinematic AI-video
+prompt (see README's
 [Why stock footage, not AI video generation?](../README.md#why-stock-footage-not-ai-video-generation)
-for why the project pivoted away from generated video entirely).
+for why the project pivoted away from generated video entirely; the
+later real hardware test in KNOWN_ISSUES ISSUE-20 confirmed that
+pivot was the right call, not just a cost-saving guess).
 
-**Inputs available to Agent 7** (already present on `state` by this
-point in the pipeline, confirmed from Agent 5/6's real output):
-- `story["title"]`, `story["content"]`, `story["background"]` per
-  selected story (Agents 1-4)
+**Inputs actually used** (confirmed via real testing, not assumed):
+- `state["stories"]` -- dict/list of selected stories, each with
+  `title`, `url`, `content`, `selection_rank`
 - `state["script"]["sections"]` -- the 10 labeled HOOK/S1_CONTEXT/.../CTA
-  sections, so a query can be tied to the specific section it should
-  appear alongside, not just the story as a whole
-- `state["script"]["tts_ready_text"]` and `audio_duration` -- for
-  eventually timing clip changes against the actual spoken audio
+  sections; query + timing are computed **per section**, not per story,
+  for finer-grained footage variety than one query per 3-sentence story
+- `state["script"]["word_count"]` and (once available)
+  `state["script"]["audio_duration"]`
 
-**Open design questions, not yet decided:**
-- One search query per story, or one per section (up to ~3 per story)?
-  More queries = more precise visual matches but more Pexels/Pixabay
-  calls and more room for an irrelevant result to slip through.
-- How literal should queries be? A story about a CVE/kernel exploit
-  has no natural stock-footage equivalent -- likely needs a fallback
-  category (e.g. generic "coding" / "server room" / "cybersecurity"
-  b-roll) rather than a literal query built from the story's specific
-  technical content.
-- Whether query generation should be a small local model (matching the
-  project's existing local-first pattern for classification-style
-  tasks, e.g. Agent 4's phi3.5 topic clustering) or pure keyword
-  extraction with no LLM call at all, given how mechanical the task is.
+**Design questions from earlier, now resolved:**
+- **One query per story or per section?** -> Per section. Implemented
+  as the primary granularity; each of the 10 sections gets its own
+  query and timing window.
+- **How literal should queries be?** -> LLM-extracted via `qwen2.5:7b`
+  with strict output validation (2-8 words, rejects instruction-echo),
+  falling back to one of 5 keyword-sniffed categories
+  (security/hardware/software/research/generic_tech) if extraction
+  fails, is malformed, or Ollama is unavailable -- never lets a
+  video-prompt failure take down the whole pipeline run.
+- **Local model or no LLM at all?** -> Local model (`qwen2.5:7b`),
+  matching the project's local-first pattern, but deliberately *not*
+  the larger models reserved for heavier reasoning tasks (Agent 2
+  synthesis, Agent 5 script writing) -- this is a small, structured,
+  low-creativity extraction task that doesn't need that capacity.
+
+**Section-to-story mapping:** `S1_*`/`S2_*`/`S3_*` prefix maps directly
+to `selection_rank` 1/2/3 via regex; `HOOK`/`CTA` are treated as
+whole-video bookends with a generic branded query and no single
+story's source domain attached.
+
+**Timing:** word-count-proportional against `audio_duration` (an
+explicit approximation, not frame-accurate -- see the `beat_timestamps`
+dependency note below, still open).
+
+**Two defensive checks added after real bugs surfaced during testing,**
+both worth keeping in any future refactor:
+1. Raises `ValueError` if a section references a `story_rank` not
+   present in `state["stories"]` -- caught a real test-data
+   inconsistency during development, not hypothetical.
+2. Raises `ValueError` if `state["script"]["word_count"]` doesn't equal
+   the actual sum of each section's word count -- guards directly
+   against the exact class of drift ISSUE-18 already documented for
+   Agent 6's rewrite loop. Also caught a real bug during Agent 7's own
+   testing (hand-reconstructed test data had a stale word count),
+   confirming this check earns its place rather than being defensive
+   programming for its own sake.
+
+**Real bug found on an actual pipeline run (ISSUE-22, fixed):**
+Agent 7 crashed outright with `KeyError: 'selection_rank'` on a real
+second run (2026-07-14). Root cause: `state["stories"]` holds every
+story seen that run (6-8 typically), not just the 3 ultimately
+selected. The original code assumed every story dict had a
+`selection_rank` key. That's false for a story Agent 3 discarded
+(contradicted/low credibility) -- a discarded story never reaches
+Agent 4's editorial scoring at all, so it has no `selection_rank` key
+whatsoever, not `None`, genuinely absent. The first run that day
+happened to have zero Agent-3 discards, so this bug existed from
+Agent 7's first version but wasn't triggered until a run with a
+genuine discard occurred. Fixed by filtering on key presence before
+access (`"selection_rank" in s and s.get("selection_rank") is not
+None`) rather than assuming uniform shape across every entry in
+`state["stories"]`. See
+[KNOWN_ISSUES ISSUE-22](../KNOWN_ISSUES.md#issue-22-agent-7-build_shot_list-crashed-with-keyerror-selection_rank-on-any-run-with-an-agent-3-discarded-story)
+for the full writeup, including the lesson that `state["stories"]` is
+best understood as "every story this run ever looked at, at any
+stage," not "the 3 selected stories" -- worth grep'ing other
+downstream code for similar unguarded key access into that dict.
 
 **Known constraint from Agent 6.1:** exact per-chunk/per-section timing
 (`beat_timestamps`) is not yet tracked -- flagged as a Phase 6.2
@@ -496,3 +543,103 @@ dependency in the README roadmap, but it's actually a dependency for
 precise Agent 7/8 clip-timing too, not just sound design. Worth
 revisiting whether that timing work should be pulled forward rather
 than treated as Phase 6.2-only.
+
+---
+
+### Agent 8 -- Video Assembler (`reactive` mode implemented and tested; `broll` mode scaffolded, not tested)
+
+![Agent 8 Architecture](./agent8_architecture.svg)
+
+**Status:** `reactive` mode complete, tested end-to-end against real
+pipeline audio (the 2026-07-13 run, 83s) and wired into
+`workflow.ipynb` (`till-agent8` checkpoint). `broll` mode is written
+but explicitly unverified -- see below.
+
+**Role:** consume Agent 7's `shot_list` + Agent 6.1's stitched audio,
+produce the final MP4 at 1080x1920 (YouTube's *recommended* Shorts
+resolution, not just the 720x1280 minimum an earlier prototype used).
+
+**`reactive` mode (proven):** pure PIL + numpy, no ML model, no GPU
+dependency --
+- Audio amplitude envelope (RMS per video frame, smoothed) drives a
+  pulsing/glowing abstract "anchor" orb and a scrolling waveform-bar
+  indicator. Deliberately not a face -- sidesteps the uncanny-valley
+  risk of a bad lip-sync entirely (see KNOWN_ISSUES ISSUE-20 for why
+  an actual AI avatar was evaluated and ruled out on this hardware).
+- Source-citation lower-thirds (story title + domain) fade in per
+  section using Agent 7's real per-section timing, not a cruder
+  per-story approximation.
+- Real measured cost on this project's actual M4 Pro: ~2 minutes
+  render time for a full ~83s video, negligible memory/thermal
+  footprint -- a deliberate contrast with the AI-video-generation path
+  (10+ minutes and 20GB+ swap for 2 *seconds* of unusable output, per
+  ISSUE-20's real hardware test).
+
+**`broll` mode (scaffolded, NOT verified):** `fetch_pexels_clip()` is
+written against Pexels' documented video search endpoint shape, but
+**no `PEXELS_API_KEY` was available during development to actually
+test it**. `assemble_broll_mode()` deliberately raises
+`NotImplementedError` past the fetch step rather than write
+untestable ffmpeg assembly logic against an unverified fetch --
+finish wiring this only after `fetch_pexels_clip()` is confirmed
+working against a real key, copying the working ffmpeg
+concat/mux pattern from `assemble_reactive_mode()` rather than writing
+it from scratch.
+
+**Real bug found and fixed during development -- ISSUE-21, worth
+knowing about for any future rendering work in this project:**
+`_load_font()`'s original version only checked a Linux font path
+(`/usr/share/fonts/truetype/dejavu/...`). On the actual target machine
+(macOS), that path doesn't exist, so every call silently fell through
+to `ImageFont.load_default()` -- PIL's fallback bitmap font, which
+**ignores the requested size entirely**. This produced unreadably
+small text no matter how large a size was requested, across five
+separate iterations, because the size parameter was never actually
+being used on the real target machine -- only in the Linux dev sandbox
+where each iteration was mistakenly "confirmed" working. Fixed by
+checking real macOS font paths first and, critically, **raising
+`RuntimeError` instead of silently degrading** if no real font is
+found anywhere -- a crashed render with a clear message beats a
+silently-wrong one. Confirmed fixed via objective pixel measurement
+(numpy: measured rendered text height went from 9px/0.47% of frame
+height to 126px/6.56%, matching the requested font size), not just a
+second round of visual inspection -- the first bug had already
+survived several rounds of "looks fine to me" checks precisely because
+visual inspection of a small crop or a scaled preview can look
+plausible even when the underlying value is completely wrong. See
+[KNOWN_ISSUES ISSUE-21](../KNOWN_ISSUES.md#issue-21-agent-8-_load_font-silently-used-a-tiny-fallback-font-on-macos----requested-size-was-ignored-entirely)
+for the full writeup.
+
+**Second real bug found and fixed on the same feature -- ISSUE-24:**
+after ISSUE-21 was fixed and font sizes were genuinely rendering, a
+different problem surfaced on a real run: the lower-third title logic
+capped rendering at `title_lines[:2]` after wrapping, but a longer
+story title (e.g. "Climate.gov was destroyed. Open data saved it")
+needed 3 lines at the fixed 92px size -- the third line was **silently
+dropped**, no error, no log, nothing indicating content was lost.
+Confirmed via a real screenshot and reproduced exactly in a standalone
+render before fixing. Fixed with `_fit_title_to_two_lines()`: instead
+of truncating, it auto-shrinks the font (92px down to a 56px floor, in
+4px steps) until the title genuinely fits in 2 lines. Verified three
+ways, not just visually: the exact broken title renders at 60px with
+zero words dropped (checked by diffing the word set of the original
+title against the wrapped lines' word set programmatically); a short
+title ("Tiny Emulators") is confirmed unaffected, still rendering at
+the full 92px; a medium-length title shrinks modestly (72px) as
+expected. `AGENT8_VERSION` string reflects this as
+`v7-title-autofit-...` or later. See
+[KNOWN_ISSUES ISSUE-24](../KNOWN_ISSUES.md#issue-24-agent-8-lower-third-text-can-visually-overlapdesync-from-spoken-content-long-titles-needed-a-follow-up-fix)
+for the full writeup, including a second, still-open finding from the
+same issue number: the lower-third's on-screen timing can visually
+mismatch what's actually being said at that moment, since Agent 7's
+timing is a word-count-proportional estimate, not real
+`beat_timestamps` -- see the Agent 7 section above for that same open
+dependency.
+
+**Design boundary -- what Agent 8 does NOT do:** does not select which
+stories to cover or what the script says (Agents 1-6's job). Does not
+decide search queries or section timing (Agent 7's job -- Agent 8
+trusts `state["shot_list"]` completely). Does not currently support a
+hybrid mode combining the reactive graphic with real b-roll footage in
+the same video -- that compositing decision is explicitly still open
+(see README's Phase 7-10 checklist).

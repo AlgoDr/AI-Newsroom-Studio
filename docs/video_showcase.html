@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Newsroom Studio — Video Samples</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --card: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --text-dim: #8b949e;
+            --accent: #58a6ff;
+            --accent-soft: #1f6feb22;
+            --green: #3fb950;
+            --mono: 'SF Mono', 'Consolas', 'Liberation Mono', Menlo, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        .wrap {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 56px 24px 80px;
+        }
+
+        header {
+            margin-bottom: 48px;
+        }
+
+        .eyebrow {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--accent);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0 0 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: var(--text-dim);
+            font-size: 16px;
+            max-width: 560px;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            margin-right: 20px;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 14px;
+            font-family: var(--mono);
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .sample-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px;
+            margin-bottom: 24px;
+        }
+
+        .sample-meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+            font-family: var(--mono);
+            font-size: 12.5px;
+            color: var(--text-dim);
+        }
+
+        .meta-pill {
+            background: var(--accent-soft);
+            color: var(--accent);
+            padding: 3px 10px;
+            border-radius: 100px;
+            border: 1px solid #1f6feb44;
+        }
+
+        .sample-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 16px;
+        }
+
+        audio {
+            width: 100%;
+            height: 40px;
+            margin-bottom: 20px;
+        }
+
+        audio::-webkit-media-controls-panel {
+            background-color: #0d1117;
+        }
+
+        .script-toggle {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--accent);
+            cursor: pointer;
+            user-select: none;
+            display: inline-block;
+        }
+
+        .script-text {
+            display: none;
+            margin-top: 16px;
+            padding: 16px 18px;
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: var(--mono);
+            font-size: 13.5px;
+            line-height: 1.7;
+            color: var(--text-dim);
+            white-space: pre-wrap;
+        }
+
+        .script-text.open {
+            display: block;
+        }
+
+        .stat-row {
+            display: flex;
+            gap: 28px;
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            font-family: var(--mono);
+            font-size: 12.5px;
+        }
+
+        .stat-label {
+            color: var(--text-dim);
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .stat-value {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .stat-value.good {
+            color: var(--green);
+        }
+
+        footer {
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            font-size: 13px;
+            color: var(--text-dim);
+            font-family: var(--mono);
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .empty-note {
+            color: var(--text-dim);
+            font-size: 14px;
+            font-family: var(--mono);
+            padding: 20px;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <header>
+            <div class="eyebrow">AI Newsroom Studio</div>
+            <h1>Video Samples</h1>
+            <p class="subtitle">Real video output from Agent 8, assembled end-to-end by the pipeline — a PIL/ffmpeg
+                reactive presenter graphic reacting to the real voice-over audio, with source-citation lower-thirds,
+                entirely local and $0 by design.</p>
+            <a class="back-link" href="https://github.com/AlgoDr/AI-Newsroom-Studio">&larr; back to the main repo</a>
+            <a class="back-link" href="./audio-showcase.html">Listen to audio samples &rarr;</a>
+        </header>
+
+
+        <div class="sample-card">
+            <div class="sample-meta">
+                <span class="meta-pill">Real pipeline output</span>
+                <span>3 stories · one continuous script</span>
+            </div>
+
+            <h2 class="sample-title">Beavis Ultrasound PnP ISA Sound Card Replica, Cyberpunk Comics, Manga and Graphic
+                Novels, Tiny Emulators</h2>
+
+            <video controls preload="metadata"
+                style="width:100%; max-width:360px; border-radius:8px; margin-bottom:20px; display:block;">
+                <source src="./video-samples/final_video.mp4" type="video/mp4">
+                Your browser does not support the video element.
+                <a href="./video-samples/final_video.mp4">Download the video file</a> instead.
+            </video>
+
+            <div class="stat-row">
+                <div class="stat">
+                    <span class="stat-label">Duration</span>
+                    <span class="stat-value">~83s</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Word count</span>
+                    <span class="stat-value">201</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Resolution</span>
+                    <span class="stat-value">1080x1920</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Cost</span>
+                    <span class="stat-value good">$0 — fully local</span>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            Generated by a 10-agent LangGraph pipeline — HackerNews trend
+            detection through fact-checking, editorial selection, script
+            writing, QC, and voice-over/video assembly, entirely autonomous.
+            <br><br>
+            Auto-generated from the 1 most recent real pipeline runs
+            by <code>generate_demo_pages.py</code> — not hand-edited.
+            <br><br>
+            <a href="https://github.com/AlgoDr/AI-Newsroom-Studio">View the full project on GitHub</a>
+        </footer>
+    </div>
+</body>
+
+</html>
