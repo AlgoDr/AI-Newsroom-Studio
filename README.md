@@ -9,12 +9,14 @@
 ![Status](https://img.shields.io/badge/Status-Agents_1--8_Complete-brightgreen?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-**A fully autonomous, multi-agent AI pipeline that researches trending tech news, fact-checks it, writes engaging scripts, generates voice-over audio, and (soon) assembles and publishes short-form videos to YouTube -- all without human intervention.**
+**A fully autonomous, multi-agent AI pipeline that researches trending tech news, fact-checks it, writes engaging scripts, generates voice-over audio, and assembles short-form videos -- all without human intervention.**
 
 [Overview](#overview) - [What's Built](#whats-built-so-far) - [Architecture](#agent-architecture) - [Tech Stack](#tech-stack) - [Setup](#getting-started) - [Roadmap](#development-roadmap)
 
 
-🔊 **[Listen to real generated voice-over samples](https://algodr.github.io/AI-Newsroom-Studio/audio-demo.html)** — actual pipeline output, zero human editing
+🔊 **[Listen to real generated voice-over samples](https://algodr.github.io/AI-Newsroom-Studio/audio-showcase.html)** &nbsp;·&nbsp; 🎬 **[Watch real generated videos](https://algodr.github.io/AI-Newsroom-Studio/video-showcase.html)**
+
+*Both pages regenerate from actual pipeline runs -- real story titles, real scripts, real word counts -- not mockups. See [Output Organization + showcase publishing](#phase-7-10----video-pipeline-current-focus) for how.*
 
 </div>
 
@@ -22,7 +24,7 @@
 
 ## Overview
 
-AI Newsroom Studio is a production-grade multi-agent system that mirrors how a real newsroom operates -- except every role is played by a specialized AI agent. From trend discovery to (eventually) YouTube upload, the entire pipeline runs autonomously on a daily schedule, targeting 2 videos/day.
+AI Newsroom Studio is a production-grade multi-agent system that mirrors how a real newsroom operates -- except every role is played by a specialized AI agent. From trend discovery through video assembly, the entire pipeline runs autonomously, targeting 1-2 videos/day.
 
 The system identifies the most buzzworthy topics from HackerNews, enriches them with article content and background context, fact-checks credibility, selects the top stories editorially, writes a compelling script, quality-checks and polishes that script, and generates natural-sounding voice-over audio -- all in one unattended pipeline run, with every LLM call backed by a locally-tested fallback model.
 
@@ -39,6 +41,8 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
 
 ## ✅ What's Built So Far
 
+📺 See it working: **[audio samples](https://algodr.github.io/AI-Newsroom-Studio/audio-showcase.html)** · **[video samples](https://algodr.github.io/AI-Newsroom-Studio/video-showcase.html)** -- real output from the agents below, not mockups.
+
 | Agent | Status | Description |
 |-------|--------|-------------|
 | **Agent 1 -- Trend Hunter** | ✅ Complete | HackerNews top stories with velocity scoring |
@@ -54,7 +58,7 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
 | Agent 9 -- SEO Optimizer | ⏳ Planned | Title, description, tags |
 | Agent 10 -- Publisher | ⏳ Planned | YouTube Data API v3 |
 
-[^1]: Agent 7 originally targeted writing a cinematic AI-video-generation prompt. That was dropped for cost reasons before ever being tested -- see [Why stock footage, not AI video generation?](#why-stock-footage-not-ai-video-generation). Agent 7 now extracts a stock-footage search query per script section instead.
+[^1]: Agent 7 originally targeted writing a cinematic AI-video-generation prompt. That was dropped for cost reasons before ever being tested -- see [Why stock footage, not AI video generation? And why PIL, not stock footage (yet)?](#why-stock-footage-not-ai-video-generation-and-why-pil-not-stock-footage-yet). Agent 7 now extracts a stock-footage search query per script section instead.
 [^2]: Agent 8's `reactive` mode (the PIL presenter graphic) is what's actually running today. Before building it, **Wan2.1 1.3B (a real local text-to-video model, via mlx-video) was downloaded, converted, quantized, and genuinely test-run end-to-end on this project's own M4 Pro** -- not just researched. It technically completed once `--tiling aggressive` was forced, but took **10.7 minutes and 20GB+ of swap for 2 seconds of unusable output**. That real result is what led to switching to the current PIL/ffmpeg approach. Full test log: [KNOWN_ISSUES ISSUE-20](docs/KNOWN_ISSUES.md#issue-20-agent-78----ai-videoavatar-generation-evaluated-and-deferred-research-log-not-a-bug). A `broll` mode (real Pexels/Pixabay stock footage) is scaffolded in the code but not yet tested end-to-end -- no API key was available during development.
 
 ---
@@ -103,10 +107,20 @@ Agent 6 -- Script QC
      v
 Agent 6.1 -- Voice-Over Generator
   pre-chunk (~40 words) -> sanitize -> Kokoro TTS per chunk -> stitch
-     |  audio_path + audio_duration + beat_timestamps
+     |  audio_path + audio_duration + audio_chunks
      v
-Agent 6.2 -> Agent 7 -> ... -> Agent 10
-  (in progress / planned)
+Agent 7 -- Video Assembly Prompt Generator
+  per-section stock-footage query (qwen2.5:7b) + word-proportional timing
+  -> state["shot_list"]
+     |  section + story_rank + query + source_domain + start_s + end_s
+     v
+Agent 8 -- Video Assembler
+  reactive mode: PIL amplitude-driven presenter graphic + lower-thirds
+  -> ffmpeg mux against real audio, 1080x1920
+     |  video_path + video_stats
+     v
+Agent 8.1 -> Agent 9 -> Agent 10
+  (idea only / planned / planned)
 ```
 
 ### Detailed Agent Architecture
@@ -122,7 +136,9 @@ the real failure modes hit during development and the exact fixes applied.
 | **[Agent 4 -- Editorial](./docs/AGENTS.md#agent-4)** | Filter -> weighted-addition score -> qwen2.5:7b topic dedup -> select top 3, LangGraph conditional edge |
 | **[Agent 5 -- Script Writer](./docs/AGENTS.md#agent-5)** | One llama-3.3-70b-versatile call -> HOOK/CONTEXT/CORE/TWIST/CTA x 3 stories, credibility-driven tone, gemma3:12b local fallback |
 | **[Agent 6 -- Script QC](./docs/AGENTS.md#agent-6)** | Two-stage JUDGE (gpt-oss-120b->qwen2.5:7b)/REWRITE (llama-3.3-70b->gemma2:9b) loop; word count and TTS-readiness are pure Python |
-| **[Agent 6.1 -- Voice-Over Generator](./docs/AGENTS.md#agent-6-1)** | Kokoro TTS via mlx-audio, Apple Metal GPU; pre-chunked, sanitized, and stitched for reliability |
+| **[Agent 6.1 -- Voice-Over Generator](./docs/AGENTS.md#agent-61---voice-over-generator-detailed)** | Kokoro TTS via mlx-audio, Apple Metal GPU; pre-chunked, sanitized, and stitched for reliability |
+| **[Agent 7 -- Video Assembly Prompt Generator](./docs/AGENTS.md#agent-7----video-assembly-prompt-implemented-tested)** | Per-section stock-footage query via qwen2.5:7b + word-proportional timing -> `state["shot_list"]`; filters `state["stories"]` to only scored entries, catching Agent-3-discard edge cases |
+| **[Agent 8 -- Video Assembler](./docs/AGENTS.md#agent-8----video-assembler-reactive-mode-implemented-and-tested-broll-mode-scaffolded-not-tested)** | PIL/ffmpeg reactive presenter graphic (amplitude-driven orb + lower-thirds), 1080x1920, real measured ~65-75s render time; `broll` mode scaffolded, not yet tested |
 
 ---
 
@@ -158,7 +174,7 @@ quality was verified.
 | Tavily Extract | Paywalled/blocked content | Free tier |
 | Exa Search | Agent 3 semantic cross-verification (primary) | Free tier |
 | Groq Cloud | Credibility, synthesis fallback, script generation, QC | Free tier (per-model daily limits, isolated pools) |
-| Pexels / Pixabay API | Stock footage for Agent 8 (planned) | Free, blanket commercial license |
+| Pexels / Pixabay API | Stock footage fetch for Agent 8's `broll` mode -- scaffolded, not yet tested (no API key available during development; Agent 7 already generates the search queries this would consume) | Free, blanket commercial license |
 | Mixkit / Freesound | Curated transition SFX + background music (Agent 6.2) | Free, one-time manual curation, no runtime API calls |
 
 ### Models in Use
@@ -167,7 +183,7 @@ quality was verified.
 |-------|------|--------|-----|------------|
 | phi3.5 | 3.8B | Ollama local | Wikipedia keyword extraction | -- (local) |
 | llama3.1:8b | 8B | Ollama local | Background synthesis (primary) | -- (local) |
-| qwen2.5:7b | 7B | Ollama local | Agent 4 dedup (primary); Agent 3 + Agent 6 JUDGE fallback | -- (local) |
+| qwen2.5:7b | 7B | Ollama local | Agent 4 dedup (primary); Agent 3 + Agent 6 JUDGE fallback; Agent 7 stock-footage query extraction (primary) | -- (local) |
 | gemma3:12b | 12B | Ollama local | Agent 5 script-generation fallback | -- (local) |
 | gemma2:9b | 9B | Ollama local | Agent 6 REWRITE fallback | -- (local) |
 | Kokoro-82M-bf16 | 82M | mlx-audio (Apple Metal GPU) | Agent 6.1 voice-over TTS | -- (local) |
@@ -353,13 +369,15 @@ Agent 4   -- Run + inspect (+ editorial_score, selected, selection_rank)
 Agent 5   -- Run + inspect (full script, word count, sections)
 Agent 6   -- Run + inspect (approved, qc_notes, annotated_text, tts_ready_text)
 Agent 6.1 -- Run + inspect (audio_path, audio_duration, audio_chunks)
+Agent 7   -- Run + inspect (shot_list: section, query, story_rank, timing)
+Agent 8   -- Run + inspect (video_path, video_stats: duration, frame count, render time)
 ```
 
 **Skip re-running Agents 1-3, 1-4, or 1-5** if you already have a good
 cached run -- see [Cache & Checkpoint Reference](#cache--checkpoint-reference)
 below.
 
-### Expected Output (Agents 1-6.1, full run)
+### Expected Output (Agents 1-8, full run)
 
 ```
 Stories fetched: 8
@@ -406,6 +424,25 @@ AGENT 6.1: Voice-Over Generator (Kokoro)
   [voiceover] expected ~78.4s, got 76.2s (within tolerance)
   [voiceover]    path:     data/audio/voiceover_20260709_090203.wav
   [voiceover]    verified: True
+
+======================================================================
+AGENT 7: Video Assembly Prompt Generator
+======================================================================
+  [agent7] built shot list: 10 sections, 2 used fallback queries
+    HOOK       rank=None  'abstract technology particles blue'  (fallback)
+    S1_CONTEXT rank=1     'ZFS home server rack'
+    S1_CORE    rank=1     'NAS hardware setup'
+    S2_HOOK    rank=2     'text to speech waveform'
+    S3_HOOK    rank=3     'router firmware security'
+    CTA        rank=None  'abstract technology particles blue'  (fallback)
+
+======================================================================
+AGENT 8: Video Assembler (reactive mode)
+======================================================================
+  [agent8] running v7-title-autofit-2026-07-14
+  [agent8] assembled video: {'total_frames': 2286, 'duration_s': 76.2,
+                              'render_time_s': 61.4,
+                              'output_path': 'data/video/voiceover_20260709_090203.mp4'}
 ```
 
 ### Cache & Checkpoint Reference
@@ -431,6 +468,14 @@ call6 = script_qc_node(state)
 # Skip A1-A6 -- jump straight to Agent 6.1 (voice-over)
 state = load_checkpoint("till-agent6")
 call6_1 = voice_over_node(state)
+
+# Skip A1-A6.1 -- jump straight to Agent 7 (video shot list)
+state = load_checkpoint("till-agent6_1")
+call7 = video_assembly_prompt_node(state)
+
+# Skip A1-A7 -- jump straight to Agent 8 (video assembly)
+state = load_checkpoint("till-agent7")
+call8 = video_assembler_node(state, mode="reactive")
 ```
 
 ---
@@ -546,7 +591,7 @@ the *voice* -- not the visuals -- feel more human:
       with `till-agent7` checkpoint)
   - [x] Extract 1-2 concrete visual search terms per section via
         `qwen2.5:7b` (not a cinematic AI-video prompt -- see
-        [Why stock footage, not AI video generation?](#why-stock-footage-not-ai-video-generation)),
+        [Why stock footage, not AI video generation? And why PIL, not stock footage (yet)?](#why-stock-footage-not-ai-video-generation-and-why-pil-not-stock-footage-yet)),
         with keyword-sniffed category fallback
         (security/hardware/software/research/generic) if extraction
         fails or is malformed
@@ -601,6 +646,25 @@ the *voice* -- not the visuals -- feel more human:
   - [ ] Fallback behavior if a story's search returns no usable footage
         (currently undecided -- likely a solid-color/title-card slide
         rather than blocking the whole video)
+- [x] **Output organization + showcase publishing** -- built and tested
+      (`experiments/agent_tools/output_organization.py`,
+      `generate_showcase_pages.py`), not tied to a specific numbered
+      agent since it's cross-cutting infrastructure, not a pipeline
+      step
+  - [x] `organize_run_output()` copies a finished run's video + audio
+        into `output/{timestamp}_{story-slug}/`, plus a `metadata.json`
+        (titles, script text, word count, QC iterations, durations)
+        pulled directly from pipeline state
+  - [x] `prune_old_runs(keep=5)` deletes anything beyond the 5 most
+        recent runs, so `output/` doesn't grow without bound
+  - [x] `generate_showcase_pages.py` reads `output/` and **regenerates**
+        `docs/audio-showcase.html` + `docs/video-showcase.html` from
+        real run data -- static HTML has no way to read the filesystem
+        at view-time, so this bakes current state into plain HTML ahead
+        of time, rather than the page updating itself
+  - [x] Deliberately **manual, not automatic** -- never runs as part of
+        the pipeline itself, so a bad run never silently goes live on
+        the public GitHub Pages site without review
 - [ ] **Agent 8.1 -- Video QA (idea, not built)**: once `broll` mode
       exists, verify a fetched stock-footage clip's first frame
       actually matches its search query before Agent 8 commits to
