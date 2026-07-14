@@ -26,6 +26,19 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+# PATCH (2026-07-14): resolve the project root from THIS SCRIPT'S OWN
+# location, not the caller's current working directory -- same fix
+# applied to generate_showcase_pages.py after a real bug on 2026-07-14
+# where a bare "output" default (resolved relative to cwd) silently
+# created a duplicate experiments/output/ tree when called from a
+# Jupyter notebook whose kernel cwd is experiments/, not the project
+# root. This file lives at <project_root>/experiments/agent_tools/, so
+# walking up two directories reliably finds the project root regardless
+# of cwd.
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent
+DEFAULT_OUTPUT_ROOT = str(PROJECT_ROOT / "output")
+
 
 def _make_run_slug(state: dict, max_len: int = 60) -> str:
     """
@@ -56,7 +69,7 @@ def _make_run_slug(state: dict, max_len: int = 60) -> str:
     return slug[:max_len].rstrip("-") or "run"
 
 
-def organize_run_output(state: dict, output_root: str = "output") -> Path:
+def organize_run_output(state: dict, output_root: str = DEFAULT_OUTPUT_ROOT) -> Path:
     """
     Takes Agent 8's output state (must contain state["video_path"] and
     state["script"]["audio_path"]), copies both into a new folder named
@@ -149,7 +162,7 @@ def _build_metadata(state: dict, run_id: str, video_filename: str, audio_filenam
     }
 
 
-def list_runs(output_root: str = "output") -> list[Path]:
+def list_runs(output_root: str = DEFAULT_OUTPUT_ROOT) -> list[Path]:
     """
     Lists all existing run folders under output_root, most recent
     first -- useful for a quick 'what have I already generated' check
@@ -166,7 +179,7 @@ def list_runs(output_root: str = "output") -> list[Path]:
     return runs
 
 
-def prune_old_runs(output_root: str = "output", keep: int = 5, dry_run: bool = False) -> list[Path]:
+def prune_old_runs(output_root: str = DEFAULT_OUTPUT_ROOT, keep: int = 5, dry_run: bool = False) -> list[Path]:
     """
     Deletes run folders beyond the most recent `keep`, so output/ doesn't
     grow without bound. The demo page (generate_demo_pages.py) only ever

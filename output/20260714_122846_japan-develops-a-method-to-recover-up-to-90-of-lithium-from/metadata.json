@@ -1,0 +1,17 @@
+{
+  "run_id": "20260714_122846_japan-develops-a-method-to-recover-up-to-90-of-lithium-from",
+  "generated_at": "2026-07-14T12:28:46.795987",
+  "video_filename": "final_video.mp4",
+  "audio_filename": "voiceover_20260714_065321.wav",
+  "story_titles": [
+    "Japan develops a method to recover up to 90% of lithium from used EV batteries",
+    "Building and shipping Mac and iOS apps without opening Xcode",
+    "Apple's new SpeechAnalyzer API, benchmarked against Whisper and its predecessor"
+  ],
+  "full_text": "Japan just developed a method to recover up to 90% of lithium from used EV batteries. Electric vehicles are gaining popularity worldwide, and as a result, we're facing a growing need to develop more effective methods for managing waste from old batteries. Scientists from Japan have developed a new method to recover up to 90 percent of lithium from used EV batteries. This huge breakthrough could change how EV batteries are made and reused for years to come. Building Mac and iOS apps doesn't require opening Xcode - you can just get started. Developers can create Mac and iOS apps without opening Xcode, using tools like `xcodebuild`, `notarytool`, and `devicectl`. This means you can vibe code Mac and iOS apps to your heart's content without looking at Xcode anymore. Apple's new SpeechAnalyzer API is actually doing better than Whisper models, like Whisper Small, in some cases. SpeechAnalyzer delivers a 2.12% word-error rate on clean speech and 4.56% on noisy speech, outperforming others with its speed, running roughly three times faster than Whisper Small, making it the most accurate on-device speech engine. Follow for daily tech news",
+  "word_count": 186,
+  "qc_iterations": 2,
+  "audio_duration_s": 79.83,
+  "video_duration_s": 79.8,
+  "voice_used": "af_heart"
+}

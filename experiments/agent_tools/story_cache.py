@@ -14,7 +14,7 @@ Format: { "story-slug-id": { full story dict with all agent fields }, ... }
 
 import json
 import pathlib
-from datetime import datetime
+from datetime import datetime, timedelta
 
 CACHE_PATH = pathlib.Path("data/stories_cache.json")
 
@@ -109,3 +109,79 @@ def _load_raw() -> dict:
     except (json.JSONDecodeError, OSError):
         print(f"  [cache] WARNING: could not read {CACHE_PATH}, starting fresh")
         return {}
+
+def load_todays_session(hours_back: int = 6) -> dict:
+    """
+    Resume a recent, interrupted run WITHOUT re-running Agent 1-3.
+
+    Unlike load_todays_pipeline_state() (which returns the ENTIRE cache,
+    including stories from days-old sessions), this filters to only
+    stories cached within the last `hours_back` hours -- i.e. this
+    specific session's Agent 1-3 output, not everything ever fetched.
+
+    hours_back=6 is a generous default (covers a normal work session)
+    -- tighten it if you want stricter "only this exact run" behavior,
+    but don't rely on this for anything more precise than "recent" --
+    cached_at is a save-time timestamp, not a run-id, so two separate
+    sessions within the window would both be included.
+    """
+    cache = _load_raw()
+    cutoff = datetime.now() - timedelta(hours=hours_back)
+
+    recent = {}
+    skipped_old = 0
+    for sid, story in cache.items():
+        cached_at_str = story.get("cached_at")
+        if not cached_at_str:
+            continue  # no timestamp at all -- definitely not from this session
+        try:
+            cached_at = datetime.fromisoformat(cached_at_str)
+        except ValueError:
+            continue
+        if cached_at >= cutoff:
+            recent[sid] = story
+        else:
+            skipped_old += 1
+
+    print(f"  [cache] load_todays_session(hours_back={hours_back}): "
+          f"{len(recent)} recent stories, {skipped_old} older stories excluded")
+    return recent
+
+
+def get_stories_for_agent4(call3: dict | None, hours_back: int = 6) -> dict:
+    """
+    The single entry point Agent 4 should always call to get its input
+    stories -- branches automatically so the notebook doesn't need an
+    if/else at the call site:
+
+      - call3 provided (Agent 1-3 just ran successfully, state is in
+        RAM): use it directly, no disk read at all.
+      - call3 is None (kernel/notebook was interrupted after
+        save_stories() ran but before Agent 4 -- RAM was cleared):
+        fall back to load_todays_session() to recover ONLY this
+        session's stories from disk, never the full multi-day cache.
+
+    Usage in workflow.ipynb, replacing the ad-hoc
+    "cached_stories = load_stories(); call4 = editorial_node(cached_stories)"
+    pattern entirely:
+
+        from agent_tools.story_cache import get_stories_for_agent4
+        from agents.agent4 import editorial_node, route_after_editorial
+
+        # normal path, right after Agent 3 in the same session:
+        stories_for_agent4 = get_stories_for_agent4(call3["stories"])
+
+        # OR, resuming after an interruption (call3 no longer in RAM):
+        stories_for_agent4 = get_stories_for_agent4(None)
+
+        call4 = editorial_node({"stories": stories_for_agent4})
+        route = route_after_editorial(call4)
+    """
+    if call3 is not None:
+        print(f"  [cache] call3 provided ({len(call3)} stories) -- "
+              f"using in-RAM state directly, no disk read")
+        return call3
+
+    print(f"  [cache] call3 not provided -- resuming from disk "
+          f"(this session's stories only, not the full cache)")
+    return load_todays_session(hours_back=hours_back)

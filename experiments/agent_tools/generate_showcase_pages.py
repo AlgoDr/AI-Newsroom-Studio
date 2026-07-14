@@ -47,6 +47,19 @@ import shutil
 import sys
 from pathlib import Path
 
+# PATCH (2026-07-14): resolve the project root from THIS SCRIPT'S OWN
+# location, not the caller's current working directory. Previously the
+# --output-root/--docs-dir defaults were bare "output"/"docs" strings,
+# resolved relative to cwd -- when this script was invoked from a
+# Jupyter notebook via subprocess.run(cwd="."), "." was the kernel's
+# cwd (experiments/), not the project root. That silently created a
+# duplicate experiments/docs/ and experiments/output/ tree that GitHub
+# Pages never serves from, while the real root docs/ stayed stale. This
+# script lives at <project_root>/experiments/agent_tools/, so walking
+# up two directories reliably finds the project root regardless of cwd.
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent
+
 sys.path.insert(0, str(Path(__file__).parent))
 try:
     from output_organization import list_runs
@@ -414,20 +427,34 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--count", type=int, default=5,
                          help="Number of most recent runs to include (default: 5)")
-    parser.add_argument("--output-root", default="output",
-                         help="Where organize_run_output() writes runs (default: output)")
-    parser.add_argument("--docs-dir", default="docs",
-                         help="Where to write the HTML + copy samples (default: docs)")
+    parser.add_argument("--output-root", default=None,
+                         help="Where organize_run_output() writes runs "
+                              "(default: <project_root>/output, resolved from "
+                              "this script's own location, NOT the caller's cwd)")
+    parser.add_argument("--docs-dir", default=None,
+                         help="Where to write the HTML + copy samples "
+                              "(default: <project_root>/docs, resolved from "
+                              "this script's own location, NOT the caller's cwd)")
     args = parser.parse_args()
 
-    docs_dir = Path(args.docs_dir)
+    # PATCH (2026-07-14): only the default resolution changed -- explicit
+    # --output-root/--docs-dir flags (if passed) still work exactly as
+    # before, resolved relative to cwd. Only the *unset* case now
+    # anchors to PROJECT_ROOT instead of a bare "output"/"docs" string.
+    output_root = Path(args.output_root) if args.output_root else PROJECT_ROOT / "output"
+    docs_dir = Path(args.docs_dir) if args.docs_dir else PROJECT_ROOT / "docs"
+
+    print(f"Project root resolved to: {PROJECT_ROOT}")
+    print(f"Reading runs from:        {output_root}")
+    print(f"Writing showcase pages to: {docs_dir}")
+
     samples_dir = docs_dir / "samples"
     video_samples_dir = docs_dir / "video-samples"
     samples_dir.mkdir(parents=True, exist_ok=True)
     video_samples_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Scanning {args.output_root}/ for runs...")
-    all_runs = list_runs(args.output_root)
+    print(f"\nScanning {output_root}/ for runs...")
+    all_runs = list_runs(str(output_root))
     print(f"Found {len(all_runs)} total run(s), taking up to {args.count} most recent")
 
     runs_metadata = []
@@ -440,13 +467,23 @@ def main():
             src = run_dir / meta["audio_filename"]
             if src.exists():
                 shutil.copy2(src, samples_dir / meta["audio_filename"])
+                print(f"  copied audio: {meta['audio_filename']}")
             else:
                 print(f"  warning: {run_dir.name} metadata references "
                       f"{meta['audio_filename']} but that file is missing")
         if meta.get("video_filename"):
             src = run_dir / meta["video_filename"]
             if src.exists():
-                shutil.copy2(src, video_samples_dir / meta["video_filename"])
+                # PATCH (2026-07-14): every run's metadata.json names its
+                # video "final_video.mp4" (organize_run_output.py always
+                # uses that name inside each timestamped folder) -- copying
+                # verbatim into one flat video_samples_dir let a later run
+                # silently overwrite an earlier one. Disambiguate using the
+                # run folder's own (unique, timestamped) name instead.
+                dest_name = f"{run_dir.name}.mp4"
+                shutil.copy2(src, video_samples_dir / dest_name)
+                meta["video_filename"] = dest_name  # HTML must reference the renamed copy
+                print(f"  copied video: {dest_name}")
             else:
                 print(f"  warning: {run_dir.name} metadata references "
                       f"{meta['video_filename']} but that file is missing")

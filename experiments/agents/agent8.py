@@ -35,6 +35,7 @@ the original prototype, per today's dimension research.
 AGENT8_VERSION = "v7-title-autofit-2026-07-14 (auto-shrinks title font to fit 2 lines instead of silently dropping overflow text; orb_r=260 bar_h=460)"
 
 import math
+import shutil
 import subprocess
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
@@ -382,6 +383,18 @@ def assemble_reactive_mode(shot_list: list[dict], audio_path: str, output_path: 
     total_frames = len(envelope)
 
     out_dir = Path(frames_dir)
+    # PATCH (2026-07-14): clear any leftover frames from a PREVIOUS run
+    # before this run starts, rather than just mkdir(exist_ok=True) (which
+    # only creates the folder if missing -- it does NOT clear existing
+    # contents). Without this, a run with fewer frames than the previous
+    # one (shorter audio) leaves the old run's trailing frames
+    # (frame_02000.png onward, say) sitting on disk untouched, since this
+    # run never writes those filenames -- silently mixing two runs'
+    # frames in one folder. Deletion happens at the START of a new run,
+    # not the end, so a crashed/interrupted run's partial frames remain
+    # on disk for debugging until the next real run actually begins.
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
     out_dir.mkdir(exist_ok=True)
 
     # Map each frame index to the shot_list entry covering it, using
