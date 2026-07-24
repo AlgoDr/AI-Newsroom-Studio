@@ -6,10 +6,10 @@
 ![LangGraph](https://img.shields.io/badge/LangGraph-In_Progress-FF6B6B?style=for-the-badge)
 ![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-black?style=for-the-badge)
 ![Groq](https://img.shields.io/badge/Groq-Cloud_Inference-F55036?style=for-the-badge)
-![Status](https://img.shields.io/badge/Status-Agents_1--8_Complete-brightgreen?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Agents_1--10_Complete-brightgreen?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-**A fully autonomous, multi-agent AI pipeline that researches trending tech news, fact-checks it, writes engaging scripts, generates voice-over audio, and assembles short-form videos -- all without human intervention.**
+**A fully autonomous, multi-agent AI pipeline that researches trending tech news, fact-checks it, writes engaging scripts, generates voice-over audio, assembles short-form videos, and publishes them to YouTube (unlisted, pending manual review) -- all without human intervention.**
 
 [Overview](#overview) - [What's Built](#whats-built-so-far) - [Architecture](#agent-architecture) - [Tech Stack](#tech-stack) - [Setup](#getting-started) - [Roadmap](#development-roadmap)
 
@@ -55,11 +55,14 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
 | Agent 6.2 -- Sound Design | 🔨 In Progress | CLAP-based semantic transition/music matching over voice-over audio |
 | **Agent 7 -- Video Assembly Prompt** | ✅ Complete | Per-section stock-footage queries + timing (qwen2.5:7b)[^1] |
 | **Agent 8 -- Video Assembler** | ✅ Complete (`reactive`) | PIL/ffmpeg presenter graphic + lower-thirds, 1080x1920[^2] |
-| Agent 9 -- SEO Optimizer | ⏳ Planned | Title, description, tags |
-| Agent 10 -- Publisher | ⏳ Planned | YouTube Data API v3 |
+| **Agent 9 -- SEO Optimizer** | ✅ Complete | Title (reused from HOOK), description + sources, qwen2.5:7b tags, custom thumbnail frame[^3] |
+| **Agent 10 -- Publisher** | ✅ Complete | YouTube Data API v3, uploads UNLISTED for manual review before going public[^4] |
 
 [^1]: Agent 7 originally targeted writing a cinematic AI-video-generation prompt. That was dropped for cost reasons before ever being tested -- see [Why stock footage, not AI video generation? And why PIL, not stock footage (yet)?](#why-stock-footage-not-ai-video-generation-and-why-pil-not-stock-footage-yet). Agent 7 now extracts a stock-footage search query per script section instead.
 [^2]: Agent 8's `reactive` mode (the PIL presenter graphic) is what's actually running today. Before building it, **Wan2.1 1.3B (a real local text-to-video model, via mlx-video) was downloaded, converted, quantized, and genuinely test-run end-to-end on this project's own M4 Pro** -- not just researched. It technically completed once `--tiling aggressive` was forced, but took **10.7 minutes and 20GB+ of swap for 2 seconds of unusable output**. That real result is what led to switching to the current PIL/ffmpeg approach. Full test log: [KNOWN_ISSUES ISSUE-20](docs/KNOWN_ISSUES.md#issue-20-agent-78----ai-videoavatar-generation-evaluated-and-deferred-research-log-not-a-bug). A `broll` mode (real Pexels/Pixabay stock footage) is scaffolded in the code but not yet tested end-to-end -- no API key was available during development.
+
+[^3]: Agent 9's title deliberately reuses Agent 5's HOOK verbatim (rule-based truncation to YouTube's 100-char hard cap only) rather than generating a separate title -- a video with only ~186 words covers up to 3 unrelated stories, and the title intentionally represents only the lead story rather than trying to summarize all three, on the reasoning that a focused hook beats a diluted multi-topic title for grabbing attention. Passed its first real test against actual pipeline data with zero bugs found.
+[^4]: Agent 10 uploads as **unlisted**, not public and not private -- watchable by anyone with the direct link (for manual review), invisible to search/recommendations/your channel's public list until a separate, deliberate manual step in YouTube Studio flips it to Public. Nothing in the pipeline performs that flip automatically. A real first upload succeeded end-to-end; setting a custom thumbnail specifically requires the YouTube channel to be phone-verified (a real, separate one-time step, unrelated to any OAuth/API configuration) -- see [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for the exact error and fix.
 
 ---
 
@@ -119,8 +122,17 @@ Agent 8 -- Video Assembler
   -> ffmpeg mux against real audio, 1080x1920
      |  video_path + video_stats
      v
-Agent 8.1 -> Agent 9 -> Agent 10
-  (idea only / planned / planned)
+Agent 9 -- SEO Optimizer
+  title (HOOK reuse) + description + sources + qwen2.5:7b tags + thumbnail frame
+  -> state["seo"]
+     |  title + description + tags + category_id + thumbnail_path
+     v
+Agent 10 -- Publisher
+  OAuth2 (Desktop app flow) -> resumable upload -> UNLISTED
+  -> rerun-protected via published_videos.json
+     |  youtube_video_id + youtube_url
+     v
+Agent 11 (idea, not built) -> manual review in YouTube Studio -> Public
 ```
 
 ### Detailed Agent Architecture
@@ -139,6 +151,8 @@ the real failure modes hit during development and the exact fixes applied.
 | **[Agent 6.1 -- Voice-Over Generator](./docs/AGENTS.md#agent-61---voice-over-generator-detailed)** | Kokoro TTS via mlx-audio, Apple Metal GPU; pre-chunked, sanitized, and stitched for reliability |
 | **[Agent 7 -- Video Assembly Prompt Generator](./docs/AGENTS.md#agent-7----video-assembly-prompt-implemented-tested)** | Per-section stock-footage query via qwen2.5:7b + word-proportional timing -> `state["shot_list"]`; filters `state["stories"]` to only scored entries, catching Agent-3-discard edge cases |
 | **[Agent 8 -- Video Assembler](./docs/AGENTS.md#agent-8----video-assembler-reactive-mode-implemented-and-tested-broll-mode-scaffolded-not-tested)** | PIL/ffmpeg reactive presenter graphic (amplitude-driven orb + lower-thirds), 1080x1920, real measured ~65-75s render time; `broll` mode scaffolded, not yet tested |
+| **[Agent 9 -- SEO Optimizer](./docs/AGENTS.md#agent-9)** | Title reused from Agent 5's HOOK (rule-based truncation, no new LLM call); description with per-story source attribution; qwen2.5:7b tag extraction (500-char budget, rule-based fallback); thumbnail frame selected from Agent 8's rendered frames |
+| **[Agent 10 -- Publisher](./docs/AGENTS.md#agent-10)** | OAuth2 Desktop-app flow (InstalledAppFlow), resumable upload via YouTube Data API v3, UNLISTED privacy status, rerun-protection log, separate non-fatal thumbnail-set call |
 
 ---
 
@@ -157,6 +171,7 @@ the real failure modes hit during development and the exact fixes applied.
 | Script QC -- JUDGE (Agent 6) | gpt-oss-120b | qwen2.5:7b | Reused Agent 3's reliability evidence; proven structured-output model |
 | Script QC -- REWRITE (Agent 6) | llama-3.3-70b-versatile | gemma2:9b | A/B test: 100% format compliance vs qwen2.5:7b's 0% |
 | Voice-over (Agent 6.1) | *(local only -- no cloud equivalent)* | Kokoro-82M (mlx-audio) | -- |
+| Tag extraction (Agent 9) | *(none -- local was always primary, same pattern as Agent 4/7)* | qwen2.5:7b | Same injected-function/fallback pattern as Agent 7's query extraction; rule-based fallback (capitalized phrases + title keywords) if the model call fails or output looks malformed |
 
 No Gemini, no OpenAI direct API, no paid cloud model anywhere in this
 project -- every "production swap" considered along the way (see
@@ -176,6 +191,7 @@ quality was verified.
 | Groq Cloud | Credibility, synthesis fallback, script generation, QC | Free tier (per-model daily limits, isolated pools) |
 | Pexels / Pixabay API | Stock footage fetch for Agent 8's `broll` mode -- scaffolded, not yet tested (no API key available during development; Agent 7 already generates the search queries this would consume) | Free, blanket commercial license |
 | Mixkit / Freesound | Curated transition SFX + background music (Agent 6.2) | Free, one-time manual curation, no runtime API calls |
+| YouTube Data API v3 | Agent 10 upload + thumbnail set | Free tier -- 10,000 units/day; upload (1,600) + thumbnail (50) = 1,650/video, supports ~6 videos/day |
 
 ### Models in Use
 
@@ -183,7 +199,7 @@ quality was verified.
 |-------|------|--------|-----|------------|
 | phi3.5 | 3.8B | Ollama local | Wikipedia keyword extraction | -- (local) |
 | llama3.1:8b | 8B | Ollama local | Background synthesis (primary) | -- (local) |
-| qwen2.5:7b | 7B | Ollama local | Agent 4 dedup (primary); Agent 3 + Agent 6 JUDGE fallback; Agent 7 stock-footage query extraction (primary) | -- (local) |
+| qwen2.5:7b | 7B | Ollama local | Agent 4 dedup (primary); Agent 3 + Agent 6 JUDGE fallback; Agent 7 stock-footage query extraction (primary); Agent 9 tag extraction (primary) | -- (local) |
 | gemma3:12b | 12B | Ollama local | Agent 5 script-generation fallback | -- (local) |
 | gemma2:9b | 9B | Ollama local | Agent 6 REWRITE fallback | -- (local) |
 | Kokoro-82M-bf16 | 82M | mlx-audio (Apple Metal GPU) | Agent 6.1 voice-over TTS | -- (local) |
@@ -221,7 +237,9 @@ NewsStudio/
 |   |   |-- agent6_1.py        # Voice-Over Generator -- Kokoro TTS
 |   |   |-- agent6_2.py        # Sound Design -- CLAP semantic matching (paused, see README)
 |   |   |-- agent7.py          # Video Assembly Prompt -- per-section stock-footage queries
-|   |   `-- agent8.py          # Video Assembler -- PIL reactive presenter + ffmpeg mux
+|   |   |-- agent8.py          # Video Assembler -- PIL reactive presenter + ffmpeg mux
+|   |   |-- agent9.py          # SEO Optimizer -- title/description/tags/thumbnail
+|   |   `-- agent10.py         # Publisher -- YouTube Data API v3, OAuth2, unlisted upload
 |   |
 |   |-- agent_tools/
 |   |   |-- __init__.py
@@ -231,7 +249,7 @@ NewsStudio/
 |   |   |-- generate_showcase_pages.py # Regenerates docs/*-showcase.html from output/ (manual)
 |   |   `-- milestone_tracker.py       # macOS alerts at N function-hit milestones
 |   |
-|   |-- workflow.ipynb          # Main pipeline notebook (A1->A2->...->A7->A8)
+|   |-- workflow.ipynb          # Main pipeline notebook (A1->A2->...->A9->A10)
 |   `-- __init__.py
 |
 |-- data/                        # gitignored -- local cache + working files
@@ -242,7 +260,8 @@ NewsStudio/
 |   |   |-- till-agent6.json
 |   |   |-- till-agent6_1.json
 |   |   |-- till-agent7.json
-|   |   `-- till-agent8.json
+|   |   |-- till-agent8.json
+|   |   `-- till-agent9.json     # Agent 10 is terminal -- no checkpoint needed past it
 |   |-- audio/                   # Agent 6.1 output -- final voice-over .wav files
 |   |-- video/                   # Agent 8 output -- final assembled .mp4 files
 |   |-- sfx/                     # curated transition sounds (Mixkit/Pixabay/Freesound, paused)
@@ -273,7 +292,11 @@ NewsStudio/
 |-- multi-agent-env/             # main venv -- everything except CLAP
 |-- clap-env/                    # SEPARATE venv -- msclap only (dependency isolation)
 |
-|-- KNOWN_ISSUES.md              # 24 documented limitations (not bugs)
+|-- client_secrets.json          # gitignored -- OAuth2 Desktop app credentials (Agent 10)
+|-- youtube_token.json           # gitignored -- cached OAuth2 token, auto-created on first auth
+|-- published_videos.json        # gitignored -- Agent 10 rerun-protection log (video_path -> youtube_url)
+|
+|-- KNOWN_ISSUES.md              # 27 documented limitations (not bugs)
 |-- .gitignore
 |-- LICENSE
 `-- README.md
@@ -292,6 +315,9 @@ NewsStudio/
 - Groq API key (free at console.groq.com)
 - Tavily API key (free tier)
 - Exa API key (free tier, for Agent 3 cross-verification)
+- A Google Cloud project with YouTube Data API v3 enabled + OAuth2
+  "Desktop app" credentials downloaded as `client_secrets.json`
+  (free -- no billing account needed; see Agent 10 setup below)
 
 ### Installation
 
@@ -308,6 +334,10 @@ source multi-agent-env/bin/activate
 pip install trafilatura requests ddgs wikipedia \
             ollama groq tavily-python exa-py langchain-core \
             typing_extensions
+
+# 3b. Install YouTube publishing dependencies (Agent 10)
+pip install google-auth google-auth-oauthlib google-auth-httplib2 \
+            google-api-python-client
 
 # 4. Install Kokoro TTS dependency chain (see KNOWN_ISSUES ISSUE-12
 #    for why each of these is needed -- the error messages are
@@ -355,6 +385,39 @@ EXA_API_KEY=your_exa_api_key
 > API keys at all -- both are fully local after their one-time model
 > download.
 
+### YouTube OAuth2 Setup (Agent 10)
+
+One-time setup in Google Cloud Console, entirely free (no billing
+account required):
+
+1. [console.cloud.google.com](https://console.cloud.google.com) -> new project
+2. APIs & Services -> Library -> enable "YouTube Data API v3"
+3. APIs & Services -> **Google Auth Platform** (this replaced the old
+   "OAuth consent screen" menu in 2024 -- if you're following an older
+   guide and can't find that menu, this is why):
+   - **Branding** tab: app name + your email
+   - **Audience** tab: User Type = External; add your own email under
+     "Test users" (apps in Testing status only allow test-user emails
+     to authorize at all)
+   - **Data Access** tab: "Add or Remove Scopes" -> search "youtube" ->
+     select `.../auth/youtube.upload`
+4. **Clients** tab -> "Create Client" -> Application type: **Desktop app**
+   -> download the JSON -> save as `client_secrets.json` in the project root
+
+First time Agent 10 runs, it opens a browser window for one-time
+consent, then caches a reusable token (`youtube_token.json`) so you
+won't need to re-authenticate every run. Note: apps in OAuth "Testing"
+status get refresh tokens that expire after 7 days -- if that happens,
+the next run just reopens the browser for one-time re-consent rather
+than failing silently.
+
+**Custom thumbnails specifically require one more, separate step:**
+your YouTube channel itself (not the OAuth app) must be phone-verified
+at [youtube.com/verify](https://www.youtube.com/verify) before
+`thumbnails.set()` will work -- confirmed via a real 403 on first use.
+Agent 10 treats a failed thumbnail set as non-fatal (falls back to
+YouTube's auto-generated default) rather than blocking the upload.
+
 ### Run the Pipeline
 
 Open `experiments/workflow.ipynb` in Jupyter and run cells top to bottom.
@@ -371,13 +434,15 @@ Agent 6   -- Run + inspect (approved, qc_notes, annotated_text, tts_ready_text)
 Agent 6.1 -- Run + inspect (audio_path, audio_duration, audio_chunks)
 Agent 7   -- Run + inspect (shot_list: section, query, story_rank, timing)
 Agent 8   -- Run + inspect (video_path, video_stats: duration, frame count, render time)
+Agent 9   -- Run + inspect (seo: title, description length, tags, thumbnail_path)
+Agent 10  -- Run + inspect (youtube_video_id, youtube_url, publish_error)
 ```
 
 **Skip re-running Agents 1-3, 1-4, or 1-5** if you already have a good
 cached run -- see [Cache & Checkpoint Reference](#cache--checkpoint-reference)
 below.
 
-### Expected Output (Agents 1-8, full run)
+### Expected Output (Agents 1-10, full run)
 
 ```
 Stories fetched: 8
@@ -443,6 +508,23 @@ AGENT 8: Video Assembler (reactive mode)
   [agent8] assembled video: {'total_frames': 2286, 'duration_s': 76.2,
                               'render_time_s': 61.4,
                               'output_path': 'data/video/voiceover_20260709_090203.mp4'}
+
+======================================================================
+AGENT 9: SEO Optimizer
+======================================================================
+  [agent9] title (85 chars): You can build a crash-proof home server for under $500 -- no Synology needed
+  [agent9] description: 1842 chars
+  [agent9] tags: 18 tags, 0 used fallback extraction, 296 chars of 500 budget
+  [agent9] thumbnail: frames_agent8/frame_00119.png
+
+======================================================================
+AGENT 10: Publisher
+======================================================================
+  [agent10] no valid cached token -- opening browser for one-time consent
+  [agent10] token saved to /path/to/NewsStudio/youtube_token.json
+  [agent10] uploading data/video/voiceover_20260709_090203.mp4 as unlisted...
+  [agent10] uploaded successfully: https://youtube.com/watch?v=XXXXXXXXXXX
+  [agent10] privacy: unlisted -- awaiting manual review
 ```
 
 ### Cache & Checkpoint Reference
@@ -476,6 +558,18 @@ call7 = video_assembly_prompt_node(state)
 # Skip A1-A7 -- jump straight to Agent 8 (video assembly)
 state = load_checkpoint("till-agent7")
 call8 = video_assembler_node(state, mode="reactive")
+
+# Skip A1-A8 -- jump straight to Agent 9 (SEO metadata)
+state = load_checkpoint("till-agent8")
+call9 = seo_optimizer_node(state)
+
+# Skip A1-A9 -- jump straight to Agent 10 (publish)
+# NOTE: this makes a REAL YouTube API call -- rerun-protection via
+# published_videos.json prevents duplicate uploads of the same
+# video_path, but only once a prior run has actually succeeded and
+# been recorded
+state = load_checkpoint("till-agent9")
+call10 = publisher_node(state)
 ```
 
 ---
@@ -679,8 +773,89 @@ the *voice* -- not the visuals -- feel more human:
       is the same mistake as chasing AI video generation before
       confirming stock footage even worked (see the two-stage decision
       above). Not started.
-- [ ] Agent 9 -- SEO Optimizer (title, description, tags)
-- [ ] Agent 10 -- YouTube Publisher (YouTube Data API v3)
+- [x] Agent 9 -- SEO Optimizer -- **built and tested against real
+      pipeline data, zero bugs found on first run**
+      (`experiments/agents/agent9.py`, wired into `workflow.ipynb`
+      with `till-agent9` checkpoint)
+  - [x] Title reuses Agent 5's HOOK verbatim (rule-based truncation
+        to the 100-char hard API cap only, no new LLM call) --
+        deliberately represents only the lead story rather than
+        summarizing all 3, on the reasoning that a focused hook beats
+        a diluted title for grabbing attention (confirmed as the
+        right call against real multi-story output)
+  - [x] Description: summary + per-story source attribution (reusing
+        `source_domain` already computed in Agent 7's `shot_list`,
+        no re-fetching) + full script text + hashtags, front-loaded
+        for the ~157-char above-the-fold limit
+  - [x] Tags: qwen2.5:7b per-story extraction with a rule-based
+        fallback (capitalized phrases + title keywords), same
+        injected-function pattern as Agent 7's query extraction;
+        respects YouTube's 500-char TOTAL tag budget by accumulating
+        and stopping, not generating a fixed count per story
+  - [x] Thumbnail: selects a real frame from Agent 8's already-
+        rendered frames (near the end of the HOOK section, past the
+        fade-in window) rather than accepting YouTube's auto-picked
+        default -- falls back cleanly to the default if Agent 8's
+        frames were already cleaned up before Agent 9 ran
+- [x] Agent 10 -- YouTube Publisher -- **built, tested, and a real
+      video successfully uploaded** (`experiments/agents/agent10.py`,
+      wired into `workflow.ipynb` with `till-agent10` not needed --
+      terminal step)
+  - [x] OAuth2 via `InstalledAppFlow` (Desktop app flow) -- one
+        browser consent, then a cached token reused on every
+        subsequent run
+  - [x] Uploads **UNLISTED**, never automatically Public -- a
+        deliberate design decision (see [Known Limitations](#known-limitations)),
+        given nothing upstream guarantees a defect-free render every
+        time (ISSUE-19/23's silent CTA loss is a real, currently-open
+        example)
+  - [x] Resumable upload with retry on transient (5xx) errors only;
+        a real auth/bad-request error surfaces immediately rather
+        than retrying blindly
+  - [x] Rerun-protection via a persistent `published_videos.json` log
+        keyed by `video_path` -- re-running the same checkpoint during
+        testing detects the prior upload and skips, rather than risking
+        a duplicate video
+  - [x] **Real path-resolution bug found and fixed**: a bare relative
+        path for `client_secrets.json` silently resolved against
+        whatever the current working directory happened to be at
+        kernel start, not necessarily the project root -- same root
+        cause and same fix pattern as `agent6_1.py`'s
+        `_find_venv_python()` (check several real candidate locations,
+        never trust one guessed relative path)
+  - [x] **Real bug found and fixed**: a thumbnail-set failure was
+        incorrectly discarding the record of an already-successful
+        video upload, because both were wrapped in the same
+        try/except. Confirmed via a real run: the upload succeeded
+        (a real video, `MohAv00LMic`, went live unlisted), but the
+        subsequent `thumbnails.set()` 403 (see below) caused the
+        whole function to report failure and skip writing the
+        rerun-protection log entry -- risking a duplicate upload on
+        retry. Fixed by giving `_set_thumbnail()` its own exception
+        handling (matching what its docstring already promised) and
+        by saving the published-video log entry immediately after a
+        successful upload, before attempting the thumbnail at all.
+  - [x] **Real, documented YouTube restriction found**: custom
+        thumbnail upload requires the channel (not the OAuth app, not
+        the Google account) to be phone-verified --
+        confirmed via Google's own API error documentation and a
+        real 403 on first use. Unrelated to any GCP/OAuth
+        configuration; a one-time step at
+        [youtube.com/verify](https://www.youtube.com/verify).
+  - [ ] Manual "flip to Public" step in YouTube Studio is intentional,
+        not yet automated -- see the Agent 11 idea below for where
+        that decision might eventually move
+- [ ] **Agent 11 -- Post-Publish Critique (idea, not built)**: a
+      text/content-based review immediately after Agent 10's upload,
+      using what the pipeline already knows (script quality, HOOK
+      strength, title/thumbnail coherence, CTA presence, pacing) to
+      flag anything worth a second look before the manual Public flip.
+      Explicitly NOT the same as measuring real audience retention/
+      attention -- that data doesn't exist until real viewers have
+      actually watched the video (hours-to-days of real traffic),
+      so a genuine "how much attention did this actually grab" critique
+      would need to be a separate, LATER-triggered job querying
+      YouTube Analytics, not part of this same pipeline run. Not started.
 
 #### Why stock footage, not AI video generation? And why PIL, not stock footage (yet)?
 
@@ -803,7 +978,7 @@ to resolve Python-version differences for Kokoro's own subprocess call.
 
 ## Known Limitations
 
-See [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for all 24 documented limitations. Highlights:
+See [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for all 27 documented limitations. Highlights:
 
 - **ISSUE-1:** GitHub/arXiv/docs URLs -- background frequency issue, largely mitigated by compound-mini web search
 - **ISSUE-4:** llama3.1:8b context bleed between stories (fixed -- `keep_alive=0`, correctly passed)
@@ -820,6 +995,9 @@ See [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for all 24 documented limitations. High
 - **ISSUE-21:** Agent 8's font loader only checked a Linux path, silently rendering unreadably tiny text on macOS regardless of the requested size -- fixed
 - **ISSUE-22:** Agent 7 crashed with `KeyError: 'selection_rank'` on any run where Agent 3 discarded a story -- fixed
 - **ISSUE-24:** Agent 8 lower-third titles could silently lose text past 2 lines -- fixed via font auto-shrink; text/audio timing sync is still an open approximation pending real `beat_timestamps`
+- **ISSUE-25:** Agent 10's `client_secrets.json` path resolution failed against a bare relative path depending on the process's working directory -- fixed, same pattern as `agent6_1.py`'s venv-python resolution
+- **ISSUE-26:** Agent 10's thumbnail-set failure was incorrectly discarding a successful upload's record (both wrapped in one try/except) -- fixed; rerun-protection log now saves immediately after a successful upload, before the thumbnail attempt
+- **ISSUE-27:** YouTube requires channel-level phone verification before `thumbnails.set()` works at all -- documented, not a code bug, real one-time step at youtube.com/verify
 
 ---
 

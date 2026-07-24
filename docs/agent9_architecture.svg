@@ -1,0 +1,116 @@
+<svg viewBox="0 0 1000 1080" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a5568"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#38a169"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c53030"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title       { font-size: 26px; font-weight: 700; fill: #1a202c; }
+    .subtitle    { font-size: 14px; fill: #718096; }
+    .box         { stroke-width: 2; rx: 8; }
+    .boxLabel    { font-size: 14px; font-weight: 600; fill: #1a202c; }
+    .boxSub      { font-size: 11.5px; fill: #4a5568; }
+    .stagePython { fill: #f0fff4; stroke: #38a169; }
+    .stageLocal  { fill: #fffaf0; stroke: #dd6b20; }
+    .stageOutput { fill: #faf5ff; stroke: #805ad5; }
+    .flowArrow   { stroke: #4a5568; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    .exitArrow   { stroke: #38a169; stroke-width: 2.5; fill: none; marker-end: url(#arrowGreen); }
+    .loopArrow   { stroke: #c53030; stroke-width: 2; fill: none; marker-end: url(#arrowRed); }
+    .sectionLabel{ font-size: 13px; font-weight: 700; fill: #2d3748; letter-spacing: 0.5px; }
+    .legendText  { font-size: 12px; fill: #4a5568; }
+  </style>
+
+  <!-- HEADER -->
+  <text x="500" y="40" text-anchor="middle" class="title">Agent 9 — SEO Optimizer</text>
+  <text x="500" y="62" text-anchor="middle" class="subtitle">Title, description, tags, thumbnail — no video/audio touched, pure metadata generation</text>
+
+  <!-- INPUT -->
+  <rect x="270" y="85" width="460" height="55" class="box stageOutput"/>
+  <text x="500" y="108" text-anchor="middle" class="boxLabel">Input: script sections, shot_list, stories</text>
+  <text x="500" y="126" text-anchor="middle" class="boxSub">from Agent 6, Agent 7, and the original story data</text>
+  <path d="M 500 140 L 500 165" class="flowArrow"/>
+
+  <!-- TITLE -->
+  <rect x="270" y="167" width="460" height="70" class="box stagePython"/>
+  <text x="500" y="190" text-anchor="middle" class="boxLabel">_build_title()</text>
+  <text x="500" y="208" text-anchor="middle" class="boxSub">reuses Agent 5's HOOK verbatim — no new LLM call</text>
+  <text x="500" y="224" text-anchor="middle" class="boxSub">truncate at 100-char hard cap, word boundary only</text>
+
+  <path d="M 500 237 L 500 262" class="flowArrow"/>
+
+  <!-- DESCRIPTION -->
+  <rect x="270" y="264" width="460" height="80" class="box stagePython"/>
+  <text x="500" y="287" text-anchor="middle" class="boxLabel">_build_description()</text>
+  <text x="500" y="305" text-anchor="middle" class="boxSub">summary + per-story sources (reuses shot_list's source_domain)</text>
+  <text x="500" y="321" text-anchor="middle" class="boxSub">+ full script text + hashtags, front-loaded for the 157-char fold</text>
+  <text x="500" y="337" text-anchor="middle" class="boxSub" font-style="italic">deduped by story title, skips HOOK/CTA bookend entries</text>
+
+  <path d="M 500 344 L 500 369" class="flowArrow"/>
+
+  <!-- TAGS LOOP CONTAINER -->
+  <rect x="60" y="371" width="880" height="330" rx="12" fill="none" stroke="#a0aec0" stroke-width="2" stroke-dasharray="8,5"/>
+  <text x="90" y="397" class="sectionLabel">TAGS — one pass per selected story</text>
+
+  <rect x="120" y="412" width="760" height="95" class="box stageLocal"/>
+  <text x="500" y="435" text-anchor="middle" class="boxLabel">_extract_tags_for_story()</text>
+  <text x="500" y="455" text-anchor="middle" class="boxSub">qwen2.5:7b — 4-6 tags, includes both literal subject and a related term</text>
+  <text x="500" y="471" text-anchor="middle" class="boxSub">FALLBACK (no model, or output fails sanity checks): rule-based —</text>
+  <text x="500" y="487" text-anchor="middle" class="boxSub">capitalized phrases + significant title words, never returns empty</text>
+
+  <path d="M 500 507 L 500 532" class="flowArrow"/>
+
+  <rect x="270" y="534" width="460" height="60" class="box stagePython"/>
+  <text x="500" y="558" text-anchor="middle" class="boxLabel">Dedupe + accumulate into final_tags</text>
+  <text x="500" y="576" text-anchor="middle" class="boxSub">stops the moment the running total would exceed 500 chars</text>
+
+  <path d="M 500 594 L 850 594 L 850 445 L 880 445" class="loopArrow"/>
+  <text x="866" y="530" class="legendText" transform="rotate(90, 866, 530)">next story (loop repeats)</text>
+
+  <text x="90" y="672" class="sectionLabel">AFTER ALL SELECTED STORIES PROCESSED</text>
+  <path d="M 500 594 L 500 636" class="exitArrow"/>
+
+  <!-- THUMBNAIL -->
+  <rect x="270" y="703" width="460" height="90" class="box stagePython"/>
+  <text x="500" y="727" text-anchor="middle" class="boxLabel">_select_thumbnail_frame()</text>
+  <text x="500" y="745" text-anchor="middle" class="boxSub">picks a real frame from Agent 8's already-rendered frames_agent8/</text>
+  <text x="500" y="761" text-anchor="middle" class="boxSub">near the end of the HOOK window, past the fade-in period</text>
+  <text x="500" y="777" text-anchor="middle" class="boxSub" font-style="italic">frames_agent8/ missing or empty -&gt; returns None, no crash</text>
+
+  <path d="M 500 636 L 500 703" class="exitArrow"/>
+  <path d="M 500 793 L 500 818" class="flowArrow"/>
+
+  <!-- DEPENDENCY WARNING -->
+  <rect x="270" y="820" width="460" height="60" class="box" fill="#fff5f5" stroke="#c53030" stroke-width="2"/>
+  <text x="500" y="843" text-anchor="middle" class="boxLabel" fill="#c53030">Real ordering dependency</text>
+  <text x="500" y="861" text-anchor="middle" class="boxSub">Agent 9 must run BEFORE any future Agent 8 frame cleanup step</text>
+
+  <path d="M 500 880 L 500 905" class="flowArrow"/>
+
+  <!-- OUTPUT -->
+  <rect x="230" y="907" width="540" height="70" class="box stageOutput"/>
+  <text x="500" y="932" text-anchor="middle" class="boxLabel">Output: state["seo"]</text>
+  <text x="500" y="950" text-anchor="middle" class="boxSub">title · description · tags · category_id · thumbnail_path</text>
+  <text x="500" y="966" text-anchor="middle" class="boxSub" font-style="italic">thumbnail_path may be None — Agent 10 falls back to YouTube's default</text>
+
+  <!-- LEGEND -->
+  <rect x="90" y="1000" width="22" height="16" class="box stageLocal"/>
+  <text x="120" y="1012" class="legendText">Local model + fallback</text>
+
+  <rect x="330" y="1000" width="22" height="16" class="box stagePython"/>
+  <text x="360" y="1012" class="legendText">Pure Python, no model call</text>
+
+  <rect x="600" y="1000" width="22" height="16" class="box stageOutput"/>
+  <text x="630" y="1012" class="legendText">I/O</text>
+
+  <path d="M 720 1008 L 760 1008" class="loopArrow"/>
+  <text x="770" y="1012" class="legendText">Per-story loop</text>
+
+</svg>

@@ -1,0 +1,135 @@
+<svg viewBox="0 0 1000 1200" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a5568"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#38a169"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c53030"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title       { font-size: 26px; font-weight: 700; fill: #1a202c; }
+    .subtitle    { font-size: 14px; fill: #718096; }
+    .box         { stroke-width: 2; rx: 8; }
+    .boxLabel    { font-size: 14px; font-weight: 600; fill: #1a202c; }
+    .boxSub      { font-size: 11.5px; fill: #4a5568; }
+    .stageCloud  { fill: #ebf8ff; stroke: #3182ce; }
+    .stagePython { fill: #f0fff4; stroke: #38a169; }
+    .stageOutput { fill: #faf5ff; stroke: #805ad5; }
+    .stageGate   { fill: #fff5f5; stroke: #c53030; }
+    .flowArrow   { stroke: #4a5568; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    .exitArrow   { stroke: #38a169; stroke-width: 2.5; fill: none; marker-end: url(#arrowGreen); }
+    .skipArrow   { stroke: #dd6b20; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+    .failArrow   { stroke: #c53030; stroke-width: 2; fill: none; marker-end: url(#arrowRed); }
+    .exitLabel   { font-size: 12px; fill: #38a169; font-weight: 600; }
+    .skipLabel   { font-size: 12px; fill: #dd6b20; font-weight: 600; }
+    .sectionLabel{ font-size: 13px; font-weight: 700; fill: #2d3748; letter-spacing: 0.5px; }
+    .legendText  { font-size: 12px; fill: #4a5568; }
+  </style>
+
+  <!-- HEADER -->
+  <text x="500" y="40" text-anchor="middle" class="title">Agent 10 — Publisher</text>
+  <text x="500" y="62" text-anchor="middle" class="subtitle">YouTube Data API v3 · OAuth2 Desktop-app flow · uploads UNLISTED, never auto-public</text>
+
+  <!-- INPUT -->
+  <rect x="270" y="85" width="460" height="55" class="box stageOutput"/>
+  <text x="500" y="108" text-anchor="middle" class="boxLabel">Input: video_path (Agent 8) + seo (Agent 9)</text>
+  <text x="500" y="126" text-anchor="middle" class="boxSub">final .mp4 + title/description/tags/thumbnail_path</text>
+  <path d="M 500 140 L 500 165" class="flowArrow"/>
+
+  <!-- RERUN PROTECTION GATE -->
+  <path d="M 500 167 L 640 213 L 500 259 L 360 213 Z" fill="#fefcbf" stroke="#d69e2e" stroke-width="2"/>
+  <text x="500" y="209" text-anchor="middle" class="boxLabel" font-size="13">Already published?</text>
+  <text x="500" y="225" text-anchor="middle" class="boxSub">published_videos.json</text>
+
+  <text x="700" y="203" text-anchor="middle" class="skipLabel">YES</text>
+  <path d="M 640 213 L 900 213" class="skipArrow"/>
+  <rect x="770" y="240" width="180" height="55" class="box stagePython"/>
+  <text x="860" y="263" text-anchor="middle" class="boxLabel" font-size="12.5">Skip re-upload</text>
+  <text x="860" y="279" text-anchor="middle" class="boxSub" font-size="10">return cached video_id/url</text>
+  <path d="M 900 213 L 900 240" class="skipArrow"/>
+
+  <text x="500" y="290" text-anchor="middle" class="exitLabel">NO</text>
+  <path d="M 500 259 L 500 316" class="exitArrow"/>
+
+  <!-- OAUTH -->
+  <rect x="270" y="318" width="460" height="90" class="box stageCloud"/>
+  <text x="500" y="341" text-anchor="middle" class="boxLabel">_get_authenticated_service()</text>
+  <text x="500" y="359" text-anchor="middle" class="boxSub">cached token valid? reuse it. expired? refresh silently.</text>
+  <text x="500" y="375" text-anchor="middle" class="boxSub">neither? open a browser once for consent (InstalledAppFlow)</text>
+  <text x="500" y="391" text-anchor="middle" class="boxSub" font-style="italic">client_secrets.json resolved via multi-candidate path search</text>
+
+  <path d="M 500 408 L 500 433" class="flowArrow"/>
+
+  <!-- UPLOAD -->
+  <rect x="270" y="435" width="460" height="90" class="box stageCloud"/>
+  <text x="500" y="458" text-anchor="middle" class="boxLabel">_upload_video()</text>
+  <text x="500" y="476" text-anchor="middle" class="boxSub">resumable upload, privacyStatus = UNLISTED</text>
+  <text x="500" y="492" text-anchor="middle" class="boxSub">retries ONLY on transient 5xx errors, real errors surface immediately</text>
+  <text x="500" y="508" text-anchor="middle" class="boxSub" font-style="italic">videos.insert — 1,600 quota units</text>
+
+  <path d="M 500 525 L 500 550" class="flowArrow"/>
+
+  <!-- SAVE LOG IMMEDIATELY -->
+  <rect x="230" y="552" width="540" height="70" class="box stagePython"/>
+  <text x="500" y="575" text-anchor="middle" class="boxLabel">Save published_videos.json entry NOW</text>
+  <text x="500" y="593" text-anchor="middle" class="boxSub">before attempting the thumbnail — a thumbnail failure must never</text>
+  <text x="500" y="609" text-anchor="middle" class="boxSub">discard the record of an already-successful upload</text>
+
+  <path d="M 500 622 L 500 647" class="flowArrow"/>
+
+  <!-- THUMBNAIL -->
+  <rect x="270" y="649" width="460" height="90" class="box stageCloud"/>
+  <text x="500" y="672" text-anchor="middle" class="boxLabel">_set_thumbnail()</text>
+  <text x="500" y="690" text-anchor="middle" class="boxSub">skipped entirely if thumbnail_path is None (Agent 9 already logged why)</text>
+  <text x="500" y="706" text-anchor="middle" class="boxSub">catches its OWN exceptions — never propagates into the outer handler</text>
+  <text x="500" y="722" text-anchor="middle" class="boxSub" font-style="italic">thumbnails.set — requires channel phone verification</text>
+
+  <text x="820" y="700" text-anchor="middle" class="failArrow" font-size="12" fill="#c53030">fails?</text>
+  <path d="M 730 685 L 850 685 L 850 760" class="failArrow"/>
+  <rect x="760" y="762" width="180" height="55" class="box stageGate"/>
+  <text x="850" y="785" text-anchor="middle" class="boxLabel" font-size="12">Log + continue</text>
+  <text x="850" y="801" text-anchor="middle" class="boxSub" font-size="9.5">non-fatal, YouTube default used</text>
+
+  <path d="M 500 739 L 500 850" class="exitArrow"/>
+  <path d="M 850 817 L 850 850 L 500 850" stroke="#38a169" stroke-width="2.5" fill="none"/>
+
+  <!-- NOTIFY -->
+  <rect x="270" y="852" width="460" height="70" class="box stagePython"/>
+  <text x="500" y="876" text-anchor="middle" class="boxLabel">_notify_success()</text>
+  <text x="500" y="894" text-anchor="middle" class="boxSub">macOS notification, Glass sound, video URL in the subtitle</text>
+  <text x="500" y="910" text-anchor="middle" class="boxSub" font-style="italic">same pattern as Agent 4's _notify_no_stories()</text>
+
+  <path d="M 500 922 L 500 947" class="flowArrow"/>
+
+  <!-- OUTPUT -->
+  <rect x="230" y="949" width="540" height="70" class="box stageOutput"/>
+  <text x="500" y="974" text-anchor="middle" class="boxLabel">Output: youtube_video_id + youtube_url</text>
+  <text x="500" y="992" text-anchor="middle" class="boxSub">unlisted — watchable via direct link, invisible to search/recommendations</text>
+  <text x="500" y="1008" text-anchor="middle" class="boxSub" font-style="italic">Public flip is a separate, manual step in YouTube Studio</text>
+
+  <!-- FAILURE PATH -->
+  <text x="90" y="1050" class="sectionLabel">ON ANY UPLOAD FAILURE (not thumbnail — the upload itself)</text>
+  <rect x="120" y="1060" width="760" height="60" class="box stageGate"/>
+  <text x="500" y="1083" text-anchor="middle" class="boxLabel">_notify_failure() + state["publish_error"] set</text>
+  <text x="500" y="1101" text-anchor="middle" class="boxSub">Basso sound — never crashes the pipeline, but is loud and visible</text>
+
+  <!-- LEGEND -->
+  <rect x="90" y="1150" width="22" height="16" class="box stageCloud"/>
+  <text x="120" y="1162" class="legendText">Cloud API call (YouTube)</text>
+
+  <rect x="330" y="1150" width="22" height="16" class="box stagePython"/>
+  <text x="360" y="1162" class="legendText">Pure Python / local file I/O</text>
+
+  <rect x="600" y="1150" width="22" height="16" class="box stageGate"/>
+  <text x="630" y="1162" class="legendText">Non-fatal handling</text>
+
+  <path d="M 800 1158 L 840 1158" class="failArrow"/>
+  <text x="850" y="1162" class="legendText">Failure path</text>
+
+</svg>

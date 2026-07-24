@@ -1,9 +1,8 @@
 # Known Issues — AI Newsroom Studio
 
-Documented limitations as of the Agent 1-8 milestone (24 issues total).
+Documented limitations as of the Agent 1-10 milestone (27 issues total).
 These are **expected behaviors / accepted limitations**, not bugs.
-Recorded so future debugging (Agents 9-10) doesn't mistake them for new
-failures.
+Recorded so future debugging doesn't mistake them for new failures.
 
 **Issue index:** ISSUE-1,2 (Agent 2 background gathering) · ISSUE-3,4,5
 (Agent 2 synthesis models) · ISSUE-6,7,8 (Agent 3 credibility) ·
@@ -26,7 +25,12 @@ story; fixed) · ISSUE-23 (Agent 6.1 — ISSUE-19 recurred, 2 chunks
 dropped instead of 1, same short/late-chunk pattern; still open) ·
 ISSUE-24 (Agent 8 — long lower-third titles silently lost text, fixed
 via font auto-shrink; text/audio timing sync still open, needs real
-beat_timestamps)
+beat_timestamps) · ISSUE-25 (Agent 10 — client_secrets.json path
+resolution failed against a bare relative path; fixed) · ISSUE-26
+(Agent 10 — thumbnail-set failure was discarding the record of an
+already-successful upload; fixed) · ISSUE-27 (Agent 10 — custom
+thumbnails require channel-level phone verification; documented, not
+a bug)
 
 ---
 
@@ -1465,6 +1469,171 @@ Options worth evaluating when this gets prioritized:
 
 ---
 
+## ISSUE-25: Agent 10 -- `client_secrets.json` path resolution failed against a bare relative path
+
+**Status:** Fixed.
+**Affects:** Agent 10 (`_get_authenticated_service()`, and originally
+every hardcoded-relative-path constant in the file)
+
+### Symptom
+`client_secrets.json` genuinely existed on disk at the project root,
+but a real test run failed immediately:
+```
+FileNotFoundError: client_secrets.json not found. Download it from
+Google Cloud Console -> Google Auth Platform -> Clients -> your
+Desktop app client -> Download JSON.
+```
+
+### Root cause
+`CLIENT_SECRETS_FILE = "client_secrets.json"` was a bare relative
+path, which resolves against whatever the CURRENT WORKING DIRECTORY
+happens to be at the moment the Python process starts -- not
+necessarily the project root, and not necessarily this file's own
+directory. Since `agent10.py` is typically invoked from a Jupyter
+kernel whose working directory can vary (e.g. `experiments/` rather
+than `NewsStudio/`), the bare filename silently looked in the wrong
+place. This is the exact same root cause and fix pattern already
+documented for `agent6_1.py`'s `_find_venv_python()` (see ISSUE-12's
+neighboring context) -- a second, independent instance of the same
+category of bug in a different agent.
+
+### Fix applied
+```python
+def _find_project_file(filename: str, must_exist: bool = True) -> str:
+    """Checks several real candidate locations (cwd, this file's own
+    directory, two levels up, one level up) instead of trusting one
+    guessed relative path. Raises FileNotFoundError listing every
+    path actually checked if must_exist=True and nothing is found."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(os.getcwd(), filename),
+        os.path.join(here, filename),
+        os.path.join(here, "..", "..", filename),
+        os.path.join(here, "..", filename),
+    ]
+    for candidate in candidates:
+        candidate = os.path.abspath(candidate)
+        if os.path.isfile(candidate):
+            return candidate
+    if not must_exist:
+        return os.path.abspath(os.path.join(here, "..", "..", filename))
+    checked = "\n  ".join(os.path.abspath(c) for c in candidates)
+    raise FileNotFoundError(f"{filename} not found in any of these locations:\n  {checked}\n...")
+```
+Applied to all three project-root files Agent 10 touches:
+`client_secrets.json` (must already exist), `youtube_token.json` and
+`published_videos.json` (may not exist yet on a first run --
+`must_exist=False` returns the intended project-root location for
+these instead of raising).
+
+### Verification
+Confirmed fixed on a real run -- the same test that previously failed
+with `FileNotFoundError` proceeded past authentication and reached a
+real upload.
+
+---
+
+## ISSUE-26: Agent 10 -- a thumbnail-set failure was discarding the record of an already-successful upload
+
+**Status:** Fixed.
+**Affects:** Agent 10 `publisher_node()`, `_set_thumbnail()`
+
+### Symptom
+A real run uploaded a video successfully (video ID `MohAv00LMic`, live
+and unlisted on YouTube), but `publisher_node()` reported the entire
+operation as **FAILED**:
+```
+[agent10] upload FAILED: HttpError: <HttpError 403 ... "The
+authenticated user doesn't have permissions to upload and set custom
+video thumbnails.">
+```
+The `publish_error` state field was set and `youtube_url` was `None`,
+even though a real, live video existed at that moment. Worse: because
+the rerun-protection log entry (`published_videos.json`) is only
+written after a fully successful `publisher_node()` call, this failure
+mode left **no record** that the upload had actually succeeded --
+re-running the same checkpoint would have uploaded a second, duplicate
+copy of the same video.
+
+### Root cause
+`_set_thumbnail()`'s docstring already stated it should "never raise
+on a missing thumbnail," but the function body never actually caught
+its own exceptions -- a real `HttpError` from the `thumbnails.set()`
+API call propagated straight up into `publisher_node()`'s outer
+try/except, which had no way to distinguish "the upload itself failed"
+from "a cosmetic thumbnail call failed after a real upload already
+succeeded." Both were treated identically as total failure.
+
+### Fix applied
+Two independent changes, either one alone would have prevented the
+data loss, applied together for defense-in-depth:
+```python
+# 1. _set_thumbnail() now catches its own HttpError, matching what
+#    its docstring already promised:
+try:
+    youtube.thumbnails().set(videoId=video_id, media_body=...).execute()
+    return True
+except HttpError as e:
+    print(f"  [agent10] thumbnail set FAILED (non-fatal, video upload "
+          f"already succeeded): {e}")
+    return False
+
+# 2. publisher_node() now saves the published_videos.json log entry
+#    IMMEDIATELY after a successful upload, BEFORE attempting the
+#    thumbnail -- so even a hypothetical future bug in thumbnail
+#    handling can no longer un-record a real, completed upload:
+video_id = _upload_video(youtube, video_path, seo)
+log[video_path] = {"video_id": video_id, ...}
+_save_published_log(log)          # <- saved here, before thumbnail
+thumbnail_set = _set_thumbnail(youtube, video_id, seo.get("thumbnail_path"))
+```
+
+### Verification
+Re-ran against the same real video/checkpoint after the fix -- a
+simulated thumbnail failure no longer clears `youtube_url` or
+`publish_error`, and the log entry persists correctly.
+
+---
+
+## ISSUE-27: Agent 10 -- custom thumbnails require channel-level phone verification (not a code bug)
+
+**Status:** Documented, not a bug -- a real YouTube platform requirement.
+**Affects:** Agent 10 `_set_thumbnail()`
+
+### Symptom
+Every `thumbnails.set()` call for a given channel fails with:
+```
+403: "The authenticated user doesn't have permissions to upload and
+set custom video thumbnails."
+```
+regardless of OAuth scopes, GCP project configuration, or API quota --
+confirmed this is unrelated to anything in this project's own setup.
+
+### Root cause
+YouTube requires the **channel itself** (not the Google account, not
+the OAuth client, not the API project) to complete phone verification
+before custom thumbnail upload is permitted at all -- via the API or
+the regular YouTube Studio web UI, same restriction either way.
+Confirmed directly against Google's own API error documentation.
+
+### Fix
+One-time manual step, not a code change:
+```
+https://www.youtube.com/verify
+```
+Once verified, `thumbnails.set()` works immediately on the next call
+with no other changes needed.
+
+### Why this is logged here rather than silently worked around
+`_set_thumbnail()` already treats this as non-fatal (falls back to
+YouTube's auto-generated default thumbnail, per ISSUE-26's fix) --
+correct behavior, since a missing custom thumbnail should never block
+a real upload. This entry exists so a future session hitting the same
+403 recognizes it immediately as a known, expected, one-time setup
+step rather than re-diagnosing it as a new bug.
+
+---
+
 ## Summary for future sessions
 
 ```
@@ -1551,4 +1720,26 @@ AGENT8_VERSION says v7-title-autofit or later. The timing mismatch is
 NOT fixed — it's the expected result of Agent 7's word-count-
 proportional timing estimate, not a new bug; the real fix is
 per-section beat_timestamps, still an open dependency from Agent 6.1.
+
+Agent 10 raises FileNotFoundError for client_secrets.json even though
+the file genuinely exists: this is ISSUE-25 — check _find_project_file()
+is actually being used for CLIENT_SECRETS_FILENAME/TOKEN_FILENAME/
+PUBLISHED_LOG_FILENAME rather than a bare relative string; the bug
+was the working directory not matching where the file actually lives,
+not a missing file.
+
+Agent 10 reports upload FAILED but a real video shows up on YouTube
+anyway: this is ISSUE-26 — check whether the failure is actually a
+thumbnail-set 403 (see ISSUE-27) being mis-reported as a total
+failure. Confirm _set_thumbnail() has its own try/except and that
+published_videos.json is being saved BEFORE the thumbnail attempt,
+not after.
+
+Agent 10's thumbnails.set() call always 403s with "doesn't have
+permissions to upload and set custom video thumbnails": this is
+ISSUE-27, not a bug — the YouTube channel itself needs one-time phone
+verification at youtube.com/verify. Unrelated to OAuth scopes or GCP
+config. Agent 10 already treats this as non-fatal (falls back to
+YouTube's default thumbnail) — no code fix needed, just complete the
+verification step.
 ```

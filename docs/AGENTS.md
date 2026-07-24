@@ -5,7 +5,7 @@ prompt engineering decisions, and real failure modes encountered during
 development. The [main README](../README.md) has the high-level summary --
 this document is the deep-dive for each agent.
 
-**Contents:** [Agent 2](#agent-2--context-researcher-detailed) - [Agent 3](#agent-3--fact-checker-detailed) - [Agent 4](#agent-4--editorial-detailed) - [Agent 5](#agent-5--script-writer-detailed) - [Agent 6](#agent-6--script-qc-detailed) - [Agent 6.1](#agent-61--voice-over-generator-detailed)
+**Contents:** [Agent 2](#agent-2--context-researcher-detailed) - [Agent 3](#agent-3--fact-checker-detailed) - [Agent 4](#agent-4--editorial-detailed) - [Agent 5](#agent-5--script-writer-detailed) - [Agent 6](#agent-6--script-qc-detailed) - [Agent 6.1](#agent-61--voice-over-generator-detailed) - [Agent 7](#agent-7----video-assembly-prompt-implemented-tested) - [Agent 8](#agent-8----video-assembler-reactive-mode-implemented-and-tested-broll-mode-scaffolded-not-tested) - [Agent 9](#agent-9----seo-optimizer-implemented-tested) - [Agent 10](#agent-10----publisher-implemented-tested)
 
 Agent 1 (Trend Hunter) has no dedicated section here -- its entire logic is
 one velocity formula, documented fully in the main README's pipeline diagram.
@@ -643,3 +643,190 @@ trusts `state["shot_list"]` completely). Does not currently support a
 hybrid mode combining the reactive graphic with real b-roll footage in
 the same video -- that compositing decision is explicitly still open
 (see README's Phase 7-10 checklist).
+
+---
+
+### Agent 9 -- SEO Optimizer (implemented, tested)
+
+![Agent 9 Architecture](./agent9_architecture.svg)
+
+**Status:** Complete. Built as `experiments/agents/agent9.py`, wired
+into `workflow.ipynb` (`till-agent9` checkpoint). Tested against real
+pipeline data -- zero bugs found on the first real run, the only agent
+in this project to pass its first real test completely clean.
+
+**Role:** turn everything upstream agents already know about the
+finished video into the actual publish-ready YouTube metadata package
+-- title, description, tags, category, thumbnail frame. Does NOT call
+the YouTube API itself (Agent 10's job) -- pure text/selection logic,
+state in, state out, same as every other agent in this pipeline.
+
+**Inputs actually used:**
+- `state["script"]["sections"]` -- specifically the `HOOK` section
+- `state["script"]["full_text"]` -- embedded verbatim in the description
+- `state["shot_list"]` -- Agent 7's per-section data, specifically
+  `source_domain` and `story_title` for source attribution
+- `state["stories"]` -- filtered to `selection_rank`-bearing entries
+  only, same defensive pattern Agent 7 already established (see
+  ISSUE-22)
+
+**Five-function pipeline:**
+
+| Function | Job |
+|----------|-----|
+| `_build_title()` | Reuses Agent 5's HOOK verbatim, rule-based truncation to the 100-char hard cap only -- no new LLM call |
+| `_build_description()` | Summary + per-story source attribution + full script text + hashtags, front-loaded for the 157-char above-fold limit |
+| `_extract_tags_for_story()` / `_build_tags()` | qwen2.5:7b per-story extraction with rule-based fallback, accumulates against a 500-char total budget |
+| `_select_thumbnail_frame()` | Picks a real frame from Agent 8's already-rendered `frames_agent8/` directory |
+| `seo_optimizer_node()` | LangGraph node, orchestrates all of the above |
+
+**Design decision -- title reuses HOOK, never generates a new one:**
+HOOK is already written to name one specific fact and front-load the
+attention-grabbing part (Agent 5's own prompt rules -- see that
+section above). Generating a SEPARATE title risks a mismatch between
+what's promised in the title and what's actually said in the video --
+a real trust problem, not just a style choice. Only rule-based cleanup
+and hard-cap truncation are applied, matching the same
+"deterministic tasks stay in Python" principle already used for word
+count and TTS-readiness checks in Agent 6.
+
+**Real numbers this design is built against** (verified via research,
+not assumed): 100-char hard title cap (upload-rejecting limit), ~40-char
+practical Shorts-feed truncation (informational only -- HOOK is
+already front-loaded by construction, so no additional truncation
+logic beyond the hard cap was needed), 500-char total tag budget
+across ALL tags combined (not per-tag), 157-char description
+above-the-fold limit.
+
+**Tag extraction -- same injected-function pattern as Agent 7's query
+extraction:** `qwen2.5:7b`, temperature 0.3, with a rule-based fallback
+(capitalized multi-word phrases + significant title words) that never
+returns an empty tag list. Sanity-checks the model's own output before
+trusting it (rejects if the "tags" look like they echoed the prompt
+back, or if the count is wildly off) -- same discipline as Agent 7's
+`extract_section_query()`.
+
+**Real, non-obvious dependency found and documented (not yet a bug,
+but flagged before it becomes one):** `_select_thumbnail_frame()`
+requires Agent 8's `frames_agent8/` directory to still exist on disk
+when Agent 9 runs. Confirmed by reading Agent 8's actual
+`assemble_reactive_mode()` code that it does NOT delete this directory
+after muxing -- frames persist post-run today. But this creates a real
+ordering constraint: **Agent 9 must run before any future cleanup step
+added to Agent 8 or a wrapper script**, or thumbnail selection will
+silently fall back to `None` (which itself falls back gracefully to
+YouTube's auto-generated default in Agent 10 -- not a crash, but a
+quietly worse result). Worth keeping in mind if `output_organization.py`
+or similar cleanup logic is ever extended to also prune `frames_agent8/`.
+
+**Design decision -- title represents only the lead story, not all
+three:** confirmed against a real 3-story run (lithium/EV battery
+recycling as story #1, alongside two unrelated stories) -- the title
+reflected ONLY story #1's HOOK, with zero indication in the title that
+the video covers two additional, unrelated stories. This is
+deliberate, not a limitation: many real news-digest formats title off
+the lead story, and a title trying to represent 3 unrelated topics at
+once would dilute the attention-grabbing HOOK that already exists.
+Confirmed as the intended design after review.
+
+**Output -- new top-level state key:**
+```python
+state["seo"] = {
+    "title":          str,        # from HOOK, truncated to 100 chars max
+    "description":    str,        # summary + sources + full script + hashtags
+    "tags":           list[str],  # qwen2.5:7b + rule-based fallback
+    "category_id":    str,        # fixed constant, "28" (Science & Technology)
+    "thumbnail_path": str | None, # None -> Agent 10 falls back to YouTube default
+}
+```
+
+**Design boundary -- what Agent 9 does NOT do:** does not call the
+YouTube API (Agent 10's job -- Agent 9 only prepares the metadata
+package). Does not decide privacy status (also Agent 10). Does not
+re-render or select a thumbnail frame beyond picking from what Agent 8
+already produced -- no new image generation.
+
+---
+
+### Agent 10 -- Publisher (implemented, tested)
+
+![Agent 10 Architecture](./agent10_architecture.svg)
+
+**Status:** Complete. Built as `experiments/agents/agent10.py`, wired
+into `workflow.ipynb`. A real video was successfully uploaded end-to-end
+during testing (video ID `MohAv00LMic`, live and unlisted on YouTube).
+
+**Role:** take Agent 9's SEO package + Agent 8's finished video, upload
+it to YouTube as **UNLISTED** for manual review. Does NOT flip it to
+public -- that is a deliberate, separate, manual step in YouTube
+Studio. This design decision matters and is worth stating explicitly:
+nothing upstream in this pipeline guarantees a defect-free render every
+single time (ISSUE-19/23's silent CTA loss is a real, currently-open
+example of exactly this kind of defect), so the pipeline stops short
+of making anything public without a human looking at it first.
+
+**OAuth2 setup (one-time, done in Google Cloud Console before this
+agent can run at all):** GCP project created, YouTube Data API v3
+enabled, Google Auth Platform configured (Branding / Audience /
+Data Access tabs -- this replaced the old single-page "OAuth consent
+screen" UI in 2024), OAuth Client ID created as "Desktop app" type,
+downloaded as `client_secrets.json`. See the main README's
+[YouTube OAuth2 Setup](../README.md#youtube-oauth2-setup-agent-10)
+section for the full walkthrough.
+
+**Six-function pipeline:**
+
+| Function | Job |
+|----------|-----|
+| `_find_project_file()` | Resolves `client_secrets.json` / `youtube_token.json` / `published_videos.json` across several real candidate paths -- see ISSUE-25 |
+| `_get_authenticated_service()` | Reuses a cached OAuth token if valid, refreshes silently if expired, opens a browser only on first run or full expiry |
+| `_already_published()` / `_load_published_log()` / `_save_published_log()` | Rerun-protection, keyed by `video_path` |
+| `_upload_video()` | Resumable upload via `videos.insert`, retries only on transient 5xx errors |
+| `_set_thumbnail()` | Separate required API call (`thumbnails.set`), catches its own exceptions -- see ISSUE-26/27 |
+| `_notify_success()` / `_notify_failure()` | macOS notifications, same pattern as Agent 4's `_notify_no_stories()` |
+| `publisher_node()` | LangGraph node, orchestrates everything |
+
+**Why "Desktop app" OAuth flow, not a web-server flow:** this is a
+local script run from a terminal/notebook, not a deployed web app --
+`InstalledAppFlow` opens a local browser window for one-time consent,
+then caches a reusable token to disk. No public redirect URI needed.
+
+**Quota cost** (YouTube Data API v3, default 10,000 units/day):
+`videos.insert` (the upload itself) costs 1,600 units;
+`thumbnails.set` (separate required call) costs 50 units; total 1,650
+units/video, supporting ~6 videos/day on the default quota --
+comfortably above this project's 1-2/day target.
+
+**Rerun protection:** before uploading, checks a persistent
+`published_videos.json` log keyed by `video_path`. Re-running the same
+checkpoint during testing detects the prior upload and skips rather
+than risking a duplicate -- a real, not hypothetical, risk given this
+project's whole checkpoint-based testing workflow.
+
+**Real bugs found and fixed (all from actual pipeline runs):**
+
+| Bug | Root cause | Fix |
+|---|---|---|
+| `FileNotFoundError` for `client_secrets.json` despite the file genuinely existing on disk | Bare relative path silently resolved against whatever the current working directory happened to be, not necessarily the project root -- same root cause and fix pattern as `agent6_1.py`'s `_find_venv_python()` | `_find_project_file()` checks several real candidate locations (cwd, this file's directory, two levels up, one level up) instead of trusting one guessed relative path. See [KNOWN_ISSUES ISSUE-25](../KNOWN_ISSUES.md#issue-25-agent-10----client_secretsjson-path-resolution-failed-against-a-bare-relative-path) |
+| A real, successful video upload was reported as a total FAILURE, and its rerun-protection log entry was never written | `_set_thumbnail()`'s docstring promised it would never raise on a thumbnail failure, but the function body never actually caught its own exceptions -- a real `thumbnails.set()` 403 propagated into `publisher_node()`'s outer try/except, which had no way to distinguish "the upload failed" from "a cosmetic thumbnail call failed after a real upload already succeeded" | `_set_thumbnail()` now catches its own `HttpError`; `publisher_node()` now saves the `published_videos.json` log entry immediately after a successful upload, BEFORE attempting the thumbnail at all. See [KNOWN_ISSUES ISSUE-26](../KNOWN_ISSUES.md#issue-26-agent-10----a-thumbnail-set-failure-was-discarding-the-record-of-an-already-successful-upload) |
+| Every `thumbnails.set()` call 403s with "doesn't have permissions to upload and set custom video thumbnails" | Not a code bug -- YouTube requires the CHANNEL itself (not the Google account, not the OAuth client) to complete phone verification before custom thumbnails work at all, via the API or the regular web UI | One-time manual step at youtube.com/verify -- already handled non-fatally by the ISSUE-26 fix (falls back to YouTube's auto-generated default). See [KNOWN_ISSUES ISSUE-27](../KNOWN_ISSUES.md#issue-27-agent-10----custom-thumbnails-require-channel-level-phone-verification-not-a-code-bug) |
+
+**Output -- new top-level state keys:**
+```python
+state["youtube_video_id"]  str | None   set on success, None on failure
+state["youtube_url"]       str | None   set on success, None on failure
+state["publish_error"]     str          only present if the upload itself failed
+```
+Never raises out of `publisher_node()` on an upload failure -- catches,
+notifies via `_notify_failure()`, records the failure in state, and
+returns. A publish failure should be visible and actionable, not a
+crashed pipeline run with no record of what happened.
+
+**Design boundary -- what Agent 10 does NOT do:** does not decide
+title/description/tags/thumbnail (Agent 9's job -- Agent 10 trusts
+`state["seo"]` completely). Does not flip the video from unlisted to
+public -- that manual step happens in YouTube Studio, on purpose, and
+nothing in this pipeline automates it. Does not retry a genuine
+upload failure indefinitely -- retries only transient 5xx errors, a
+real auth or bad-request error surfaces immediately rather than
+retrying blindly.

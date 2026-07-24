@@ -19,3 +19,24 @@ docs/agent3.png
 docs/updates.txt
 lastcommit.txt
 experiments/data/
+
+
+# credentials -- never commit
+client_secrets.json
+youtube_token.json
+
+# local runtime state -- not source
+published_videos.json
+
+# large model weights -- never commit
+wan21-1.3b/
+wan21_mlx/
+
+# working/output directories -- not source
+experiments/frames_agent8/
+output/
+wandb/
+
+# stray debug files
+experiments/log1.txt
+EOF
