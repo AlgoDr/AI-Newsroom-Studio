@@ -11,7 +11,7 @@
 
 **A fully autonomous, multi-agent AI pipeline that researches trending tech news, fact-checks it, writes engaging scripts, generates voice-over audio, assembles short-form videos, and publishes them to YouTube (unlisted, pending manual review) -- all without human intervention.**
 
-[Overview](#overview) - [What's Built](#whats-built-so-far) - [Architecture](#agent-architecture) - [Tech Stack](#tech-stack) - [Setup](#getting-started) - [Roadmap](#development-roadmap)
+[Overview](#overview) - [What's Built](#whats-built-so-far) - [Architecture](#agent-architecture) - [Tech Stack](#tech-stack) - [Setup](#getting-started) - [Roadmap](#development-roadmap) - [Automation](#automation--scheduling)
 
 
 🔊 **[Listen to real generated voice-over samples](https://algodr.github.io/AI-Newsroom-Studio/audio-showcase.html)** &nbsp;·&nbsp; 🎬 **[Watch real generated videos](https://algodr.github.io/AI-Newsroom-Studio/video-showcase.html)**
@@ -63,6 +63,25 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
 
 [^3]: Agent 9's title deliberately reuses Agent 5's HOOK verbatim (rule-based truncation to YouTube's 100-char hard cap only) rather than generating a separate title -- a video with only ~186 words covers up to 3 unrelated stories, and the title intentionally represents only the lead story rather than trying to summarize all three, on the reasoning that a focused hook beats a diluted multi-topic title for grabbing attention. Passed its first real test against actual pipeline data with zero bugs found.
 [^4]: Agent 10 uploads as **unlisted**, not public and not private -- watchable by anyone with the direct link (for manual review), invisible to search/recommendations/your channel's public list until a separate, deliberate manual step in YouTube Studio flips it to Public. Nothing in the pipeline performs that flip automatically. A real first upload succeeded end-to-end; setting a custom thumbnail specifically requires the YouTube channel to be phone-verified (a real, separate one-time step, unrelated to any OAuth/API configuration) -- see [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for the exact error and fix.
+
+---
+
+## Real Output -- Proof It Works
+
+This isn't a mockup or a design doc -- the pipeline genuinely runs
+end-to-end, unattended, and publishes real videos. Below is an actual
+screenshot of the YouTube channel this project publishes to, showing
+real, pipeline-generated videos (unlisted, pending manual review per
+Agent 10's design -- see footnote 4 above).
+
+![Real videos published by this pipeline](docs/channel-screenshot.png)
+
+Every video shown was produced by a genuinely automated run: HackerNews
+trend detection -> fact-checking -> editorial selection -> script
+writing -> QC -> voice-over -> video assembly -> SEO metadata ->
+YouTube upload, with zero human editing of the content itself. See
+[Automation & Scheduling](#automation--scheduling) below for how this
+runs completely unattended on a daily schedule.
 
 ---
 
@@ -284,10 +303,20 @@ NewsStudio/
 |   |-- agent6_1_architecture.svg
 |   |-- agent7_architecture.svg
 |   |-- agent8_architecture.svg
+|   |-- agent9_architecture.svg
+|   |-- agent10_architecture.svg
+|   |-- channel-screenshot.png   # real YouTube channel screenshot, see "Real Output" section
 |   |-- audio-showcase.html      # auto-generated -- do not hand-edit, see generate_showcase_pages.py
 |   |-- video-showcase.html      # auto-generated -- do not hand-edit
 |   |-- samples/                 # audio files copied in by the showcase generator
 |   `-- video-samples/           # video files copied in by the showcase generator
+|
+|-- logs/                        # gitignored -- run-notebook-daily.py's own output
+|   |-- launchd_stdout.log       # launchd's own capture, separate from the per-run logs below
+|   |-- launchd_stderr.log
+|   |-- {timestamp}_{title-slug}.log   # one per real automated run
+|   `-- executed_notebooks/
+|       `-- {timestamp}.ipynb    # full executed notebook, every cell's real output preserved
 |
 |-- multi-agent-env/             # main venv -- everything except CLAP
 |-- clap-env/                    # SEPARATE venv -- msclap only (dependency isolation)
@@ -295,8 +324,10 @@ NewsStudio/
 |-- client_secrets.json          # gitignored -- OAuth2 Desktop app credentials (Agent 10)
 |-- youtube_token.json           # gitignored -- cached OAuth2 token, auto-created on first auth
 |-- published_videos.json        # gitignored -- Agent 10 rerun-protection log (video_path -> youtube_url)
+|-- run-notebook-daily.py        # launchd entry point -- hard 8am IST deadline + papermill execution
+|-- com.newsroomstudio.dailyrun.plist  # launchd job definition (copy to ~/Library/LaunchAgents/)
 |
-|-- KNOWN_ISSUES.md              # 27 documented limitations (not bugs)
+|-- KNOWN_ISSUES.md              # 28 documented limitations (not bugs)
 |-- .gitignore
 |-- LICENSE
 `-- README.md
@@ -907,6 +938,102 @@ footage" -- that's the next real gap to close, not a finished feature.
 
 ---
 
+## Automation & Scheduling
+
+**Status:** Complete and verified end-to-end -- a real unattended run
+has completed successfully through Agent 10, publishing a genuine
+video ([youtube.com/watch?v=H3002RAfmjQ](https://youtube.com/watch?v=H3002RAfmjQ)),
+not just a dry run.
+
+### Why automate the notebook itself, not a separate reimplementation
+
+An earlier design attempt built a standalone `pipeline_graph.py`, a
+real compiled LangGraph `StateGraph` wiring all 10 agents together as
+a parallel, hand-written module. That approach was abandoned once a
+direct comparison against the actual `workflow.ipynb` revealed a real,
+non-obvious gap: Agent 4's real invocation runs through
+`get_stories_for_agent4()` (a caching/multi-day-contamination guard)
+before calling `editorial_node()`, and imports the notebook's own
+`route_after_editorial()` rather than reimplementing that logic --
+neither of which the parallel module had correctly captured. A
+hand-maintained second copy of the pipeline's wiring can silently
+drift from the real, working notebook; automating the notebook
+directly cannot.
+
+### The actual mechanism
+
+```
+launchd (macOS native scheduler, no persistent process required)
+  |  fires at 08:00 IST daily
+  v
+run-notebook-daily.py (project root)
+  |  hard deadline check: only proceeds if actual wall-clock time is
+  |  within 08:00:00-08:05:00 IST (explicit zoneinfo, not system-
+  |  local time) -- if outside this window, exits immediately
+  |  without touching the pipeline at all, no late catch-up
+  v
+papermill (executes experiments/workflow.ipynb directly, unchanged --
+  |  the real, proven notebook, not a reimplementation)
+  v
+Agent 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 6.1 -> 7 -> 8 -> 9 -> 10
+  |  every agent's own real print() output captured automatically,
+  |  zero changes needed to any of the 10 agent files
+  v
+logs/{timestamp}_{video-title-slug}.log
+logs/executed_notebooks/{timestamp}.ipynb  (full executed notebook,
+                                             every cell's real output preserved)
+```
+
+### Why a hard deadline, not launchd's own catch-up
+
+`launchd`'s built-in behavior for a missed `StartCalendarInterval`
+firing was checked against real evidence, not assumed: reliable if the
+Mac was merely asleep with the lid **open**, does **not** fire at all
+until the lid is physically opened if closed, and inconsistent in
+real testing if the Mac was fully powered off. Rather than depend on
+any of that, `run-notebook-daily.py` checks the actual wall-clock time
+itself the moment it starts -- if the Mac's lid was closed at 8am and
+only opened at noon, the script sees noon, recognizes it's outside the
+deadline window, and skips today's run entirely rather than running
+late. This makes the guarantee live in code under this project's
+control, not in OS behavior that isn't fully controllable.
+
+### Real bug found during setup (see KNOWN_ISSUES ISSUE-28)
+
+A real automated test run completed with exit code 0 and no errors,
+but stopped after Agent 8 -- Agent 9 and Agent 10 had been tested
+extensively earlier, but only as cells run in an already-open, live
+Jupyter kernel, never actually saved back into `workflow.ipynb` on
+disk. `papermill` (correctly) only ever sees what's persisted in the
+file, not what's remembered in an open browser tab's kernel session.
+Confirmed via `grep -c "seo_optimizer_node\|publisher_node"
+workflow.ipynb` returning 0 before the fix, 4 after actually saving --
+a real, if simple, lesson about live-session state vs. saved-file
+state.
+
+### `--force` flag for manual testing without waiting for 8am
+
+```bash
+./multi-agent-env/bin/python3 run-notebook-daily.py --force
+```
+Bypasses the deadline check for a manual, on-demand full pipeline run.
+The real scheduled `launchd`-triggered invocation never passes this
+flag, so the actual automated daily run always enforces the hard
+deadline exactly as designed -- `--force` exists purely as a testing
+affordance.
+
+### Setup
+
+```bash
+pip install papermill
+
+cp com.newsroomstudio.dailyrun.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.newsroomstudio.dailyrun.plist
+launchctl list | grep newsroomstudio   # confirm registered
+```
+
+---
+
 ## Key Design Decisions
 
 ### Why HackerNews over Reddit/NewsAPI?
@@ -978,7 +1105,7 @@ to resolve Python-version differences for Kokoro's own subprocess call.
 
 ## Known Limitations
 
-See [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for all 27 documented limitations. Highlights:
+See [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for all 28 documented limitations. Highlights:
 
 - **ISSUE-1:** GitHub/arXiv/docs URLs -- background frequency issue, largely mitigated by compound-mini web search
 - **ISSUE-4:** llama3.1:8b context bleed between stories (fixed -- `keep_alive=0`, correctly passed)
@@ -998,6 +1125,7 @@ See [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for all 27 documented limitations. High
 - **ISSUE-25:** Agent 10's `client_secrets.json` path resolution failed against a bare relative path depending on the process's working directory -- fixed, same pattern as `agent6_1.py`'s venv-python resolution
 - **ISSUE-26:** Agent 10's thumbnail-set failure was incorrectly discarding a successful upload's record (both wrapped in one try/except) -- fixed; rerun-protection log now saves immediately after a successful upload, before the thumbnail attempt
 - **ISSUE-27:** YouTube requires channel-level phone verification before `thumbnails.set()` works at all -- documented, not a code bug, real one-time step at youtube.com/verify
+- **ISSUE-28:** A live Jupyter kernel session is not the same as the saved `.ipynb` file -- an automated run via `papermill` only sees what's actually persisted to disk, not cells tested in an already-open notebook session
 
 ---
 

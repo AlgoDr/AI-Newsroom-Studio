@@ -1,6 +1,6 @@
 # Known Issues — AI Newsroom Studio
 
-Documented limitations as of the Agent 1-10 milestone (27 issues total).
+Documented limitations as of the Agent 1-10 milestone (28 issues total).
 These are **expected behaviors / accepted limitations**, not bugs.
 Recorded so future debugging doesn't mistake them for new failures.
 
@@ -30,7 +30,8 @@ resolution failed against a bare relative path; fixed) · ISSUE-26
 (Agent 10 — thumbnail-set failure was discarding the record of an
 already-successful upload; fixed) · ISSUE-27 (Agent 10 — custom
 thumbnails require channel-level phone verification; documented, not
-a bug)
+a bug) · ISSUE-28 (Automation — a live Jupyter kernel session is not
+the same as the saved .ipynb file; resolved)
 
 ---
 
@@ -1634,6 +1635,59 @@ step rather than re-diagnosing it as a new bug.
 
 ---
 
+## ISSUE-28: Automation -- a live Jupyter kernel session is not the same as the saved .ipynb file
+
+**Status:** Resolved -- real gap found and corrected during automation testing, not a bug in run-notebook-daily.py or papermill.
+**Affects:** `run-notebook-daily.py` (papermill-based automation), `workflow.ipynb`
+
+### Symptom
+A real automated test run completed successfully (`papermill exit
+code: 0`, real 8-minute runtime, zero errors) but the resulting log
+got named `..._no-title.log` instead of including the real video
+title. Inspecting the actual executed notebook (papermill always
+saves a complete, fully-executed copy regardless of what did or
+didn't get relayed to captured stdout) confirmed the run genuinely
+stopped after Agent 8's showcase-generation cell -- there were no
+Agent 9 or Agent 10 cells in the file at all.
+
+### Root cause
+Agent 9 and Agent 10 had been tested extensively earlier by running
+their code as new cells in an already-open, live Jupyter kernel
+session -- but those cells were never saved back into `workflow.ipynb`
+on disk. A live kernel session and the `.ipynb` file are two separate
+things: the kernel remembers whatever cells were executed in it, but
+`papermill` (or any other tool that runs a notebook non-interactively)
+only ever sees what's actually persisted in the file. Cmd+S / File ->
+Save Notebook is not automatic and is easy to forget after a long,
+iterative testing session.
+
+### How it was actually confirmed (not just assumed)
+```bash
+grep -c "seo_optimizer_node\|publisher_node" experiments/workflow.ipynb
+```
+returned `0` before the fix, `4` after actually saving the notebook --
+a simple, fast way to verify the file on disk genuinely contains the
+cells expected, rather than trusting what's visible in an open browser
+tab.
+
+### Fix
+Added the Agent 9 and Agent 10 cells to `workflow.ipynb` as real,
+saved cells (matching the existing checkpoint-based pattern already
+used for every other agent), then explicitly saved the file. Re-running
+`run-notebook-daily.py --force` afterward completed successfully
+through Agent 10, with the log correctly titled from Agent 9's real
+output and a real video published (`youtube.com/watch?v=H3002RAfmjQ`).
+
+### Lesson for future sessions
+Whenever new cells are added to `workflow.ipynb` during interactive
+testing, verify they're actually persisted to disk (a quick `grep` for
+a distinctive function name, or checking the file's modified
+timestamp) before assuming an automated/scheduled run will include
+them -- "it worked when I ran it in the notebook" and "it's saved in
+the notebook" are two different claims.
+
+---
+
 ## Summary for future sessions
 
 ```
@@ -1742,4 +1796,13 @@ verification at youtube.com/verify. Unrelated to OAuth scopes or GCP
 config. Agent 10 already treats this as non-fatal (falls back to
 YouTube's default thumbnail) — no code fix needed, just complete the
 verification step.
+
+Automated run (run-notebook-daily.py) completes successfully but ends
+early / a log gets titled "no-title" for no obvious reason: this is
+ISSUE-28 — check whether workflow.ipynb was actually SAVED after
+adding new cells (Cmd+S / File -> Save), not just run in an open
+kernel. `grep -c "seo_optimizer_node\|publisher_node"
+experiments/workflow.ipynb` should return a real count if Agent 9/10
+cells are genuinely persisted; 0 means they only ever existed in an
+unsaved live session.
 ```
