@@ -16,7 +16,7 @@
 
 🔊 **[Listen to real generated voice-over samples](https://algodr.github.io/AI-Newsroom-Studio/audio-showcase.html)** &nbsp;·&nbsp; 🎬 **[Watch real generated videos](https://algodr.github.io/AI-Newsroom-Studio/video-showcase.html)**
 
-*Both pages regenerate from actual pipeline runs -- real story titles, real scripts, real word counts -- not mockups. See [Output Organization + showcase publishing](#phase-7-10----video-pipeline-current-focus) for how.*
+*Both pages regenerate from actual pipeline runs -- real story titles, real scripts, real word counts -- not mockups. See [Output Organization + showcase publishing](#output-organization--showcase-publishing) for how.*
 
 </div>
 
@@ -771,25 +771,26 @@ the *voice* -- not the visuals -- feel more human:
   - [ ] Fallback behavior if a story's search returns no usable footage
         (currently undecided -- likely a solid-color/title-card slide
         rather than blocking the whole video)
-- [x] **Output organization + showcase publishing** -- built and tested
-      (`experiments/agent_tools/output_organization.py`,
-      `generate_showcase_pages.py`), not tied to a specific numbered
-      agent since it's cross-cutting infrastructure, not a pipeline
-      step
-  - [x] `organize_run_output()` copies a finished run's video + audio
-        into `output/{timestamp}_{story-slug}/`, plus a `metadata.json`
-        (titles, script text, word count, QC iterations, durations)
-        pulled directly from pipeline state
-  - [x] `prune_old_runs(keep=5)` deletes anything beyond the 5 most
-        recent runs, so `output/` doesn't grow without bound
-  - [x] `generate_showcase_pages.py` reads `output/` and **regenerates**
-        `docs/audio-showcase.html` + `docs/video-showcase.html` from
-        real run data -- static HTML has no way to read the filesystem
-        at view-time, so this bakes current state into plain HTML ahead
-        of time, rather than the page updating itself
-  - [x] Deliberately **manual, not automatic** -- never runs as part of
-        the pipeline itself, so a bad run never silently goes live on
-        the public GitHub Pages site without review
+#### Output Organization + Showcase Publishing
+
+Built and tested (`experiments/agent_tools/output_organization.py`,
+`generate_showcase_pages.py`), not tied to a specific numbered agent
+since it's cross-cutting infrastructure, not a pipeline step.
+
+- [x] `organize_run_output()` copies a finished run's video + audio
+      into `output/{timestamp}_{story-slug}/`, plus a `metadata.json`
+      (titles, script text, word count, QC iterations, durations)
+      pulled directly from pipeline state
+- [x] `prune_old_runs(keep=5)` deletes anything beyond the 5 most
+      recent runs, so `output/` doesn't grow without bound
+- [x] `generate_showcase_pages.py` reads `output/` and **regenerates**
+      `docs/audio-showcase.html` + `docs/video-showcase.html` from
+      real run data -- static HTML has no way to read the filesystem
+      at view-time, so this bakes current state into plain HTML ahead
+      of time, rather than the page updating itself
+- [x] Deliberately **manual, not automatic** -- never runs as part of
+      the pipeline itself, so a bad run never silently goes live on
+      the public GitHub Pages site without review
 - [ ] **Agent 8.1 -- Video QA (idea, not built)**: once `broll` mode
       exists, verify a fetched stock-footage clip's first frame
       actually matches its search query before Agent 8 commits to
