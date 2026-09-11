@@ -41,7 +41,7 @@ def _ask_judge(client, system: str, user: str) -> tuple[float | None, str]:
                 {"role": "user", "content": user},
             ],
             temperature=0,
-            max_tokens=80,
+            max_tokens=config.JUDGE_MAX_TOKENS,
         )
     except Exception as e:
         return None, f"judge call failed: {type(e).__name__}: {e}"
@@ -108,23 +108,29 @@ def content_eval_relevance() -> tuple[bool, str]:
     if not selected:
         return False, "no selected stories in golden checkpoint"
 
-    stories = "\n".join(f"- {s['title']}" for s in selected[:3])
+    # Production reality check: a YouTube news short covers MULTIPLE
+    # stories but the title+HOOK is SUPPOSED to hook on the LEAD story
+    # (rank 1) -- that's how real news channels drive views. Judging the
+    # title against ALL stories at once is a mis-specified criterion.
+    lead = selected[0]
     sections = script.get("sections", {})
     hook = sections.get("HOOK", "")[:400]
     seo_title = state.get("seo", {}).get("title", "")
 
     score, note = _ask_judge(
         client,
-        system=("You are a content-relevance evaluator. Score from 0.0 to 1.0 how "
-                "relevant the SEO title and opening hook are to the target stories. "
-                "Reply with ONLY the score number, e.g. 0.88."),
-        user=f"TARGET STORIES:\n{stories}\n\nSEO TITLE:\n{seo_title}\n\nHOOK:\n{hook}",
+        system=("You are a content-relevance evaluator for a news shorts "
+                "channel. Each short covers several news stories; the title "
+                "and hook must match the LEAD (primary) story. Score from "
+                "0.0 to 1.0 how relevant the SEO title and opening hook are "
+                "to the lead story. Reply with ONLY the score number."),
+        user=f"LEAD STORY:\n{lead['title']}\n\nSEO TITLE:\n{seo_title}\n\nHOOK:\n{hook}",
     )
     if score is None:
         return False, note
     passed = score >= config.RELEVANCE_THRESHOLD
     verdict = "PASS" if passed else "FAIL"
-    return passed, (f"relevance={score:.2f} "
+    return passed, (f"relevance(lead)={score:.2f} "
                     f"(threshold {config.RELEVANCE_THRESHOLD}) [{verdict}]")
 
 

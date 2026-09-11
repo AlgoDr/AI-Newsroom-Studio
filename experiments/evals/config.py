@@ -33,7 +33,12 @@ SECTION_ORDER = [
 # ── Content-eval judge LLM (same model family the pipeline itself
 #    uses for QC -- gpt-oss-120b via Groq). Keeps cost near zero.
 JUDGE_PROVIDER = "groq"
-JUDGE_MODEL = "openai/gpt-oss-120b"
+# NOTE: use a non-reasoning model as the judge. gpt-oss-120b is a
+# reasoning model that can consume its whole max_tokens budget on
+# reasoning and return an EMPTY answer (seen live), which breaks the
+# score parser. qwen/qwen3.8-27b returns its answer immediately.
+JUDGE_MODEL = "qwen/qwen3.8-27b"
+JUDGE_MAX_TOKENS = 200
 FAITHFULNESS_THRESHOLD = 0.80   # script claims must be grounded in sources
 RELEVANCE_THRESHOLD = 0.80      # title/hook must relate to selected stories
 
