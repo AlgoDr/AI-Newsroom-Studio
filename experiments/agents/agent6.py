@@ -7,7 +7,7 @@ Role: Validate and polish Agent 5's script until it is genuinely ready
 
 Two-stage model split:
   JUDGE   (openai/gpt-oss-120b)       -- reasoning-tuned, finds problems
-  REWRITE (llama-3.3-70b-versatile)   -- creative fluency, fixes ONLY
+  REWRITE (qwen/qwen3.8-27b)   -- creative fluency, fixes ONLY
                                          what was flagged, never the
                                          whole script
 
@@ -38,9 +38,9 @@ from groq import Groq
 dotenv.load_dotenv(".env")
 
 JUDGE_MODEL             = "openai/gpt-oss-120b"
-REWRITE_MODEL           = "llama-3.3-70b-versatile"
-JUDGE_FALLBACK_MODEL    = "qwen2.5:7b"
-REWRITE_FALLBACK_MODEL  = "gemma3:12b"
+REWRITE_MODEL           = "qwen/qwen3.8-27b"
+JUDGE_FALLBACK_MODEL    = "qwen3.5:9b"
+REWRITE_FALLBACK_MODEL  = "gemma4:12b-mlx"
 TARGET_MIN      = 150
 TARGET_MAX      = 225
 MAX_ITERATIONS  = 2
@@ -228,7 +228,7 @@ CTA_OK: YES or NO"""
 
 
 def _judge_script_local(prompt: str) -> str:
-    """Local fallback for the JUDGE stage -- qwen2.5:7b via Ollama."""
+    """Local fallback for the JUDGE stage -- qwen3.5:9b via Ollama."""
     try:
         resp = ollama.generate(
             model=JUDGE_FALLBACK_MODEL,
@@ -298,7 +298,7 @@ def _default_judgment_pass() -> dict:
 
 
 def _rewrite_flagged(script: dict, judgment: dict) -> dict:
-    """Stage 2 -- llama-3.3-70b-versatile rewrites ONLY flagged sections."""
+    """Stage 2 -- qwen/qwen3.8-27b rewrites ONLY flagged sections."""
     sections = dict(script["sections"])
 
     to_fix = {}
@@ -358,7 +358,7 @@ SECTION_LABEL: rewritten text"""
         )
         raw = (resp.choices[0].message.content or "").strip()
     except Exception as e:
-        print(f"  [qc] REWRITE (llama-3.3-70b) call failed: {e}")
+        print(f"  [qc] REWRITE (qwen/qwen3.8-27b) call failed: {e}")
 
     if not raw:
         print("  [qc] REWRITE empty/failed on Groq -> "
@@ -405,7 +405,7 @@ def _parse_rewrite_output(raw: str) -> dict:
 
 
 def _rewrite_flagged_local(prompt: str) -> str:
-    """Local fallback for the REWRITE stage -- gemma2:9b via Ollama."""
+    """Local fallback for the REWRITE stage -- gemma4:12b-mlx via Ollama."""
     try:
         resp = ollama.generate(
             model=REWRITE_FALLBACK_MODEL,

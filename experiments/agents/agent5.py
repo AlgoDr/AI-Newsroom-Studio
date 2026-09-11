@@ -28,12 +28,12 @@ New state key added:
       "attempt":      int,   # 1 or 2 (audit trail for word count enforcement)
   }
 
-Model: llama-3.3-70b-versatile (Groq)
+Model: qwen/qwen3.8-27b (Groq)
   - Strong creative writing -- better than 8B for generation tasks
   - Separate quota from gpt-oss-120b (Agent 3) and gpt-oss-20b (Agent 2)
   - 1-2 calls per pipeline run maximum
 
-Fallback: gemma3:12b (local, Ollama, Metal-accelerated)
+Fallback: gemma4:12b-mlx (local, Ollama, Metal-accelerated)
   - The main generation call had ZERO local fallback until this version --
     confirmed real-world failure: Groq down -> Agent 5 produced 0 words,
     cascading into Agent 6 having nothing to QC.
@@ -55,8 +55,8 @@ dotenv.load_dotenv(".env")
 
 # CONSTANTS
 
-MODEL          = "llama-3.3-70b-versatile"   # creative generation model
-FALLBACK_MODEL = "gemma3:12b"                # local fallback, confirmed via
+MODEL          = "qwen/qwen3.8-27b"   # creative generation model
+FALLBACK_MODEL = "gemma4:12b-mlx"                # local fallback, confirmed via
                                               # A/B test (see module docstring)
 TARGET_MIN  = 150    # minimum words (60 sec at 2.5 words/sec)
 TARGET_MAX  = 225    # maximum words (90 sec at 2.5 words/sec)
@@ -348,7 +348,7 @@ def _enforce_word_count(raw: str, attempt: int = 1) -> tuple:
     Never blocks pipeline -- if attempt 2 is still wrong, accepts
     and logs a warning. Agent 6 (QC) will review it.
 
-    Uses the same model (llama-3.3-70b-versatile) for consistency.
+    Uses the same model (qwen/qwen3.8-27b) for consistency.
     """
     word_count = len(raw.split())
     print(f"  [script] word count after attempt {attempt}: {word_count} words")
@@ -397,8 +397,8 @@ def _enforce_word_count(raw: str, attempt: int = 1) -> tuple:
 # FUNCTION 5b -- _generate_script_local (NEW -- Groq fallback for Step 3)
 
 def _generate_script_local(prompt: str) -> str:
-    """Local fallback for the PRIMARY script generation call -- gemma3:12b
-    via Ollama, Metal-accelerated. Used only when llama-3.3-70b-versatile
+    """Local fallback for the PRIMARY script generation call -- gemma4:12b-mlx
+    via Ollama, Metal-accelerated. Used only when qwen/qwen3.8-27b
     (Groq) returns empty or the API call fails.
 
     Before this function existed, Agent 5's main generation call had
