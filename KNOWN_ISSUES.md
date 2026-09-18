@@ -2046,3 +2046,13 @@ each 7-day expiry, or publish the app to remove the constraint.
 2. New final retry tier: TEXT PERTURBATION. If every voice fails, append a neutral filler sentence (" And that is the latest.") and retry — changing text length moves the input out of the crash window. Validated live 2026-09-18: exact failing chunk 4 text → all voices fail → perturbed retry succeeds (13.8s audio, 11.7s total).
 
 **Note:** Longer-term real fix is upgrading mlx-audio (0.5.4 current) — defer until eval suite can validate voice quality parity.
+
+## ISSUE-33c: Refresh token revived WITHOUT browser consent after flipping app to production (2026-09-18)
+
+**Expected:** after the app went In production, agent10's silent refresh would fail with RefreshError (token was dead since Aug 20), pop the consent browser once, and mint a new never-expiring token.
+
+**Actually happened:** silent refresh SUCCEEDED immediately -- no browser, no consent screen. Log sequence: "cached token expired -- refreshing silently" -> "token saved", with no browser line in between.
+
+**Explanation:** the Testing-mode 7-day policy doesn't necessarily destroy the stored refresh token -- it makes Google REFUSE it (invalid_grant) while the app is in Testing. The Jul-24 token file stayed on disk; the moment the app flipped to production, the same token worked again via the silent path. A brand-new access token was minted (1hr expiry, standard refresh grant) and the token file was rewritten in place (created Jul 24, modified Sep 18 21:17).
+
+**Why it matters:** (1) Testing-mode invalid_grant can be a reversible policy rejection, not always a fatal revocation -- worth one silent-refresh attempt after fixing publishing status before assuming re-consent is required. (2) The never-expiring-token goal was achieved with zero user interaction. The agent10 auto-reconsent fallback remains in place for genuinely revoked tokens (password change, manual revoke).
