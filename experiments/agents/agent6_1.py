@@ -321,8 +321,16 @@ def _generate_one_call(text: str, voice: str, chunk_index: int) -> list:
 
     produced = sorted(glob.glob(os.path.join(OUTPUT_DIR, "audio_*.wav")))
     if not produced:
+        # mlx-audio 0.4.4 swallows internal exceptions and still exits 0,
+        # so the real crash reason only lives in the captured output.
+        tail = (result.stdout or "")[-300:].strip()
+        errtail = (result.stderr or "")[-300:].strip()
         print(f"  [voiceover] chunk {chunk_index + 1}: mlx_audio exited "
               f"cleanly but produced no audio_*.wav file")
+        if tail:
+            print(f"  [voiceover] chunk {chunk_index + 1} stdout tail: {tail!r}")
+        if errtail:
+            print(f"  [voiceover] chunk {chunk_index + 1} stderr tail: {errtail!r}")
         print(f"  [voiceover] chunk {chunk_index + 1} text: {text!r}")
         return []
 
@@ -371,6 +379,7 @@ def _generate_audio(text: str, voice: str, _regen_done: bool = False) -> tuple:
     all_audio_files = []
     skipped_chunks = []
     failed_voices = set()  # chunk indices that needed a fallback voice
+    perturbed_chunks = False  # any chunk saved only by text perturbation
 
     for i, chunk_text in enumerate(text_chunks):
         chunk_word_count = len(chunk_text.split())
@@ -407,6 +416,29 @@ def _generate_audio(text: str, voice: str, _regen_done: bool = False) -> tuple:
             print(f"  [voiceover] chunk {i + 1}: retrying with original "
                   f"voice...")
             chunk_files = _generate_one_call(chunk_text, voice, chunk_index=i)
+
+        if not chunk_files and not perturbed_chunks:
+            # Text-perturbation retry: mlx-audio 0.4.4's Kokoro crashes
+            # deterministically on specific (text-length, voice) pairs
+            # for EVERY voice in the ladder. Changing the text length by
+            # even one word moves the input out of the crash window.
+            # Appending a short filler sentence is content-neutral for a
+            # news script and adds a natural closing beat.
+            print(f"  [voiceover] chunk {i + 1}: all voices failed -- "
+                  f"retrying with perturbed text (length change escapes "
+                  f"the crash window)...")
+            perturbed_text = chunk_text.rstrip() + " And that is the latest."
+            chunk_files = _generate_one_call(perturbed_text, voice,
+                                              chunk_index=i)
+            if not chunk_files:
+                for fb_voice in VOICE_FALLBACKS.get(voice, []):
+                    chunk_files = _generate_one_call(perturbed_text, fb_voice,
+                                                      chunk_index=i)
+                    if chunk_files:
+                        failed_voices.add(i)
+                        break
+            if chunk_files:
+                perturbed_chunks = True
 
         if not chunk_files:
             # skip this chunk -- don't abort the whole pipeline

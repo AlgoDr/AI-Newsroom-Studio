@@ -2035,3 +2035,14 @@ re-consent fallback is the pragmatic path. Caveat: on the launchd/
 scheduled run (no interactive session), a browser cannot open -- the
 run will fail loudly instead; run the pipeline once manually after
 each 7-day expiry, or publish the app to remove the constraint.
+## ISSUE-33b: Chunk 4 failed on ALL voices — istftnet length-window crash, fixed via text perturbation (2026-09-18)
+
+**Symptom:** In the 21:04 full run, voiceover chunk 4 ("And finally, one developer claims... Conway's refinement conjecture.") failed all 3 ladder attempts: af_heart, af_nova, and original-voice retry ALL produced "exited cleanly but produced no audio_*.wav file". Published video was missing the twist sentence.
+
+**Root cause (now proven, not inferred):** mlx-audio 0.4.4's Kokoro crashes in istftnet.py with `ValueError: [broadcast_shapes] Shapes (1,294000,1) and (1,294300,9) cannot be broadcast` — a deterministic function of generated audio length, INDEPENDENT of voice. Some text lengths land in a shape-mismatch window that fails for every voice. mlx_audio swallows the exception and exits 0, hiding the reason.
+
+**Fixes (agent6_1.py):**
+1. Failure path now prints captured stdout/stderr tails — the real crash reason is visible in logs instead of a silent exit-0.
+2. New final retry tier: TEXT PERTURBATION. If every voice fails, append a neutral filler sentence (" And that is the latest.") and retry — changing text length moves the input out of the crash window. Validated live 2026-09-18: exact failing chunk 4 text → all voices fail → perturbed retry succeeds (13.8s audio, 11.7s total).
+
+**Note:** Longer-term real fix is upgrading mlx-audio (0.5.4 current) — defer until eval suite can validate voice quality parity.
