@@ -60,6 +60,7 @@ import subprocess
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
@@ -159,8 +160,22 @@ def _get_authenticated_service():
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             print("  [agent10] cached token expired -- refreshing silently")
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except RefreshError as e:
+                # Refresh token is DEAD (typically: OAuth app still in
+                # "Testing" status -> refresh tokens expire after 7 days;
+                # also happens on password change or app revocation).
+                # Retrying or crashing is useless -- the only fix is a
+                # fresh one-time browser consent, so do it automatically
+                # instead of failing the run (issue seen 2026-09-18:
+                # invalid_grant after the Jul 29 grant aged out).
+                print(f"  [agent10] refresh token rejected ({type(e).__name__}: "
+                      f"{str(e).splitlines()[0][:80]})")
+                print("  [agent10] cached credentials are unrecoverable -- "
+                      "opening browser for fresh one-time consent")
+                creds = None
+        if creds is None:
             print("  [agent10] no valid cached token -- opening browser "
                   "for one-time consent")
             secrets_path = _find_project_file(CLIENT_SECRETS_FILENAME, must_exist=True)

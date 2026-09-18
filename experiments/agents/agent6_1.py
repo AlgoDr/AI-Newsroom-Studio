@@ -81,6 +81,18 @@ import wave
 from datetime import datetime, timezone
 
 KOKORO_MODEL         = "mlx-community/Kokoro-82M-bf16"
+
+# Per-chunk voice fallback ladder. mlx-audio 0.4.4's Kokoro crashes with
+# a broadcast_shapes ValueError inside istftnet for SPECIFIC
+# (text-length, voice) combinations -- reproduced 2026-09-18: the same
+# text rendered fine with af_nova but crashed with af_heart and
+# af_bella. Retrying a doomed chunk with a different voice is the only
+# reliable recovery for that failure class.
+VOICE_FALLBACKS = {
+    "af_heart": ["af_nova"],
+    "af_bella": ["af_nova"],
+    "af_nova":  ["af_heart"],
+}
 DEFAULT_VOICE        = "af_heart"
 OUTPUT_DIR           = "data/audio"
 WORDS_PER_SECOND     = 2.5
@@ -218,6 +230,33 @@ def _sanitize_for_tts(text: str) -> str:
     return text
 
 
+def _strip_wrapping_straight_quotes(text: str) -> str:
+    """Strip a matching pair of straight single/double quotes wrapped
+    around the whole text.
+
+    Root cause of the 2026-09-18 first-chunk silent failure (no file,
+    exit 0, no stderr): the LLM script was delivered as ONE string
+    wrapped in literal straight single quotes
+    ('Microsoft execs called ... admissions.'). Straight quotes are NOT
+    in _sanitize_for_tts's substitution list (it only handles curly
+    ' ' " " -- straight ASCII quotes were assumed harmless), and
+    espeak-ng/misaki treat a leading ' as an unclosed quote marker and
+    phonemize to nothing -> mlx_audio exits cleanly, writes no file.
+
+    Only strips when the SAME quote char wraps the entire text, so
+    legitimate in-sentence quotes ("he said \"hello\".") are untouched.
+    """
+    t = text.strip()
+    for q in ("'", '"'):
+        if len(t) >= 2 and t.startswith(q) and t.endswith(q):
+            inner = t[1:-1].strip()
+            # don't un-wrap when the quote is actually used inside
+            # (e.g. an apostrophe pair, not a text wrapper)
+            if q not in inner:
+                return inner
+    return t
+
+
 def _concatenate_wavs(wav_paths: list, output_path: str) -> bool:
     """Concatenate multiple .wav files into one, in the given order.
     Pure Python via the stdlib wave module."""
@@ -296,23 +335,34 @@ def _generate_one_call(text: str, voice: str, chunk_index: int) -> list:
     return renamed
 
 
-def _generate_audio(text: str, voice: str) -> tuple:
+def _generate_audio(text: str, voice: str, _regen_done: bool = False) -> tuple:
     """Generate audio for the FULL text by:
-      1. Pre-sanitizing the full text (catches most problematic chars
-         before they ever reach mlx_audio)
+      1. Stripping whole-text wrapper quotes, then pre-sanitizing
+         (catches most problematic chars before they reach mlx_audio)
       2. Pre-splitting into safe-size chunks
-      3. Generating each chunk with a clean directory + unique rename
-      4. On chunk failure: retry once with extra sanitization
-      5. If retry also fails: SKIP the chunk, continue to next
+      3. Generating each chunk with a clean directory + unique rename;
+         wrapper quotes are also stripped per-chunk before first attempt
+      4. On chunk failure: retry once with a FALLBACK VOICE (mlx-audio
+         0.4.4 Kokoro deterministically crashes on specific
+         text-length x voice pairs -- same-voice retries are futile),
+         then once verbatim with the original voice (covers transient
+         failures voice-switching can't fix)
+      5. If all retries fail: SKIP the chunk, continue to next
          (partial audio is better than no audio)
-      6. Concatenating all successful chunks into one file
+      6. If any chunk needed a fallback voice: regenerate the WHOLE
+         script with that fallback voice -- chunks with mismatched
+         voices sound broken in one video; consistency wins
+      7. Concatenating all successful chunks into one file
 
-    Returns (final_path, audio_file_count) or (None, 0) if ALL chunks fail.
+    Returns (final_path, audio_file_count, skipped_count);
+    (None, 0, N) if ALL chunks fail.
     """
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # sanitize the whole text first -- catches most issues before chunking
-    sanitized_text = _sanitize_for_tts(text)
+    # strip whole-text wrapper quotes, then sanitize -- catches the
+    # 2026-09-18 failure where the LLM delivered the script wrapped in
+    # literal straight quotes (leading quote kills espeak phonemization)
+    sanitized_text = _sanitize_for_tts(_strip_wrapping_straight_quotes(text))
 
     text_chunks = _split_text_for_tts(sanitized_text)
     print(f"  [voiceover] split script into {len(text_chunks)} TTS-safe "
@@ -320,29 +370,49 @@ def _generate_audio(text: str, voice: str) -> tuple:
 
     all_audio_files = []
     skipped_chunks = []
+    failed_voices = set()  # chunk indices that needed a fallback voice
 
     for i, chunk_text in enumerate(text_chunks):
         chunk_word_count = len(chunk_text.split())
         print(f"  [voiceover] generating chunk {i + 1}/{len(text_chunks)} "
               f"({chunk_word_count} words)...")
 
+        # strip wrapper quotes from THIS chunk before the first attempt
+        # (whole-text strip can't catch per-section wrapping by the LLM)
+        chunk_text = _strip_wrapping_straight_quotes(chunk_text)
+
         chunk_files = _generate_one_call(chunk_text, voice, chunk_index=i)
 
         if not chunk_files:
-            # retry with an even more aggressive sanitization pass
-            # (the full-text sanitize above may have missed something
-            # that only becomes obvious per-chunk)
-            retry_text = _sanitize_for_tts(chunk_text)
-            if retry_text != chunk_text:
-                print(f"  [voiceover] chunk {i + 1}: retrying with "
-                      f"additional sanitization...")
-                chunk_files = _generate_one_call(retry_text, voice,
+            # First recovery: retry with a DIFFERENT VOICE. mlx-audio
+            # 0.4.4's Kokoro deterministically crashes on specific
+            # (text-length, voice) pairs with a broadcast_shapes error
+            # inside istftnet -- retrying the same voice is futile, but
+            # a different voice renders the same text fine (verified
+            # 2026-09-18: chunk 1 crashed on af_heart AND af_bella,
+            # rendered fine on af_nova).
+            for fb_voice in VOICE_FALLBACKS.get(voice, []):
+                print(f"  [voiceover] chunk {i + 1}: {voice} failed -- "
+                      f"retrying with fallback voice {fb_voice}...")
+                chunk_files = _generate_one_call(chunk_text, fb_voice,
                                                   chunk_index=i)
+                if chunk_files:
+                    failed_voices.add(i)
+                    break
+
+        if not chunk_files:
+            # Last resort: retry the ORIGINAL voice verbatim. Covers
+            # transient failures (model loading, GPU contention) that
+            # voice-switching can't fix.
+            print(f"  [voiceover] chunk {i + 1}: retrying with original "
+                  f"voice...")
+            chunk_files = _generate_one_call(chunk_text, voice, chunk_index=i)
 
         if not chunk_files:
             # skip this chunk -- don't abort the whole pipeline
-            print(f"  [voiceover] chunk {i + 1}: skipping after retry "
-                  f"failed (partial audio will be generated without this chunk)")
+            print(f"  [voiceover] chunk {i + 1}: skipping after all "
+                  f"retries failed (partial audio will be generated "
+                  f"without this chunk)")
             skipped_chunks.append(i + 1)
             continue
 
@@ -355,6 +425,25 @@ def _generate_audio(text: str, voice: str) -> tuple:
     if not all_audio_files:
         print("  [voiceover] no audio files were generated (all chunks failed)")
         return None, 0
+
+    # Consistency pass: if any chunk needed a fallback voice, the audio
+    # would be stitched from mismatched voices -- audibly broken in one
+    # video. Regenerate the WHOLE script with the fallback voice instead
+    # (_regen_done prevents infinite recursion if the fallback voice
+    # hits the same class of failure on other chunks).
+    if failed_voices and not _regen_done:
+        fb_voice = VOICE_FALLBACKS.get(voice, [voice])[0]
+        print(f"  [voiceover] {len(failed_voices)} chunk(s) needed fallback "
+              f"voice {fb_voice} -- regenerating the WHOLE script with "
+              f"{fb_voice} for consistent audio...")
+        fb_final, fb_count, fb_skipped = _generate_audio(text, fb_voice,
+                                                          _regen_done=True)
+        if fb_final:
+            print(f"  [voiceover] whole-script regeneration with {fb_voice} "
+                  f"succeeded ({fb_count} chunk(s), {fb_skipped} skipped)")
+            return fb_final, fb_count, fb_skipped
+        print("  [voiceover] whole-script regeneration failed -- keeping "
+              "mixed-voice audio")
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     final_path = os.path.join(OUTPUT_DIR, f"voiceover_{timestamp}.wav")

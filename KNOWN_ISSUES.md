@@ -1920,3 +1920,118 @@ pip's RECORD is the audit trail: after any manual file cleanup,
 package to its exact documented state. If voiceover ever fails again,
 FIRST check `ls multi-agent-env/lib/python3.13/site-packages/mlx/lib/`
 for mlx.metallib before suspecting Kokoro/espeak/macOS.
+
+---
+
+## ISSUE-32: mlx-audio 0.4.4 Kokoro crashes on specific (text-length, voice) pairs -- chunk 1 silently skipped (fixed 2026-09-18)
+
+### Symptom (2026-09-18 run)
+
+Agent 6.1: chunk 1/5 failed with "mlx_audio exited cleanly but produced
+no audio_*.wav file" (exit 0, no useful stderr), then skipped. Chunks
+2-5 generated fine. Video shipped with the opening line missing -- the
+worst possible chunk to lose.
+
+### First hypothesis -- WRONG (worth documenting)
+
+Chunk 1's text was wrapped in literal straight single quotes
+(`'Microsoft execs called ... admissions.'`), which the sanitizer
+doesn't strip (it only handled curly quotes). Plausible, and a real
+secondary defect, but NOT the cause: controlled reproduction showed
+the SAME text with NO quotes crashes identically, and the same text
+renders fine on another voice.
+
+### Actual mechanism (proven by controlled A/B reproduction)
+
+mlx-audio 0.4.4's Kokoro deterministically crashes with
+
+    ValueError: [broadcast_shapes] Shapes (1,277200,1) and (1,277500,9)
+    cannot be broadcast.
+
+inside `istftnet.py` (`noise = noise_amp * mx.random.normal(sine_waves.shape)`
+-- an F0-derived tensor vs the waveform grid, always 300 samples apart).
+Traceback root: kokoro.py `decoder(asr, F0_pred, N_pred, ref_s[:, :128])`.
+mlx_audio's generate.py catches ALL exceptions and exits 0 -- that's why
+it looks like a "silent" failure.
+
+Controls that isolate the cause (all real, same env, same day):
+
+  same 26-word text + af_heart  -> CRASH
+  same 26-word text + af_bella  -> CRASH
+  same 26-word text + af_nova   -> renders fine
+  same text, quotes stripped    -> still crashes on af_heart
+  different 27/32-word texts    -> render fine on af_heart
+  short text ("Testing...")     -> renders fine on af_heart
+
+=> the failure is a function of (text length, voice) only. Chunk 1's
+length is poisoned for af_heart/af_bella; chunks 2-5's lengths are not.
+"No random flakiness" -- it reproduces 100% for the same input.
+
+### Fix (agent6_1.py)
+
+1. `VOICE_FALLBACKS` ladder: on chunk failure, FIRST retry with a
+   different voice (af_heart <-> af_nova; af_bella -> af_nova).
+   Same-voice retries are provably futile for this failure class.
+2. Whole-video consistency pass: if any chunk needed a fallback voice,
+   the ENTIRE script is regenerated with that voice (mixed voices
+   stitched into one video sound broken). `_regen_done` guards against
+   recursion. Verified end-to-end: poisoned chunk 1 script -> heart
+   fails -> nova recovers -> whole-script regen in nova -> chunk 2 hits
+   the mirror-image bug (nova's poisoned length) -> heart recovers ->
+   final stitch 2/2 chunks, 0 skipped, 23.57s audio in 26.7s.
+3. Verbatim retry with the original voice kept as last resort (covers
+   transient failures voice-switching can't fix).
+4. Secondary hardening kept: `_strip_wrapping_straight_quotes()` runs
+   pre-attempt on full text AND per chunk (LLM sometimes wraps the
+   whole script in quotes; espeak phonemizes a leading quote badly).
+   Unit-tested: 6/6 cases pass.
+
+### Upgrade note
+
+mlx-audio 0.5.4 is available (installed: 0.4.4). A newer istftnet may
+fix this at the source. Deliberately NOT upgraded in the same change as
+the recovery logic: a dependency bump plus new recovery code in one
+commit can't be attributed if something regresses. Revisit under the
+eval suite: upgrade, run evals, only then drop the ladder if the crash
+class is gone.
+
+---
+
+## ISSUE-33: Agent 10 upload failed -- invalid_grant (OAuth refresh token expired, Testing-mode 7-day lifetime) (fixed 2026-09-18)
+
+### Symptom (2026-09-18 run)
+
+    [agent10] cached token expired -- refreshing silently
+    [agent10] upload FAILED: RefreshError: ('invalid_grant: Bad Request', ...)
+
+### Mechanism (all verified)
+
+- youtube_token.json was granted 2026-07-29 (file mtime). Its refresh
+  token stopped working long before the run.
+- The Google Cloud OAuth app is in "Testing" status (per agent10.py's
+  own setup docstring). Google expires Testing-mode refresh tokens
+  after 7 days BY DESIGN. This is expected behavior, not corruption.
+- The old code called `creds.refresh(Request())` with no fallback --
+  despite the docstring promising "if this file goes stale, the next
+  run reopens a browser". A dead refresh token therefore crashed the
+  publisher instead of re-consenting.
+
+### Fix (agent10.py)
+
+`_get_authenticated_service()` now catches `RefreshError`: on rejection
+it logs WHY the cached credentials are unrecoverable and falls through
+to the normal `InstalledAppFlow` browser-consent path, then saves the
+fresh token. One consent screen per ~7 days while the app stays in
+Testing -- automatic, no code changes needed per occurrence.
+
+### Making it stop happening entirely (user action, outside the repo)
+
+Publish the OAuth app: Google Cloud Console -> Google Auth Platform ->
+Audience -> "In production". Production-mode refresh tokens don't
+expire after 7 days. Note: youtube.upload is a RESTRICTED scope, so
+production status triggers Google's verification/case-for-review
+process -- expect some setup burden. Until that's done, the automated
+re-consent fallback is the pragmatic path. Caveat: on the launchd/
+scheduled run (no interactive session), a browser cannot open -- the
+run will fail loudly instead; run the pipeline once manually after
+each 7-day expiry, or publish the app to remove the constraint.
