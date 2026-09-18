@@ -14,7 +14,7 @@
 [Overview](#overview) - [What's Built](#whats-built-so-far) - [Architecture](#agent-architecture) - [Tech Stack](#tech-stack) - [Setup](#getting-started) - [Roadmap](#development-roadmap) - [Automation](#automation--scheduling)
 
 
-🔊 **[Listen to real generated voice-over samples](https://algodr.github.io/AI-Newsroom-Studio/audio-showcase.html)** &nbsp;·&nbsp; 🎬 **[Watch real generated videos](https://algodr.github.io/AI-Newsroom-Studio/video-showcase.html)**
+🔊 **[Listen to real generated voice-over samples](https://algodr.github.io/AI-Newsroom-Studio/docs/audio-showcase.html)** &nbsp;·&nbsp; 🎬 **[Watch real generated videos](https://algodr.github.io/AI-Newsroom-Studio/docs/video-showcase.html)**
 
 *Both pages regenerate from actual pipeline runs -- real story titles, real scripts, real word counts -- not mockups. See [Output Organization + showcase publishing](#output-organization--showcase-publishing) for how.*
 
@@ -41,7 +41,7 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
 
 ## ✅ What's Built So Far
 
-📺 See it working: **[audio samples](https://algodr.github.io/AI-Newsroom-Studio/audio-showcase.html)** · **[video samples](https://algodr.github.io/AI-Newsroom-Studio/video-showcase.html)** -- real output from the agents below, not mockups.
+📺 See it working: **[audio samples](https://algodr.github.io/AI-Newsroom-Studio/docs/audio-showcase.html)** · **[video samples](https://algodr.github.io/AI-Newsroom-Studio/docs/video-showcase.html)** -- real output from the agents below, not mockups.
 
 | Agent | Status | Description |
 |-------|--------|-------------|
