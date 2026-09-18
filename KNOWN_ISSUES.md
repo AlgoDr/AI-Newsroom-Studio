@@ -1849,3 +1849,74 @@ this repo must pass `think=False` unless the task genuinely needs
 multi-step reasoning — and if it does, budget the wall-clock time
 explicitly. Do NOT "fix" slowness by silently swapping to a smaller
 model first: benchmark with thinking off before touching the model.
+
+## ISSUE-31: mlx.metallib missing from both venvs — Agent 6.1 voice generation silently skipped for every chunk
+
+**Status:** Resolved 2026-09-18. Preflight guard added.
+
+**Affects:** Agent 6.1 (Kokoro TTS) and anything else running on MLX
+(agent7-style mlx video work in wan-env would hit the same wall).
+
+### Symptom
+
+Real automated runs (e.g. logs/executed_notebooks 2026-08-20) show:
+
+```
+[voiceover] generating chunk 1/5 (26 words)...
+[voiceover] generation failed for chunk: libc++abi: terminating due to
+  uncaught exception of type std::runtime_error: Failed to load the
+  default metallib. library not found ...
+[voiceover] chunk 1: skipping after retry failed
+... (all 5 chunks skipped, zero audio produced)
+```
+
+### Root cause — deleted file, not a code/Kokoro/macOS bug
+
+`mlx-metal`'s wheel ships `mlx/lib/mlx.metallib` — a 162,449,848-byte
+precompiled Metal kernel library that `libmlx.dylib` loads at runtime.
+That file was DELETED from BOTH multi-agent-env and wan-env. The
+`mlx/lib/` directory mtime (Aug 12 11:02) sits exactly between the last
+successful voiceover (Aug 3, voiceover_20260803_023458.wav) and the
+first failing run (Aug 20) — consistent with a disk-space cleanup
+sweep that also deleted output/*.mp4 files around the same period
+(those deletions are still visible in git status).
+
+How it was proven (all live, not assumed):
+1. `import mlx.core as mx; mx.array([1.0,2.0,3.0])` in multi-agent-env
+   reproduced the EXACT error → framework-level, not mlx_audio.
+2. Same test failed in wan-env too → not a single-venv corruption.
+3. `mlx_metal-0.32.0.dist-info/RECORD` lists
+   `mlx/lib/mlx.metallib,sha256=FRjAiGB...,162449848` → expected file.
+4. `ls mlx/lib/` showed only cmake/, libjaccl.dylib, libmlx.dylib
+   → metallib physically absent. Case closed.
+
+### Fix applied
+
+```
+multi-agent-env/bin/pip install --force-reinstall --no-deps mlx-metal==0.32.0
+wan-env/bin/pip install --force-reinstall --no-deps mlx-metal==0.32.0
+```
+
+Same pinned version — no dependency churn. Wheel was cached, install
+instant, metallib restored (162,449,848 bytes, matching RECORD).
+Verified: Metal compute OK in both venvs; REAL voice generation through
+agent6_1._generate_one_call() → 13.2s, valid 4.30s wav (chunk_000_00.wav,
+verified with wave, then cleaned up).
+
+### Hardening added (agent6_1.py)
+
+`_metal_preflight()` — runs the SAME interpreter the TTS subprocess
+uses (`PYTHON_BIN`), asserts a real Metal compute op, and is called at
+the top of `voice_over_node()` before any chunk attempts. On failure it
+prints FATAL + the exact error + the exact reinstall command and skips
+generation entirely. This converts the next occurrence from "5 silent
+chunk skips and a video with no voice" into one loud, actionable
+message in the very first log line.
+
+### Preventive note
+
+pip's RECORD is the audit trail: after any manual file cleanup,
+`pip install --force-reinstall --no-deps <pkg>==<pinned>` restores a
+package to its exact documented state. If voiceover ever fails again,
+FIRST check `ls multi-agent-env/lib/python3.13/site-packages/mlx/lib/`
+for mlx.metallib before suspecting Kokoro/espeak/macOS.

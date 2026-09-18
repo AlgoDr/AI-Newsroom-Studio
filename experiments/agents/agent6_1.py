@@ -122,6 +122,39 @@ def _find_venv_python() -> str:
 PYTHON_BIN = _find_venv_python()
 
 
+def _metal_preflight(timeout: int = 60) -> tuple:
+    """Verify the MLX/Metal runtime actually works BEFORE attempting
+    any TTS chunks (see KNOWN_ISSUES ISSUE-31).
+
+    When the MLX metallib is missing/stale, mlx_audio dies as a native
+    subprocess crash ("Failed to load the default metallib") -- every
+    chunk then fails as a silent skip and the run produces zero audio
+    with only confusing per-chunk messages. This check runs the SAME
+    interpreter used for the real generation calls and fails fast with
+    the exact reason, instead of N doomed chunk attempts.
+
+    Returns (True, '') when Metal compute works, else (False, reason).
+    """
+    try:
+        check = subprocess.run(
+            [PYTHON_BIN, "-c",
+             "import mlx.core as mx; assert (mx.array([1.0]) * 2).item() == 2.0"],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return False, f"Metal preflight timed out after {timeout}s"
+    except Exception as e:
+        return False, f"Metal preflight could not run: {e}"
+
+    if check.returncode == 0:
+        return True, ""
+
+    tail = (check.stderr or "").strip().splitlines()[-3:]
+    reason = " | ".join(tail) if tail else f"exit code {check.returncode}"
+    return False, reason
+PYTHON_BIN = _find_venv_python()
+
+
 def _split_text_for_tts(text: str, max_words: int = MAX_WORDS_PER_CALL) -> list:
     """Split text into TTS-safe chunks, respecting sentence boundaries.
     Never splits mid-sentence."""
@@ -404,6 +437,21 @@ def voice_over_node(state: dict, voice: str = DEFAULT_VOICE) -> dict:
     tts_text = script.get("tts_ready_text", "")
     if not tts_text.strip():
         print("  [voiceover] tts_ready_text is empty -- nothing to synthesize")
+        return state
+
+    # ISSUE-31: fail fast + loud when the MLX/Metal runtime is broken.
+    # Without this, every chunk dies as a silent skip and the run
+    # produces zero audio with only confusing per-chunk messages.
+    metal_ok, metal_err = _metal_preflight()
+    if not metal_ok:
+        print("  [voiceover] FATAL: MLX/Metal runtime is broken -- "
+              "skipping voice generation entirely")
+        print(f"  [voiceover] preflight error: {metal_err}")
+        print("  [voiceover] fix: reinstall the MLX metal backend in the "
+              "pipeline venv, e.g.")
+        print("    multi-agent-env/bin/pip install --force-reinstall "
+              "--no-deps mlx-metal==0.32.0")
+        print("  (full diagnosis: KNOWN_ISSUES.md ISSUE-31)")
         return state
 
     total_words = len(tts_text.split())
