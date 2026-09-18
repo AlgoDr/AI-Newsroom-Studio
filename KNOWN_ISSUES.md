@@ -1,6 +1,6 @@
 # Known Issues — AI Newsroom Studio
 
-Documented limitations as of the Agent 1-10 milestone (28 issues total).
+Documented limitations as of the Agent 1-10 milestone (34 entries total).
 These are **expected behaviors / accepted limitations**, not bugs.
 Recorded so future debugging doesn't mistake them for new failures.
 
@@ -31,7 +31,21 @@ resolution failed against a bare relative path; fixed) · ISSUE-26
 already-successful upload; fixed) · ISSUE-27 (Agent 10 — custom
 thumbnails require channel-level phone verification; documented, not
 a bug) · ISSUE-28 (Automation — a live Jupyter kernel session is not
-the same as the saved .ipynb file; resolved)
+the same as the saved .ipynb file; resolved) · ISSUE-30 (Local models —
+qwen3.5-family thinks by default, ~7k hidden tokens turn an 8s call
+into a 10-min hang; all local calls now pass `think=False`; introduced
+the "benchmark before swapping models" rule; fixed) · ISSUE-31
+(Agent 6.1 — mlx.metallib was deleted from both venvs by a disk-cleanup
+sweep, every TTS chunk silently skipped; restored + Metal preflight
+added; fixed) · ISSUE-32 (Agent 6.1 — mlx-audio 0.4.4 Kokoro crashes
+deterministically on specific text-length x voice pairs; voice-fallback
+ladder added; fixed) · ISSUE-33 (Agent 10 — OAuth refresh token expired
+under Testing-mode 7-day lifetime; app moved to production status =
+permanent tokens, plus silent-refresh -> browser-consent fallback in
+code; fixed) · ISSUE-33b (Agent 6.1 — chunk failed on ALL voices:
+istftnet length-window crash; text-perturbation retry added; fixed) ·
+ISSUE-33c (Agent 10 — refresh token revived silently after production
+flip, no browser consent needed; documented)
 
 ---
 

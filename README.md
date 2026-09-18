@@ -33,7 +33,7 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
 - **Real-world multi-agent orchestration** -- not a toy demo, built line by line
 - **Edge AI + Cloud hybrid** -- local Ollama models for dev and resilience, cloud APIs for production precision
 - **Evidence-first engineering** -- every fallback model swap is justified by a real multi-run reliability test (N=5+) on cached story data, never assumed from a single sample
-- **Honest engineering** -- every design decision is documented, including what failed and why (see [KNOWN_ISSUES.md](./KNOWN_ISSUES.md), 18 entries and counting)
+- **Honest engineering** -- every design decision is documented, including what failed and why (see [KNOWN_ISSUES.md](./KNOWN_ISSUES.md), 34 entries and counting)
 - **Genuinely free** -- every external dependency (Groq free tier, Ollama local models, DDG/Wikipedia/Exa search, Kokoro TTS, stock footage/audio APIs) stays at $0 cost by design, not by accident
 - **Short-form first** -- targets YouTube Shorts (60-90 sec) for algorithmic reach
 
@@ -48,14 +48,14 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
 | **Agent 1 -- Trend Hunter** | ✅ Complete | HackerNews top stories with velocity scoring |
 | **Agent 2 -- Context Researcher** | ✅ Complete | 3-tier content fetch + background synthesis |
 | **Agent 3 -- Fact Checker** | ✅ Complete | 3-signal scoring (-1 to +1): source + LLM + cross-verify |
-| **Agent 4 -- Editorial** | ✅ Complete | Filter -> score -> deduplicate (qwen2.5:7b) -> select top 3 |
-| **Agent 5 -- Script Writer** | ✅ Complete | HOOK -> CONTEXT -> CORE -> TWIST -> CTA (llama-3.3-70b-versatile) |
+| **Agent 4 -- Editorial** | ✅ Complete | Filter -> score -> deduplicate (qwen3.5:9b) -> select top 3 |
+| **Agent 5 -- Script Writer** | ✅ Complete | HOOK -> CONTEXT -> CORE -> TWIST -> CTA (qwen/qwen3.8-27b) |
 | **Agent 6 -- Script QC** | ✅ Complete | Two-stage JUDGE/REWRITE loop, TTS-readiness scan, date humanization |
-| **Agent 6.1 -- Voice-Over Generator** | ✅ Complete | Kokoro TTS via mlx-audio, pre-chunked + sanitized + stitched |
+| **Agent 6.1 -- Voice-Over Generator** | ✅ Complete | Kokoro TTS via mlx-audio, pre-chunked + sanitized + stitched, with voice-fallback ladder + Metal preflight |
 | Agent 6.2 -- Sound Design | 🔨 In Progress | CLAP-based semantic transition/music matching over voice-over audio |
-| **Agent 7 -- Video Assembly Prompt** | ✅ Complete | Per-section stock-footage queries + timing (qwen2.5:7b)[^1] |
+| **Agent 7 -- Video Assembly Prompt** | ✅ Complete | Per-section stock-footage queries + timing (qwen3.5:4b-mlx)[^1] |
 | **Agent 8 -- Video Assembler** | ✅ Complete (`reactive`) | PIL/ffmpeg presenter graphic + lower-thirds, 1080x1920[^2] |
-| **Agent 9 -- SEO Optimizer** | ✅ Complete | Title (reused from HOOK), description + sources, qwen2.5:7b tags, custom thumbnail frame[^3] |
+| **Agent 9 -- SEO Optimizer** | ✅ Complete | Title (reused from HOOK), description + sources, qwen3.5:4b-mlx tags, custom thumbnail frame[^3] |
 | **Agent 10 -- Publisher** | ✅ Complete | YouTube Data API v3, uploads UNLISTED for manual review before going public[^4] |
 
 [^1]: Agent 7 originally targeted writing a cinematic AI-video-generation prompt. That was dropped for cost reasons before ever being tested -- see [Why stock footage, not AI video generation? And why PIL, not stock footage (yet)?](#why-stock-footage-not-ai-video-generation-and-why-pil-not-stock-footage-yet). Agent 7 now extracts a stock-footage search query per script section instead.
@@ -63,6 +63,28 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
 
 [^3]: Agent 9's title deliberately reuses Agent 5's HOOK verbatim (rule-based truncation to YouTube's 100-char hard cap only) rather than generating a separate title -- a video with only ~186 words covers up to 3 unrelated stories, and the title intentionally represents only the lead story rather than trying to summarize all three, on the reasoning that a focused hook beats a diluted multi-topic title for grabbing attention. Passed its first real test against actual pipeline data with zero bugs found.
 [^4]: Agent 10 uploads as **unlisted**, not public and not private -- watchable by anyone with the direct link (for manual review), invisible to search/recommendations/your channel's public list until a separate, deliberate manual step in YouTube Studio flips it to Public. Nothing in the pipeline performs that flip automatically. A real first upload succeeded end-to-end; setting a custom thumbnail specifically requires the YouTube channel to be phone-verified (a real, separate one-time step, unrelated to any OAuth/API configuration) -- see [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) for the exact error and fix.
+
+### Recent milestones (Sept 2026)
+
+- **Local model refresh completed** -- all Ollama calls migrated from the
+  generation-1 roster (phi3.5, llama3.1:8b, qwen2.5:7b, gemma3:12b,
+  gemma2:9b) to qwen3.5 / qwen3.8 / MLX builds. The decisive lesson,
+  documented in [ISSUE-30](./KNOWN_ISSUES.md#issue-30): the new qwen3.5
+  models *think by default* (~7k hidden reasoning tokens), which looked
+  like 10-minute hangs until benchmarked -- every local call now passes
+  `think=False` explicitly (639s -> 8s measured).
+- **Content eval suite** -- 11 deterministic unit evals against golden
+  checkpoints plus an LLM-judge pipeline (qwen/qwen3.8-27b on Groq), so
+  model swaps like the one above can be validated instead of guessed.
+- **Voice-over reliability hardened** -- root-caused two silent
+  mlx-audio failure modes (deleted `mlx.metallib` GPU library,
+  ISSUE-31; deterministic text-length crash, ISSUE-32/33b) and fixed
+  them with a Metal preflight check and a per-chunk voice-fallback
+  ladder (af_heart -> af_nova) with a text-perturbation last resort.
+- **Agent 10 token made permanent** -- the OAuth refresh token now
+  lives under a production-status Google OAuth app (no more 7-day
+  expiry), with a silent-refresh + auto-browser-consent fallback
+  (ISSUE-33/33c). First fully unattended upload verified end-to-end.
 
 ---
 
@@ -132,7 +154,7 @@ Agent 6.1 -- Voice-Over Generator
      |  audio_path + audio_duration + audio_chunks
      v
 Agent 7 -- Video Assembly Prompt Generator
-  per-section stock-footage query (qwen2.5:7b) + word-proportional timing
+  per-section stock-footage query (qwen3.5:4b-mlx) + word-proportional timing
   -> state["shot_list"]
      |  section + story_rank + query + source_domain + start_s + end_s
      v
@@ -142,7 +164,7 @@ Agent 8 -- Video Assembler
      |  video_path + video_stats
      v
 Agent 9 -- SEO Optimizer
-  title (HOOK reuse) + description + sources + qwen2.5:7b tags + thumbnail frame
+  title (HOOK reuse) + description + sources + qwen3.5:4b-mlx tags + thumbnail frame
   -> state["seo"]
      |  title + description + tags + category_id + thumbnail_path
      v
@@ -162,15 +184,15 @@ the real failure modes hit during development and the exact fixes applied.
 
 | Agent | One-line summary |
 |---|---|
-| **[Agent 2 -- Context Researcher](./docs/AGENTS.md#agent-2)** | 3-tier content fetch (trafilatura->Jina->Tavily) -> background synthesis (compound-mini/8B routing) |
-| **[Agent 3 -- Fact Checker](./docs/AGENTS.md#agent-3)** | 3-signal credibility (-1 to +1): domain trust + LLM classification + Exa/DDG cross-verify, dynamically reweighted, with a local qwen2.5:7b fallback |
-| **[Agent 4 -- Editorial](./docs/AGENTS.md#agent-4)** | Filter -> weighted-addition score -> qwen2.5:7b topic dedup -> select top 3, LangGraph conditional edge |
-| **[Agent 5 -- Script Writer](./docs/AGENTS.md#agent-5)** | One llama-3.3-70b-versatile call -> HOOK/CONTEXT/CORE/TWIST/CTA x 3 stories, credibility-driven tone, gemma3:12b local fallback |
-| **[Agent 6 -- Script QC](./docs/AGENTS.md#agent-6)** | Two-stage JUDGE (gpt-oss-120b->qwen2.5:7b)/REWRITE (llama-3.3-70b->gemma2:9b) loop; word count and TTS-readiness are pure Python |
+| **[Agent 2 -- Context Researcher](./docs/AGENTS.md#agent-2)** | 3-tier content fetch (trafilatura->Jina->Tavily) -> background synthesis (compound-mini when snippets are scarce / qwen3.5:9b when rich, `think=False`) |
+| **[Agent 3 -- Fact Checker](./docs/AGENTS.md#agent-3)** | 3-signal credibility (-1 to +1): domain trust + LLM classification + Exa/DDG cross-verify, dynamically reweighted, with a local qwen3.5:9b fallback |
+| **[Agent 4 -- Editorial](./docs/AGENTS.md#agent-4)** | Filter -> weighted-addition score -> qwen3.5:9b topic dedup -> select top 3, LangGraph conditional edge |
+| **[Agent 5 -- Script Writer](./docs/AGENTS.md#agent-5)** | One qwen/qwen3.8-27b call -> HOOK/CONTEXT/CORE/TWIST/CTA x 3 stories, credibility-driven tone, gemma4:12b-mlx local fallback |
+| **[Agent 6 -- Script QC](./docs/AGENTS.md#agent-6)** | Two-stage JUDGE (gpt-oss-120b->qwen3.5:9b)/REWRITE (qwen3.8-27b->gemma4:12b-mlx) loop; word count and TTS-readiness are pure Python |
 | **[Agent 6.1 -- Voice-Over Generator](./docs/AGENTS.md#agent-61---voice-over-generator-detailed)** | Kokoro TTS via mlx-audio, Apple Metal GPU; pre-chunked, sanitized, and stitched for reliability |
-| **[Agent 7 -- Video Assembly Prompt Generator](./docs/AGENTS.md#agent-7----video-assembly-prompt-implemented-tested)** | Per-section stock-footage query via qwen2.5:7b + word-proportional timing -> `state["shot_list"]`; filters `state["stories"]` to only scored entries, catching Agent-3-discard edge cases |
+| **[Agent 7 -- Video Assembly Prompt Generator](./docs/AGENTS.md#agent-7----video-assembly-prompt-implemented-tested)** | Per-section stock-footage query via qwen3.5:4b-mlx + word-proportional timing -> `state["shot_list"]`; filters `state["stories"]` to only scored entries, catching Agent-3-discard edge cases |
 | **[Agent 8 -- Video Assembler](./docs/AGENTS.md#agent-8----video-assembler-reactive-mode-implemented-and-tested-broll-mode-scaffolded-not-tested)** | PIL/ffmpeg reactive presenter graphic (amplitude-driven orb + lower-thirds), 1080x1920, real measured ~65-75s render time; `broll` mode scaffolded, not yet tested |
-| **[Agent 9 -- SEO Optimizer](./docs/AGENTS.md#agent-9)** | Title reused from Agent 5's HOOK (rule-based truncation, no new LLM call); description with per-story source attribution; qwen2.5:7b tag extraction (500-char budget, rule-based fallback); thumbnail frame selected from Agent 8's rendered frames |
+| **[Agent 9 -- SEO Optimizer](./docs/AGENTS.md#agent-9)** | Title reused from Agent 5's HOOK (rule-based truncation, no new LLM call); description with per-story source attribution; qwen3.5:4b-mlx tag extraction (500-char budget, rule-based fallback); thumbnail frame selected from Agent 8's rendered frames |
 | **[Agent 10 -- Publisher](./docs/AGENTS.md#agent-10)** | OAuth2 Desktop-app flow (InstalledAppFlow), resumable upload via YouTube Data API v3, UNLISTED privacy status, rerun-protection log, separate non-fatal thumbnail-set call |
 
 ---
@@ -181,16 +203,18 @@ the real failure modes hit during development and the exact fixes applied.
 
 | Stage | Primary (cloud) | Fallback (local, Ollama) | Fallback justified by |
 |-------|------------------|---------------------------|-------------------------|
-| Wiki keyword extraction | -- | phi3.5 (3.8B) | -- |
-| Background synthesis | groq/compound-mini -> gpt-oss-20b | llama3.1:8b | -- |
-| Topic deduplication (Agent 4) | *(none -- local was always primary)* | qwen2.5:7b | N=5 reliability test; beat gpt-oss-120b on real data |
-| Credibility classification (Agent 3) | gpt-oss-120b | qwen2.5:7b | N=15 reliability test (3 stories x 5 runs), 100% consistent/correct |
+| Search-term extraction (Agent 2) | -- | llama3.2:3b | tiny fast task, 3B is enough |
+| Background synthesis (Agent 2) | groq/compound-mini -> gpt-oss-20b (only when snippets are scarce -- compound has built-in web search) | qwen3.5:9b (`think=False`) | replaced llama3.1:8b; see [ISSUE-30](./KNOWN_ISSUES.md#issue-30): `think=False` turns a 10-min hidden-thinking hang into an 8s call |
+| Topic deduplication (Agent 4) | *(none -- local was always primary)* | qwen3.5:9b (`think=False`) | migrated from qwen2.5:7b in the Sept 2026 model refresh |
+| Credibility classification (Agent 3) | gpt-oss-120b | qwen3.5:9b (`think=False`) | migrated from qwen2.5:7b (N=15 test was done on the old model) |
 | Contradiction check (Agent 3) | groq/compound-mini | -- | -- |
-| Script generation (Agent 5) | llama-3.3-70b-versatile | gemma3:12b | 4-model A/B test on real data; best facts, no story-bleed bug |
-| Script QC -- JUDGE (Agent 6) | gpt-oss-120b | qwen2.5:7b | Reused Agent 3's reliability evidence; proven structured-output model |
-| Script QC -- REWRITE (Agent 6) | llama-3.3-70b-versatile | gemma2:9b | A/B test: 100% format compliance vs qwen2.5:7b's 0% |
-| Voice-over (Agent 6.1) | *(local only -- no cloud equivalent)* | Kokoro-82M (mlx-audio) | -- |
-| Tag extraction (Agent 9) | *(none -- local was always primary, same pattern as Agent 4/7)* | qwen2.5:7b | Same injected-function/fallback pattern as Agent 7's query extraction; rule-based fallback (capitalized phrases + title keywords) if the model call fails or output looks malformed |
+| Script generation (Agent 5) | qwen/qwen3.8-27b | gemma4:12b-mlx (`think=False`) | replaced llama-3.3-70b-versatile / gemma3:12b in the Sept 2026 model refresh |
+| Script QC -- JUDGE (Agent 6) | gpt-oss-120b | qwen3.5:9b (`think=False`) | migrated from qwen2.5:7b; proven structured-output model family |
+| Script QC -- REWRITE (Agent 6) | qwen/qwen3.8-27b | gemma4:12b-mlx (`think=False`) | replaced llama-3.3-70b-versatile / gemma2:9b; the old A/B test showed local rewrite must strictly follow format -- enforced with `think=False` |
+| Voice-over (Agent 6.1) | *(local only -- no cloud equivalent)* | Kokoro-82M (mlx-audio) + af_heart -> af_nova voice-fallback ladder | see ISSUE-32: mlx-audio 0.4.4 crashes deterministically on specific text-length x voice pairs; the ladder + text perturbation recover every chunk |
+| Stock-footage query extraction (Agent 7) | -- | qwen3.5:4b-mlx (`think=False`) | migrated from qwen2.5:7b; tiny JSON task |
+| Tag extraction (Agent 9) | *(none -- local was always primary)* | qwen3.5:4b-mlx (`think=False`) | migrated from qwen2.5:7b; same injected-function pattern as Agent 7, rule-based fallback if output is malformed |
+| Content evals -- LLM judge (offline) | qwen/qwen3.8-27b (Groq) | -- | chosen over gpt-oss-120b after silent-thinking-parser issues; returns scores immediately |
 
 No Gemini, no OpenAI direct API, no paid cloud model anywhere in this
 project -- every "production swap" considered along the way (see
@@ -216,19 +240,27 @@ quality was verified.
 
 | Model | Size | Where | Job | Quota Pool |
 |-------|------|--------|-----|------------|
-| phi3.5 | 3.8B | Ollama local | Wikipedia keyword extraction | -- (local) |
-| llama3.1:8b | 8B | Ollama local | Background synthesis (primary) | -- (local) |
-| qwen2.5:7b | 7B | Ollama local | Agent 4 dedup (primary); Agent 3 + Agent 6 JUDGE fallback; Agent 7 stock-footage query extraction (primary); Agent 9 tag extraction (primary) | -- (local) |
-| gemma3:12b | 12B | Ollama local | Agent 5 script-generation fallback | -- (local) |
-| gemma2:9b | 9B | Ollama local | Agent 6 REWRITE fallback | -- (local) |
-| Kokoro-82M-bf16 | 82M | mlx-audio (Apple Metal GPU) | Agent 6.1 voice-over TTS | -- (local) |
+| llama3.2:3b | 3B | Ollama local | Agent 2 search-term extraction | -- (local) |
+| qwen3.5:9b | 9B | Ollama local | Agent 2 background synthesis (rich-snippet path); Agent 4 dedup (primary); Agent 3 credibility fallback; Agent 6 JUDGE fallback -- always with `think=False` ([ISSUE-30](./KNOWN_ISSUES.md#issue-30)) | -- (local) |
+| qwen3.5:4b-mlx | 4B | Ollama local (MLX) | Agent 7 stock-footage query extraction (primary); Agent 9 tag extraction (primary) | -- (local) |
+| gemma4:12b-mlx | 12B | Ollama local (MLX) | Agent 5 script-generation fallback; Agent 6 REWRITE fallback | -- (local) |
+| Kokoro-82M-bf16 | 82M | mlx-audio (Apple Metal GPU) | Agent 6.1 voice-over TTS, with voice-fallback ladder + Metal preflight | -- (local) |
 | MS-CLAP 2023 | ~160M | Python/torch (separate venv) | Agent 6.2 audio-text semantic matching, in progress | -- (local) |
 | groq/compound-mini | cloud | Groq | 0-snippet synthesis + contradiction check | 8K TPM (own pool) |
 | openai/gpt-oss-20b | 20B | Groq | Agent 2 big-boss synthesis fallback | 200K TPD (own pool) |
 | openai/gpt-oss-120b | 120B | Groq | Credibility classification (Agent 3) + JUDGE (Agent 6) | 200K TPD (own pool) |
-| llama-3.3-70b-versatile | 70B | Groq | Script generation (Agent 5) + REWRITE (Agent 6) | 100K TPD (own pool) |
+| qwen/qwen3.8-27b | 27B | Groq | Script generation (Agent 5) + REWRITE (Agent 6) + content-evals LLM judge | own pool |
 
-**Quota isolation matters:** the three Groq models above have fully separate
+**Retired in the Sept 2026 model refresh:** phi3.5, llama3.1:8b,
+qwen2.5:7b, gemma3:12b, gemma2:9b (generation-1 local roster) and
+llama-3.3-70b-versatile. Their replacement (qwen3.5 / qwen3.8 / MLX
+builds) was benchmarked first -- the decisive finding was that the new
+qwen3.5 models *think by default* (~7k hidden tokens, 10-min hangs);
+all local calls now pass `think=False` explicitly. See
+[ISSUE-30](./KNOWN_ISSUES.md#issue-30) for the full benchmark table,
+and the "benchmark before swapping models" rule it introduced.
+
+**Quota isolation matters:** the four Groq models above have fully separate
 daily pools, confirmed via independent 429 responses in live runs.
 See KNOWN_ISSUES ISSUE-7.
 
@@ -378,12 +410,11 @@ brew install espeak-ng
 # spacy + en_core_web_sm auto-download on first Kokoro run -- no
 # manual step needed
 
-# 5. Pull local Ollama models
-ollama pull phi3.5
-ollama pull llama3.1:8b
-ollama pull qwen2.5:7b
-ollama pull gemma3:12b
-ollama pull gemma2:9b
+# 5. Pull local Ollama models (Sept 2026 roster -- see Tech Stack)
+ollama pull llama3.2:3b
+ollama pull qwen3.5:4b-mlx
+ollama pull qwen3.5:9b
+ollama pull gemma4:12b-mlx
 
 # 6. Create a SEPARATE venv for CLAP (Agent 6.2) -- msclap needs an
 #    older transformers version that conflicts with mlx-audio's,
