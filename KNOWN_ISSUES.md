@@ -1806,3 +1806,46 @@ experiments/workflow.ipynb` should return a real count if Agent 9/10
 cells are genuinely persisted; 0 means they only ever existed in an
 unsaved live session.
 ```
+
+## ISSUE-30: qwen3.5 local models think by default — ~7,000 hidden tokens turn an 8-second call into a 10-minute hang (Agents 2/3/4/5/6/7/9)
+
+**Symptom:** Agent 2's background synthesis (qwen3.5:9b) appears to
+"hang" for ~10 minutes per call. Same symptom waiting to happen in
+agent3 (credibility fallback), agent4 (dedup), agent6 (JUDGE fallback),
+agent5/agent6 (gemma4:12b-mlx rewrite fallback), agent7/agent9
+(qwen3.5:4b-mlx extraction).
+
+**Root cause:** The new-generation qwen3.5 and gemma local models run
+in reasoning/"thinking" mode BY DEFAULT. The thinking tokens are
+stripped from the final answer, so logs show nothing — but they are
+generated at ~12 tok/s on M4/16GB. Measured on the exact Agent 2
+synthesis prompt (same model, same options, warm server):
+
+| call                                | time    | total tokens | output |
+|-------------------------------------|---------|--------------|--------|
+| qwen3.5:9b default (thinking ON)    | 639.7s  | 7,789        | 534 chars |
+| qwen3.5:9b default warm             | 548.0s  | 6,854        | 398 chars |
+| qwen3.5:9b `think=False`            | 7.5s    | 84           | 525 chars |
+| qwen3.5:9b `think=False` (run 2)    | 8.9s    | 108          | 697 chars |
+| gemma4:12b-mlx default              | 21.0s   | 194          | 1 sentence |
+| gemma4:12b-mlx `think=False`        | 2.6s    | 24           | 1 sentence |
+| qwen3.5:4b-mlx default (JSON task)  | 87.1s   | 1,801        | correct JSON |
+| qwen3.5:4b-mlx `think=False`        | ~3s     | —            | correct |
+
+Output quality with thinking disabled is the same (same content,
+cleaner single-paragraph answers). `think=False` is supported by the
+pinned `ollama` python lib (0.6.2) `generate()` signature and accepted
+by all three local models in the pipeline (verified live, not assumed).
+
+**Fix applied:** `think=False` added to every local `ollama.generate()`
+call site: agent2 `_synthesize_local`, agent3 `_llm_credibility_check_local`,
+agent4 `deduplicate_topics`, agent5 `_generate_script_local`, agent6
+`_judge_script_local` + REWRITE fallback, agent7/agent9 `_ollama_query`.
+Verified live through the real venv: agent2 synth cold = 14.1s / 379
+clean chars (was ~10 min); agent7-style extraction = 3.1s (was 87s).
+
+**Rule of thumb going forward:** any NEW local qwen3.5/gemma call in
+this repo must pass `think=False` unless the task genuinely needs
+multi-step reasoning — and if it does, budget the wall-clock time
+explicitly. Do NOT "fix" slowness by silently swapping to a smaller
+model first: benchmark with thinking off before touching the model.

@@ -16,7 +16,7 @@ Design decisions locked in before writing this file:
   Description -- full script text + explicit per-story source
                  attribution (already tracked via shot_list's
                  source_domain) + hashtags.
-  Tags        -- qwen2.5:7b per-story extraction with a rule-based
+  Tags        -- qwen3.5:4b-mlx per-story extraction with a rule-based
                  fallback, same injected-function pattern as Agent 7's
                  extract_section_query() -- tag relevance benefits from
                  light semantic understanding a pure keyword-match
@@ -165,7 +165,7 @@ def _extract_tags_for_story(story: dict, ollama_generate_fn=None) -> tuple[list[
     """
     Returns (tags, used_fallback). ollama_generate_fn injected for
     testability, same pattern as Agent 7's extract_section_query() --
-    pass e.g. `lambda prompt: ollama.generate(model="qwen2.5:7b",
+    pass e.g. `lambda prompt: ollama.generate(model="qwen3.5:4b-mlx",
     prompt=prompt)["response"]`.
 
     Fallback (no model wired up, or model output fails sanity checks):
@@ -319,9 +319,11 @@ def seo_optimizer_node(state: dict) -> dict:
 
     def _ollama_query(prompt: str) -> str:
         response = ollama.generate(
-            model="qwen2.5:7b",
+            model="qwen3.5:4b-mlx",
             prompt=prompt,
-            options={"temperature": 0.3},  # low temp: extraction, not creative writing
+            think=False,   # qwen3.5 thinks by default — measured 87s → fast; extraction task needs no reasoning
+            keep_alive=0,
+            options={"temperature": 0.3, "num_ctx": 2048},  # low temp: extraction, not creative writing
         )
         return response["response"]
 

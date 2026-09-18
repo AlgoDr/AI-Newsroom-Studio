@@ -234,6 +234,7 @@ def _judge_script_local(prompt: str) -> str:
             model=JUDGE_FALLBACK_MODEL,
             prompt=prompt,
             stream=False,
+            think=False,   # qwen3.5 thinks by default — hidden tokens cause multi-minute hangs
             keep_alive=0,
             options={"temperature": 0.1, "num_ctx": 4096},
         )
@@ -411,6 +412,7 @@ def _rewrite_flagged_local(prompt: str) -> str:
             model=REWRITE_FALLBACK_MODEL,
             prompt=prompt,
             stream=False,
+            think=False,   # gemma/qwen local models think by default — hidden tokens cause multi-minute hangs; measured 21s → 2.6s
             keep_alive=0,
             options={"temperature": 0.4, "num_ctx": 4096},
         )

@@ -6,7 +6,7 @@ Role: "Which 3 stories should we actually cover today?"
 Responsibilities:
   1. filter_stories()       — remove Agent 3 discards (score < 0.0)
   2. score_editorially()    — compute editorial_score per story
-  3. deduplicate_topics()   — phi3.5 clusters titles → keep best per topic
+  3. deduplicate_topics()   — qwen3.5:9b clusters titles → keep best per topic
   4. select_top_stories()   — pick top 3 (or fewer) by editorial_score
   5. editorial_node()       — LangGraph node (orchestrates 1-4)
   6. route_after_editorial()— LangGraph conditional edge (→ Agent 5 or end)
@@ -15,7 +15,7 @@ What Agent 4 does NOT do:
   - Does not re-fetch content (Agent 2 did that)
   - Does not re-score credibility (Agent 3 did that)
   - Does not write scripts (Agent 5 will do that)
-  - Does not call any cloud API (phi3.5 is local)
+  - Does not call any cloud API (qwen3.5:9b is local)
 
 Keys added to story dict:
   editorial_score   float  — composite editorial rank (0.0 to 1.0)
@@ -203,14 +203,15 @@ def deduplicate_topics(stories: dict) -> dict:
 
     try:
         resp = ollama.generate(
-        model="qwen2.5:7b",
+        model="qwen3.5:9b",
         prompt=prompt,
         stream=False,
+        think=False,   # qwen3.5 thinks by default — hidden tokens cause multi-minute hangs; measured 8.2s with think=False
         keep_alive=0,
         options={"temperature": 0.1, "num_ctx": 4096})
 
         raw = resp["response"].strip()
-        print(f"  [deduplicate] qwen2.5:7b raw output: {raw[:120]}")
+        print(f"  [deduplicate] qwen3.5:9b raw output: {raw[:120]}")
 
         # ── LAYER 1: clean malformed JSON before parsing ──────────────
         # phi3.5 sometimes adds trailing commas → invalid JSON
@@ -283,7 +284,7 @@ def deduplicate_topics(stories: dict) -> dict:
                           f"{stories[sid]['title'][:50]}")
 
     except Exception as e:
-        print(f"  [deduplicate] qwen2.5:7b failed ({type(e).__name__}: {e}) "
+        print(f"  [deduplicate] qwen3.5:9b failed ({type(e).__name__}: {e}) "
               f"→ no deduplication, all stories eligible")
         # safe fallback: treat every story as its own cluster
         for i, (sid, story) in enumerate(stories.items()):

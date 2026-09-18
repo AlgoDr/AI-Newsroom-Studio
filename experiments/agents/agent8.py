@@ -42,6 +42,8 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import wave
 
+FFMPEG_BIN = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
+
 W, H = 1080, 1920  # YouTube Shorts recommended (not just minimum) resolution
 FPS = 30
 BG_COLOR = (13, 17, 23)
@@ -424,7 +426,7 @@ def assemble_reactive_mode(shot_list: list[dict], audio_path: str, output_path: 
 
     subprocess.run(
         [
-            "ffmpeg", "-y",
+            FFMPEG_BIN, "-y",
             "-framerate", str(FPS),
             "-i", str(out_dir / "frame_%05d.png"),
             "-i", audio_path,

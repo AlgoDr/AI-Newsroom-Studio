@@ -111,12 +111,12 @@ def extract_section_query(section_text: str, fallback_category: str, ollama_gene
     """
     Returns (query, used_fallback). ollama_generate_fn is injected so this
     stays testable without a live Ollama server -- pass e.g.
-    `lambda prompt: ollama.generate(model="qwen2.5:7b", prompt=prompt)["response"]`.
+    `lambda prompt: ollama.generate(model="qwen3.5:4b-mlx", prompt=prompt)["response"]`.
 
-    Model choice: qwen2.5:7b, not a larger local model -- this is a small,
+    Model choice: qwen3.5:4b-mlx, not a larger local model -- this is a small,
     structured, low-creativity extraction task, and the project already
-    reserves gemma3:12b for tasks that need more reasoning (Agent 2
-    synthesis, Agent 5 script writing). See conversation log for the
+    reserves gemma4:12b-mlx for tasks that need more reasoning (Agent 5
+    script writing, Agent 6 rewrite). See conversation log for the
     reasoning behind not defaulting to the biggest available model here.
     """
     if ollama_generate_fn is None:
@@ -265,9 +265,11 @@ def video_assembly_prompt_node(state: dict) -> dict:
 
     def _ollama_query(prompt: str) -> str:
         response = ollama.generate(
-            model="qwen2.5:7b",
+            model="qwen3.5:4b-mlx",
             prompt=prompt,
-            options={"temperature": 0.3},  # low temp: extraction, not creative writing
+            think=False,   # qwen3.5 thinks by default — measured 87s → fast; extraction task needs no reasoning
+            keep_alive=0,
+            options={"temperature": 0.3, "num_ctx": 2048},  # low temp: extraction, not creative writing
         )
         return response["response"]
 

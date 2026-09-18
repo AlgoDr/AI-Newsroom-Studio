@@ -49,7 +49,7 @@ MIN_CREDIBILITY = 0.0        # zero is the natural boundary in -1 to +1 design
                               # negative = active negative evidence -> discard
                               # positive or zero = keep (benefit of the doubt)
 
-CREDIBILITY_FALLBACK_MODEL = "qwen2.5:7b"   # local fallback for
+CREDIBILITY_FALLBACK_MODEL = "qwen3.5:9b"   # local fallback for
                                              # llm_credibility_check(), see
                                              # that function's docstring
 
@@ -147,7 +147,7 @@ def llm_credibility_check(title: str, content: str) -> float:
       < 500 chars -> 0.0 neutral (too thin to classify reliably)
 
     Fallback (NEW): if gpt-oss-120b fails, returns empty, or gives an
-    unparseable response, falls back to qwen2.5:7b (local, Ollama)
+    unparseable response, falls back to qwen3.5:9b (local, Ollama)
     before giving up. Previously this function had NO fallback at
     all -- any Groq failure silently returned 0.0 neutral, which
     during a full-run Groq outage (a recurring, confirmed issue this
@@ -244,7 +244,7 @@ def _parse_credibility_label(raw, title: str):
 
 
 def _llm_credibility_check_local(prompt: str) -> str:
-    """Local fallback for credibility classification -- qwen2.5:7b via
+    """Local fallback for credibility classification -- qwen3.5:9b via
     Ollama, Metal-accelerated. Used only when gpt-oss-120b fails,
     returns empty, or gives an unparseable response.
 
@@ -258,6 +258,7 @@ def _llm_credibility_check_local(prompt: str) -> str:
             model=CREDIBILITY_FALLBACK_MODEL,
             prompt=prompt,
             stream=False,
+            think=False,   # qwen3.5 thinks by default — hidden tokens cause multi-minute hangs; measured 1.1s with think=False
             keep_alive=0,
             options={"temperature": 0.1, "num_ctx": 4096},
         )

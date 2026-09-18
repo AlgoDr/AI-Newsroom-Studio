@@ -421,6 +421,7 @@ def _generate_script_local(prompt: str) -> str:
             model=FALLBACK_MODEL,
             prompt=prompt,
             stream=False,
+            think=False,   # gemma/qwen local models think by default — hidden tokens cause multi-minute hangs; measured 21s → 2.6s
             keep_alive=0,
             options={"temperature": 0.4, "num_ctx": 4096},
         )

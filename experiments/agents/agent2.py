@@ -198,8 +198,13 @@ Headline: {title}
 
 Search term:"""
     try:
-        resp = ollama.generate(model="phi3.5", prompt=prompt, stream=False,
-                               options={"temperature": 0.1})
+        resp = ollama.generate(
+            model="llama3.2:3b",
+            prompt=prompt,
+            stream=False,
+            keep_alive=0,
+            options={"temperature": 0.1, "num_ctx": 2048}
+        )
         kw = resp["response"].strip().strip('"').split("\n")[0].strip()
         
         if 0 < len(kw) <= 40:
@@ -262,13 +267,13 @@ def synthesize_background(topic: str, content: str, snippets: list) -> str:
     use_cloud = not has_real_snippets and snippet_chars < 200
     
     print(f"  [synth] {len(snippets)} snippets, {snippet_chars} snippet chars "
-          f"→ {'groq/compound (will search)' if use_cloud else 'llama3.1:8b'}")
+          f"→ {'groq/compound (will search)' if use_cloud else 'qwen3.5:9b'}")
 
     if use_cloud:
         result = _synthesize_grokapi_cloud(content, snippet_text)
         if result:
             return result
-        print(f"  [synth] compound empty/failed → local 8B fallback")
+        print(f"  [synth] compound empty/failed → local 9B fallback")
 
     return _synthesize_local(content[:3500], snippet_text)
 
@@ -378,7 +383,7 @@ Background paragraph:"""
 
 
 def _synthesize_local(content: str, snippet_text: str) -> str:
-    """llama3.1:8b local — no payload limit, handles large articles."""
+    """qwen3.5:9b local — no payload limit, handles large articles."""
     try:
         prompt = f"""Write ONE tight background paragraph (4-6 sentences, MAX 120 words).
 
@@ -397,18 +402,19 @@ Rules:
 Background:"""
 
         resp = ollama.generate(
-            model="llama3.1:8b",
+            model="qwen3.5:9b",
             prompt=prompt,
             stream=False,
+            think=False,   # qwen3.5 thinks by default: ~7k hidden tokens = 10-min hang; think=False measured 639s → 8s
             options={"temperature": 0.2, "num_ctx": 8192},
             keep_alive=0 # ← release model from memory(memory overhead but neccesary but in mac it is faster 2-3 sec) after each call
                     # forces fresh load next call — no context bleed
         )
         result = resp["response"].strip()
-        print(f"  [synth] llama3.1:8b → {len(result)} chars")
+        print(f"  [synth] qwen3.5:9b → {len(result)} chars")
         return _clean_synthesis(result)
     except Exception as e:
-        print(f"  [synth] local 8B failed ({e}) → empty")
+        print(f"  [synth] local 9B failed ({e}) → empty")
         return ""
 
 
