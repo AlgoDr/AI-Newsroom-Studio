@@ -1,0 +1,169 @@
+[
+  {
+    "test_id": "t1",
+    "description": "3 stories, all high credibility — standard baseline",
+    "difficulty": "easy",
+    "stories": {
+      "s1": {
+        "title": "CoMaps: Open-Source Maps App Reaches 5M Downloads, Fully Offline",
+        "content": "CoMaps, the open-source fork of MAPS.ME, has hit 5 million downloads on Android and iOS. The app offers fully offline navigation using OpenStreetMap data, with maps stored locally on the device. Unlike Google Maps, CoMaps requires no internet connection after initial map download. The app supports turn-by-turn navigation, public transit routing in 40 cities, and hiking trail overlays. CoMaps stores no user data and has zero tracking — the entire codebase is MIT-licensed and auditable on GitHub. The project is maintained by a team of 12 volunteers across Europe and has received contributions from over 200 developers. Revenue comes solely from optional donations. The Android APK is 28MB compared to Google Maps at 290MB. Performance benchmarks show route calculation completing in under 200ms on mid-range devices, compared to 800ms for Google Maps on the same hardware. The project recently added support for electric vehicle charging station POIs sourced from OpenChargeMap.",
+        "background": "CoMaps emerged in 2023 after MAPS.ME was acquired and monetized with aggressive advertising. The open-source community forked the project to preserve the ad-free, privacy-first experience. OpenStreetMap-based apps have seen growing adoption as privacy concerns around Google's location tracking practices increase.",
+        "credibility_score": 0.82,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "Critical RCE in Tenda AC1200 Routers — No Patch Available (CVE-2026-4821)",
+        "content": "Security researcher Mika Linden has disclosed a critical remote code execution vulnerability in Tenda AC1200 routers (CVE-2026-4821, CVSS 9.8). The vulnerability exists in the router's web management interface and allows unauthenticated attackers to execute arbitrary commands via a crafted HTTP POST request to the /goform/setMacFilter endpoint. Linden discovered the bug during a firmware audit of Tenda's httpd binary using Ghidra. The buffer overflow in the sscanf parsing of the deviceList parameter allows stack-based code execution. Tenda was notified 90 days ago and has not responded. The researcher released a proof-of-concept exploit after the disclosure deadline passed. Shodan scans show approximately 340,000 Tenda AC1200 units exposed to the internet globally. The recommended mitigation is to disable remote management entirely and restrict LAN access to the admin panel.",
+        "background": "Tenda is one of the top-selling budget router brands globally, particularly popular in developing markets. The company has a history of slow or absent vulnerability response — CVE-2023-0192 in a different Tenda model remained unpatched for over a year. SOHO router vulnerabilities are a common vector for botnet recruitment.",
+        "credibility_score": 0.91,
+        "selected": true,
+        "selection_rank": 2
+      },
+      "s3": {
+        "title": "Kokoro-82M: This TTS Model Runs Real-Time Speech on a 12-Year-Old CPU",
+        "content": "Kokoro-82M is a new text-to-speech model with just 82 million parameters that achieves near-human naturalness on the LJSpeech benchmark (MOS 4.2 vs human 4.5). The model runs in real-time on a 2014-era Intel i5-4590 without GPU acceleration. Kokoro uses a novel phoneme-level diffusion architecture that reduces inference compute by 94% compared to XTTS-v2 while maintaining comparable voice quality. The model supports 8 English voices (4 male, 4 female) and can be fine-tuned on 30 seconds of target speaker audio. The entire model fits in 330MB of RAM. The project is Apache 2.0 licensed and available on Hugging Face. Early benchmarks show latency of 0.3x real-time on the i5-4590 (generating audio faster than playback speed) and 0.05x on an M3 MacBook Air.",
+        "background": "Text-to-speech has historically required large models and GPU inference. Bark (Suno) requires 8GB VRAM, XTTS-v2 needs 4GB. Kokoro's approach of trading model size for a more efficient architecture follows the trend seen in small language models like Phi-3 and Gemma-2B.",
+        "credibility_score": 0.75,
+        "selected": true,
+        "selection_rank": 3
+      }
+    },
+    "expected": {
+      "n_sections": 10,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
+    }
+  },
+  {
+    "test_id": "t2",
+    "description": "3 stories, mixed credibility — tone variation test",
+    "difficulty": "medium",
+    "stories": {
+      "s1": {
+        "title": "Rocket Lab Completes Acquisition of Virgin Orbit Launch Assets for $180M",
+        "content": "Rocket Lab has finalized its acquisition of Virgin Orbit's remaining launch infrastructure for $180 million, including the Boeing 747 Cosmic Girl carrier aircraft, the Long Beach factory, and 14 partially-built LauncherOne rockets. CEO Peter Beck confirmed the deal in an SEC filing on Tuesday. The acquisition gives Rocket Lab air-launch capability for payloads up to 300kg to LEO, complementing its existing Electron ground-launched vehicle (300kg to LEO) and the in-development Neutron medium-lift rocket (8,000kg to LEO). Beck stated the air-launch platform will be rebranded as 'Electron Air' and target responsive-launch contracts for the US Space Force. The first refurbished LauncherOne is expected to fly in Q2 2027. Rocket Lab shares rose 12% on the announcement.",
+        "background": "Virgin Orbit filed for Chapter 11 bankruptcy in April 2023 after a failed launch from the UK. Most assets were auctioned off. Rocket Lab has been aggressively expanding from a small-sat launcher into a full-spectrum space company, acquiring satellite component makers and engine test facilities.",
+        "credibility_score": 0.78,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "Leaked Benchmarks: GPT-5 Allegedly Scores 94.2% on MMLU, 89% on GPQA",
+        "content": "A set of benchmark results allegedly from OpenAI's unreleased GPT-5 model appeared on an anonymous Pastebin post linked from a now-deleted Twitter account. The results claim GPT-5 scores 94.2% on MMLU (vs GPT-4's 86.4%), 89% on GPQA Diamond (vs 49.6%), and 97.1% on HumanEval (vs 67%). The post includes what appears to be internal eval dashboard screenshots showing model identifier 'gpt-5-0901'. OpenAI has not commented on the leak. Independent AI researchers note the GPQA jump from 49.6% to 89% would represent an unprecedented improvement on a dataset specifically designed to be resistant to model scaling. Researcher Sarah Chen commented: 'Either this is fabricated or they've made a fundamental architectural breakthrough. The GPQA number alone would invalidate several scaling law predictions.'",
+        "background": "MMLU and GPQA are standard benchmarks for evaluating LLM reasoning. GPQA Diamond in particular consists of PhD-level science questions. Previous generation-over-generation improvements on these benchmarks have typically been 5-15 percentage points, not the 40-point jump claimed here.",
+        "credibility_score": 0.32,
+        "selected": true,
+        "selection_rank": 2
+      },
+      "s3": {
+        "title": "Sources: YC-Backed Startup Claims Room-Temperature Superconductor, No Paper Published",
+        "content": "Two sources familiar with the matter say Lattice Dynamics, a Y Combinator W24 batch company, has privately demonstrated a material exhibiting zero electrical resistance at 22 degrees Celsius and ambient pressure. The company has not published a preprint or peer-reviewed paper. CEO James Wu declined to comment but the company's LinkedIn page was recently updated to read 'Redefining energy transmission.' The alleged material is a modified copper-apatite compound similar to the debunked LK-99 but with a different synthesis process involving high-pressure annealing. No independent replication has been attempted. YC partner Garry Tan posted and then deleted a tweet saying 'Something huge is coming from one of our companies.' The startup raised $4.2M in its seed round.",
+        "background": "Room-temperature superconductivity is considered a holy grail of materials science. The LK-99 episode in 2023 generated enormous hype followed by thorough debunking. Multiple claims of room-temperature superconductivity have been made and retracted in the past decade.",
+        "credibility_score": 0.08,
+        "selected": true,
+        "selection_rank": 3
+      }
+    },
+    "expected": {
+      "n_sections": 10,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
+    }
+  },
+  {
+    "test_id": "t3",
+    "description": "2 stories only — tests 8-section format (no S3_*)",
+    "difficulty": "medium",
+    "stories": {
+      "s1": {
+        "title": "Build a Crash-Proof Home Server: ZFS on Debian 12 with RAIDZ1",
+        "content": "A detailed guide on building a home NAS/server using Debian 12 and ZFS with RAIDZ1 across four drives. The author demonstrates the complete setup from hardware selection (used Dell OptiPlex 7060, $120 on eBay, plus 4x 4TB Seagate Exos drives at $65 each) to a running system serving Plex, Nextcloud, and Home Assistant. Total hardware cost: $380. ZFS provides automatic data integrity verification via checksums, self-healing through redundancy, and instant snapshots. The guide covers apt-based ZFS installation, pool creation with 'zpool create tank raidz1 /dev/sd{b,c,d,e}', dataset structure, automated snapshots via sanoid, and remote backup with syncoid. Key advantage over Synology: if the motherboard dies, plug the drives into ANY machine running ZFS and run 'zfs import tank' — all data is intact. The setup takes about an hour for someone comfortable with Linux.",
+        "background": "Home server and NAS setups have gained popularity as cloud storage costs rise and privacy concerns grow. ZFS, originally developed by Sun Microsystems, is considered the gold standard for data integrity in storage systems. Synology and QNAP dominate the consumer NAS market but lock users into proprietary hardware.",
+        "credibility_score": 0.72,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "Rust 1.82 Adds Native Async Iterators and GATs Stabilization",
+        "content": "Rust 1.82, released today, stabilizes two long-awaited features: native async iterators (AsyncIterator trait and 'for await' syntax) and Generic Associated Types (GATs). Async iterators allow writing 'for await item in stream { ... }' instead of manual Stream polling, reducing boilerplate by an estimated 40% in async Rust codebases. GATs enable traits to express lifetime-parameterized associated types, unlocking patterns like lending iterators and async trait methods without boxing. The release also includes a 15% improvement in compile times for projects using procedural macros, achieved through parallel macro expansion. The async iterator RFC was first proposed in 2019 and has gone through 7 major revisions. Rust Foundation executive director Rebecca Rumbul called it 'the most significant ergonomic improvement to async Rust since async/await itself.' The feature required changes to 14 compiler crates and 3 standard library crates.",
+        "background": "Rust's async ecosystem has been criticized for complexity compared to languages like Go and Python. Async iterators and GATs address two of the top-5 most requested features in the annual Rust survey. The Rust compiler team has been working on these features since 2020.",
+        "credibility_score": 0.88,
+        "selected": true,
+        "selection_rank": 2
+      }
+    },
+    "expected": {
+      "n_sections": 8,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "CTA"]
+    }
+  },
+  {
+    "test_id": "t4",
+    "description": "3 stories, dense technical content — simplification challenge",
+    "difficulty": "hard",
+    "stories": {
+      "s1": {
+        "title": "Linux Kernel Use-After-Free in nf_tables Allows Local Privilege Escalation (CVE-2026-31337)",
+        "content": "A use-after-free vulnerability in the Linux kernel's nf_tables subsystem (CVE-2026-31337, CVSS 7.8) allows local users to escalate privileges to root. The bug exists in nft_set_elem_destroy() in net/netfilter/nf_tables_api.c at line 4827, where a set element's data is freed but the element remains accessible through a concurrent nft_set_lookup() call from another CPU. The race window is approximately 200 nanoseconds on a 4-core system. Exploit developer @chompie1337 published a working exploit for Ubuntu 24.04 (kernel 6.8.0-40) that achieves reliable root in under 5 seconds using a heap spray technique targeting the kmalloc-192 slab cache. The fix is a one-line patch adding rcu_read_lock() around the destroy path: commit a3b4c5d6e7f8 in Linus's tree. All kernels from 5.12 to 6.10.3 are affected. Major distributions have released patches: Ubuntu, Fedora, and Debian within 48 hours.",
+        "background": "nf_tables is the successor to iptables in the Linux kernel's network packet filtering framework. Use-after-free vulnerabilities in nf_tables have been a recurring pattern — CVE-2024-1086 and CVE-2023-32233 were similar bugs in the same subsystem. Google Project Zero researcher Jann Horn has described nf_tables as 'one of the kernel's most complex attack surfaces.'",
+        "credibility_score": 0.91,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "MLX 0.5: Apple's ML Framework Now 2.3x Faster Than PyTorch on M4 Max",
+        "content": "Apple has released MLX 0.5, the latest version of its machine learning framework optimized for Apple Silicon. Benchmarks on an M4 Max (128GB unified memory) show MLX 0.5 achieving 2.3x faster training throughput than PyTorch 2.4 on Llama-3.1-8B fine-tuning (LoRA, rank 16, batch size 4): 847 tokens/sec vs 368 tokens/sec. Inference benchmarks show 1.8x improvement on Mistral-7B text generation. The performance gains come from three changes: a new fused attention kernel written in Metal Shading Language that eliminates 3 intermediate buffer allocations, lazy graph evaluation that reduces CPU-GPU synchronization by 60%, and quantized matmul kernels supporting 2-bit, 3-bit, and 4-bit weights natively. MLX 0.5 also adds support for Mixture-of-Experts models, distributed training across multiple Apple Silicon Macs via Thunderbolt networking, and an ONNX import path. The framework remains NumPy-compatible and pip-installable.",
+        "background": "MLX was first released by Apple in December 2023 as an alternative to PyTorch for Apple Silicon. Adoption has been growing in the local/edge AI community, particularly for running language models on MacBooks. The mlx-community on Hugging Face hosts over 2,000 quantized models optimized for MLX.",
+        "credibility_score": 0.65,
+        "selected": true,
+        "selection_rank": 2
+      },
+      "s3": {
+        "title": "Quantinuum Reports 99.9% Two-Qubit Gate Fidelity on H2 Processor",
+        "content": "Quantinuum has published results in Nature Physics claiming 99.9% two-qubit gate fidelity on its H2 trapped-ion quantum processor, the highest ever reported for any quantum computing platform. The H2 processor uses 56 ytterbium-171 ions arranged in a racetrack trap geometry. The fidelity was measured using randomized benchmarking with 2,000 random Clifford circuits. For comparison, IBM's best reported two-qubit gate fidelity on superconducting qubits is 99.5% (Eagle processor), and Google's Willow chip achieves 99.7%. Quantinuum CEO Rajeev Hazra stated the result 'crosses the threshold needed for fault-tolerant quantum error correction with the surface code at practical code distances.' The company plans to scale to 100 qubits by 2027 while maintaining above 99.8% fidelity. Independent verification by NIST is pending.",
+        "background": "Quantum computing companies are racing to achieve the gate fidelities needed for practical quantum error correction. The commonly cited threshold for surface code error correction is 99.0% — well below Quantinuum's claim. Trapped-ion systems have consistently demonstrated higher fidelities than superconducting qubit systems but face challenges in scaling qubit count.",
+        "credibility_score": 0.42,
+        "selected": true,
+        "selection_rank": 3
+      }
+    },
+    "expected": {
+      "n_sections": 10,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
+    }
+  },
+  {
+    "test_id": "t5",
+    "description": "3 stories, all low credibility — cautious framing challenge",
+    "difficulty": "hard",
+    "stories": {
+      "s1": {
+        "title": "Rumor: NVIDIA Next-Gen GPU Architecture Leaked, Code-Named 'Vera'",
+        "content": "A user on the hardware leaks forum Chiphell posted what they claim are slides from an internal NVIDIA presentation showing the next-generation GPU architecture code-named 'Vera.' The slides describe a chiplet-based design with up to 4 GPU dies on a single package, connected by a 900 GB/s NVLink-C2C interconnect. The top SKU allegedly features 48,576 CUDA cores (3x the current Blackwell B200) and 288GB of HBM4 memory. The poster claims to be a contractor at TSMC's N3P fab where Vera test chips are being produced. NVIDIA has not commented. Hardware analyst Moore's Law Is Dead rated the leak 'plausible but unverifiable' noting that the chiplet approach aligns with NVIDIA's known research direction but the core counts seem aggressive for the timeline. The slides show a 2027 launch date.",
+        "background": "GPU architecture leaks on forums like Chiphell have a mixed track record — some have been accurate months before official announcements, while others have been fabricated for engagement. NVIDIA typically announces new architectures at its GTC conference.",
+        "credibility_score": 0.10,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "Anonymous Post Claims Amazon Planning 15,000 Engineering Layoffs in Q1",
+        "content": "An anonymous post on Blind, the workplace discussion app, claims Amazon is planning to lay off approximately 15,000 engineers across AWS, Alexa, and Prime Video divisions in Q1 of next year. The poster identifies themselves as an L7 manager and says the cuts represent about 12% of Amazon's engineering headcount. They claim internal planning documents show the layoffs will be framed as 'organizational simplification' and will disproportionately affect L4-L5 software engineers. The post has received over 2,000 upvotes and 500 comments. Amazon spokesperson Brian Huseman said: 'We don't comment on rumors or speculation.' Several replies from verified Amazon employees say they have not heard of any such plans. Tech layoff tracker Layoffs.fyi shows Amazon has not conducted major engineering layoffs since the January 2023 cuts of 18,000 total employees.",
+        "background": "Anonymous workplace posts about layoffs are common on Blind and are frequently inaccurate. However, some past Blind posts have accurately predicted layoffs at Meta and Google weeks before official announcements. Amazon's AWS division has been under pressure to cut costs as cloud growth has slowed.",
+        "credibility_score": 0.05,
+        "selected": true,
+        "selection_rank": 2
+      },
+      "s3": {
+        "title": "Report: Apple in Early Talks to Acquire DuckDuckGo for $2B",
+        "content": "The Information reports, citing two people with knowledge of the discussions, that Apple has held preliminary acquisition talks with DuckDuckGo at a valuation of approximately $2 billion. The discussions are described as 'early stage' and may not lead to a deal. The acquisition would give Apple a privacy-focused search engine to replace Google as the default on Safari, potentially ahead of the DOJ's antitrust ruling that could force Google to end its $20B/year default search deal with Apple. DuckDuckGo CEO Gabriel Weinberg declined to comment. Apple also declined to comment. DuckDuckGo currently handles approximately 100 million daily searches, compared to Google's 8.5 billion. The company has approximately 200 employees and has been profitable since 2014. Its revenue comes from keyword-based advertising that does not track users.",
+        "background": "Apple's search deal with Google has been a central issue in the DOJ antitrust case. Legal analysts expect a ruling in early 2027 that could prohibit or significantly restrict default search agreements. Apple has been quietly building search technology, including its own web crawler Applebot and on-device search features in Spotlight.",
+        "credibility_score": 0.12,
+        "selected": true,
+        "selection_rank": 3
+      }
+    },
+    "expected": {
+      "n_sections": 10,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
+    }
+  }
+]
