@@ -1,0 +1,256 @@
+[
+  {
+    "script_id": 1,
+    "difficulty": "easy",
+    "comment": "Clean script \u2014 real pipeline output with markdown stripped. All sections natural, CTA short and imperative, word count in range. Should pass cleanly.",
+    "sections": {
+      "HOOK": "Eight point eight million Danes just had their names, addresses, and CPR numbers stolen.",
+      "S1_CONTEXT": "The Central Person Register confirmed a massive breach, marking one of the largest data leaks in the country's history.",
+      "S1_CORE": "Hackers exploited a Danish company's legitimate access to pull data on nearly every citizen, specifically targeting sensitive health records alongside basic identification details.",
+      "S1_TWIST": "Police are investigating, but your data is already in the wild.",
+      "S2_HOOK": "With that nightmare over, here's a fix for your AI's memory.",
+      "S2_CORE": "Cloudflare's Web Search API is in beta, letting agents use live internet data instead of stale training cutoffs.",
+      "S2_TWIST": "It runs through AI Gateway with zero data retention, so your queries stay private.",
+      "S3_HOOK": "And for the dev crowd, a linker that won't slow you down.",
+      "S3_CORE": "Mold 3.0 is here, fully rewritten in Rust after years in C++. It's a drop-in replacement for the old version, aiming to become the default Linux linker.",
+      "CTA": "Follow for daily tech news."
+    },
+    "word_count": 154,
+    "expected_verdict": "pass",
+    "expected_flagged": [],
+    "expected_cta_category": "A",
+    "_note": "Based on the real till-agent5.json script, cleaned up. This is the closest to what a properly working pipeline produces.",
+    "expected_cta_ok": true
+  },
+  {
+    "script_id": 2,
+    "difficulty": "easy",
+    "comment": "Clean script \u2014 different topic set (Samsung health data, Telegram suspension, Japan lithium). Natural voice, good transitions, real twists.",
+    "sections": {
+      "HOOK": "Samsung just gave its users a choice: let us train AI on your health data, or we delete it all.",
+      "S1_CONTEXT": "The company updated its health app terms to require data sharing for AI model training, effective next month.",
+      "S1_CORE": "Users who decline lose their entire history: heart rate logs, sleep patterns, workout records, all gone. Samsung says the data helps build better health features.",
+      "S1_TWIST": "There is no export option. Decline and the data vanishes, not to your phone, not to a backup. Just gone.",
+      "S2_HOOK": "Speaking of platforms making unilateral decisions, Telegram just lost its front door.",
+      "S2_CORE": "The t.me domain has been suspended, breaking every short link the platform has ever shared. Deep links to channels, bots, and groups all return errors.",
+      "S2_TWIST": "Telegram says it is working on a fix, but millions of links embedded across the internet are already dead.",
+      "S3_HOOK": "On a brighter note, the battery problem might have a real solution.",
+      "S3_CORE": "Japanese researchers developed a method to recover up to ninety percent of lithium from used EV batteries, using a water-based process instead of the acid baths current recyclers rely on.",
+      "CTA": "Drop a comment if you'd switch to a lithium-recycled battery."
+    },
+    "word_count": 191,
+    "expected_verdict": "pass",
+    "expected_flagged": [],
+    "expected_cta_category": "B",
+    "_note": "All-clean synthetic script. Natural voice, good transitions that signal story shifts, twists that add new information.",
+    "expected_cta_ok": true
+  },
+  {
+    "script_id": 3,
+    "difficulty": "easy",
+    "comment": "BROKEN: Heavy AI press-release phrasing in multiple sections. HOOK uses 'revolutionary', S1_CORE has 'ensures maximum', S2_CORE has 'leverages cutting-edge'. Should flag HUMAN_VOICE issues.",
+    "sections": {
+      "HOOK": "A revolutionary new breakthrough in database technology is set to transform how developers build applications.",
+      "S1_CONTEXT": "YouTrackDB launched its general-use object-oriented graph database with enterprise-grade features after three years of closed beta testing with select partners.",
+      "S1_CORE": "The platform ensures maximum scalability through its innovative architecture, enabling developers to seamlessly integrate graph operations into their existing workflows.",
+      "S1_TWIST": "Early benchmarks show it is twenty times faster than the competition on complex multi-hop graph traversals.",
+      "S2_HOOK": "Meanwhile, another game-changing tool hit the scene.",
+      "S2_CORE": "The new Ant JavaScript runtime leverages cutting-edge optimization techniques to deliver unprecedented performance gains across the entire development stack.",
+      "S2_TWIST": "It can run legacy Node code without any modifications whatsoever, which could make migration painless for teams with large existing codebases.",
+      "S3_HOOK": "And rounding out today's innovations, a fresh take on emulation.",
+      "S3_CORE": "Tiny Emulators brings classic gaming hardware to your browser with just a few hundred lines of code. No downloads, no installs, just pure retro gaming accessible from any modern browser.",
+      "CTA": "Subscribe for more tech insights."
+    },
+    "word_count": 163,
+    "expected_verdict": "fail",
+    "expected_flagged": [
+      "HOOK",
+      "S1_CORE",
+      "S2_CORE"
+    ],
+    "_note": "Three sections loaded with AI marketing language: 'revolutionary breakthrough', 'ensures maximum scalability', 'leverages cutting-edge', 'unprecedented performance gains'. The judge should catch HUMAN_VOICE problems here.",
+    "expected_cta_category": "A",
+    "expected_cta_ok": true
+  },
+  {
+    "script_id": 4,
+    "difficulty": "easy",
+    "comment": "BROKEN: Markdown artifacts throughout \u2014 bold markers, headers. TTS-readiness scanner (Python regex) will catch these independently, but the LLM should also flag them.",
+    "sections": {
+      "HOOK": "**Breaking:** Linux has had a critical vulnerability hiding in plain sight for fifteen years.",
+      "S1_CONTEXT": "## The Bug\nGhostLock is a stack use-after-free bug that affects every major Linux distribution.",
+      "S1_CORE": "An attacker can trigger it through **any** unprivileged user process, escalating to root access in seconds.",
+      "S1_TWIST": "The fix requires a kernel update, but most production servers running affected distributions have not rebooted since the patch dropped last week.",
+      "S2_HOOK": "From one security mess to another, __Telegram's__ link system just collapsed.",
+      "S2_CORE": "The t.me short domain got suspended without warning, killing every deep link the platform has shared in the last decade.",
+      "S2_TWIST": "Telegram has no ETA on a fix, and third-party bots that relied on those links are completely broken.",
+      "S3_HOOK": "And if those security problems sound old-school, here is a thoroughly modern one.",
+      "S3_CORE": "Samsung's health app now demands you share your data for AI training. # The Alternative\nRefuse and they delete everything.",
+      "CTA": "Follow for daily security news."
+    },
+    "word_count": 154,
+    "expected_verdict": "fail",
+    "expected_flagged": [
+      "HOOK",
+      "S1_CONTEXT",
+      "S1_CORE",
+      "S2_HOOK",
+      "S3_CORE"
+    ],
+    "_note": "Markdown artifacts: ** bold in HOOK/S1_CORE, ## header in S1_CONTEXT, __ in S2_HOOK, # in S3_CORE. The Python TTS scanner catches these via regex, so they'll be in flagged_sections regardless of what the LLM says.",
+    "expected_cta_category": "A",
+    "expected_cta_ok": true
+  },
+  {
+    "script_id": 5,
+    "difficulty": "medium",
+    "comment": "BROKEN: Weak twists \u2014 S1_TWIST and S2_TWIST just restate the CORE fact in different words instead of revealing new consequences.",
+    "sections": {
+      "HOOK": "PgBouncer just got four times faster, and the trick was embarrassingly simple.",
+      "S1_CONTEXT": "The team behind PgBouncer published their scaling story after months of production testing at high traffic loads.",
+      "S1_CORE": "By switching from a single-threaded event loop to a multi-process architecture, they cut tail latency by seventy-five percent while handling four times the connection volume.",
+      "S1_TWIST": "So the database proxy is now much faster and handles way more connections than before.",
+      "S2_HOOK": "From databases to runtimes, JavaScript just got a new contender.",
+      "S2_CORE": "Ant is a new JavaScript runtime built from scratch with a focus on startup time. Cold starts clock in at under two milliseconds, about fifty times faster than Node.",
+      "S2_TWIST": "That means Ant starts up really quickly compared to other runtimes.",
+      "S3_HOOK": "And in the world of physics, a resource just got a major refresh.",
+      "S3_CORE": "The second edition of So You Want to Learn Physics is out, reorganizing the entire self-study roadmap from classical mechanics through quantum field theory.",
+      "CTA": "Comment with your favorite physics resource."
+    },
+    "word_count": 162,
+    "expected_verdict": "fail",
+    "expected_flagged": [
+      "S1_TWIST",
+      "S2_TWIST"
+    ],
+    "_note": "S1_TWIST just says 'faster and more connections' which is exactly what S1_CORE said. S2_TWIST just says 'starts up quickly' which restates S2_CORE. Real twists should reveal a NEW consequence \u2014 'but the migration broke connection pooling for 12 hours' or 'but it can't run TypeScript yet'.",
+    "expected_cta_category": "B",
+    "expected_cta_ok": true
+  },
+  {
+    "script_id": 6,
+    "difficulty": "medium",
+    "comment": "BROKEN: Bad transitions \u2014 S2_HOOK doesn't signal S1 is complete, S3_HOOK is just 'next up' with no tension.",
+    "sections": {
+      "HOOK": "Your cursive handwriting might be holding your brain back, and there is math to prove it.",
+      "S1_CONTEXT": "A new study analyzed backtrack-free cursive, a writing style where the pen never retraces its path.",
+      "S1_CORE": "Researchers found that eliminating backtracks forces more efficient letter formation, reducing cognitive load during sustained writing by about eighteen percent.",
+      "S1_TWIST": "The catch: only twelve percent of common English letter pairs can actually be written backtrack-free, so you'd need to redesign the entire alphabet.",
+      "S2_HOOK": "Also, there is this thing about conversation patterns.",
+      "S2_CORE": "A large-scale study of ten thousand recorded conversations found that the single best predictor of relationship satisfaction is turn-taking rhythm, not content, not empathy, just timing.",
+      "S2_TWIST": "Couples who interrupted each other at consistent intervals scored higher than those who politely waited.",
+      "S3_HOOK": "Next up, something about comics.",
+      "S3_CORE": "A curated collection of cyberpunk manga and graphic novels just dropped, spanning forty years of the genre from Akira through modern indie titles.",
+      "CTA": "Follow for more unexpected science."
+    },
+    "word_count": 157,
+    "expected_verdict": "fail",
+    "expected_flagged": [
+      "S2_HOOK",
+      "S3_HOOK"
+    ],
+    "_note": "S2_HOOK is 'Also, there is this thing about...' \u2014 lazy, no tension, doesn't signal S1 is done. S3_HOOK is 'Next up, something about...' \u2014 even lazier, zero tension. Good transitions should be like 'Speaking of hidden patterns, conversation has its own' or 'From redesigning alphabets to redesigning genres'.",
+    "expected_cta_category": "A",
+    "expected_cta_ok": true
+  },
+  {
+    "script_id": 7,
+    "difficulty": "medium",
+    "comment": "BROKEN: CTA is too long (19 words), not imperative, and reads like a full sentence rather than a punchy call to action.",
+    "sections": {
+      "HOOK": "Linux 0.11 just got rewritten in Rust, and yes, it actually boots.",
+      "S1_CONTEXT": "A developer took Linus Torvalds' original 1991 kernel and translated every line into idiomatic Rust, preserving the exact same behavior.",
+      "S1_CORE": "The rewrite boots in QEMU, runs the original userspace tools, and passes the same test suite as the C version. No shortcuts, no stubs.",
+      "S1_TWIST": "The Rust version is actually shorter. Three thousand fewer lines, mostly because Rust's ownership model eliminated manual memory tracking code.",
+      "S2_HOOK": "From rewriting the past to rethinking the present, Git's most underused command just got a spotlight.",
+      "S2_CORE": "The git history command lets you search commit messages, diffs, and file contents across your entire repo history in one query. Most developers have never touched it.",
+      "S2_TWIST": "It found a credentials leak in a five-year-old commit that git log completely missed.",
+      "S3_HOOK": "And speaking of finding hidden things, here's one from the hardware side.",
+      "S3_CORE": "Beavis is a replica of the Ultrasound PnP ISA sound card, fully open source. You can build one from the published schematics and hear the same Gravis audio from 1994.",
+      "CTA": "If you found these stories interesting and want to hear more about tech news every day, make sure you hit that subscribe button and turn on notifications."
+    },
+    "word_count": 202,
+    "expected_verdict": "fail",
+    "expected_flagged": [
+      "CTA"
+    ],
+    "_note": "CTA is 29 words \u2014 way over the 10-word limit, not imperative (it's 'if you found... make sure you...' instead of 'Subscribe for daily tech'), and reads like a YouTube outro monologue. The rest of the script is clean.",
+    "expected_cta_category": "A",
+    "expected_cta_ok": false
+  },
+  {
+    "script_id": 8,
+    "difficulty": "medium",
+    "comment": "BROKEN: Dense alphanumeric identifier in S1_CORE that will trip the TTS-readiness regex. Also, S2_CORE has AI marketing phrasing.",
+    "sections": {
+      "HOOK": "A fifteen-year-old bug in every Linux distro just got a name. And an exploit.",
+      "S1_CONTEXT": "Security researchers disclosed GhostLock, a stack use-after-free vulnerability present in the Linux kernel since 2011.",
+      "S1_CORE": "The bug lives in the kernel's locking subsystem under identifier CVE_2026_LK_FH1201V1.0BR_V1.2.0.14 and allows any unprivileged user to escalate to root in under three seconds.",
+      "S1_TWIST": "A proof of concept is already circulating. The patch exists, but requires a reboot most production servers haven't done.",
+      "S2_HOOK": "From kernel bugs to language upgrades, Rust just crossed a major threshold.",
+      "S2_CORE": "The latest Rust release harnesses the power of advanced borrow-checking algorithms to deliver seamless memory safety guarantees across all compilation targets.",
+      "S2_TWIST": "The new async runtime cuts compile times by thirty percent, which might finally stop the 'Rust is slow to compile' complaints.",
+      "S3_HOOK": "And for the retro enthusiasts, open-source hardware is alive and well.",
+      "S3_CORE": "RISCBoy is an open-source portable gaming console built from scratch, running on a custom FPGA board with its own toolchain.",
+      "CTA": "Follow for daily dev news."
+    },
+    "word_count": 162,
+    "expected_verdict": "fail",
+    "expected_flagged": [
+      "S1_CORE",
+      "S2_CORE"
+    ],
+    "_note": "S1_CORE has a dense firmware-style identifier (CVE_2026_LK_FH1201V1.0BR_V1.2.0.14) \u2014 Python TTS regex catches this. S2_CORE has 'harnesses the power of' and 'deliver seamless' \u2014 AI press release phrasing the LLM should catch.",
+    "expected_cta_category": "A",
+    "expected_cta_ok": true
+  },
+  {
+    "script_id": 9,
+    "difficulty": "hard",
+    "comment": "Subtly broken \u2014 S1_TWIST restates rather than adds, and S3_HOOK is a weak transition. Everything else is clean, making the issues harder to spot.",
+    "sections": {
+      "HOOK": "Apple's own speech recognition just got benchmarked against Whisper. The results are not what you'd expect.",
+      "S1_CONTEXT": "Apple quietly released SpeechAnalyzer, a new on-device API for real-time speech recognition on iOS and macOS.",
+      "S1_CORE": "Independent benchmarks show it matches Whisper's accuracy on clean English audio while using sixty percent less memory and running entirely on the Neural Engine.",
+      "S1_TWIST": "So Apple's new API is just as accurate as Whisper but uses less memory and runs on-device.",
+      "S2_HOOK": "From on-device AI to on-device gaming, homebrew hardware is having a moment.",
+      "S2_CORE": "RISCBoy is an open-source portable games console designed from scratch around a custom FPGA, with its own assembler, graphics pipeline, and SDK.",
+      "S2_TWIST": "The entire design is MIT licensed. Every schematic, every line of HDL, every tool in the chain.",
+      "S3_HOOK": "And here is another thing that happened.",
+      "S3_CORE": "Climate.gov was taken offline, but the scientific community had already mirrored the entire dataset. Open data practices saved decades of climate research from disappearing.",
+      "CTA": "Subscribe for tech that matters."
+    },
+    "word_count": 160,
+    "expected_verdict": "fail",
+    "expected_flagged": [
+      "S1_TWIST",
+      "S3_HOOK"
+    ],
+    "_note": "S1_TWIST is a subtle restatement \u2014 'just as accurate but less memory and on-device' is exactly what S1_CORE said. S3_HOOK is 'And here is another thing that happened' \u2014 no tension, no signal. Both are more subtle than the easy/medium versions.",
+    "expected_cta_category": "A",
+    "expected_cta_ok": true
+  },
+  {
+    "script_id": 10,
+    "difficulty": "hard",
+    "comment": "Clean script with tricky content \u2014 topics that SOUND like they could trigger AI-phrasing flags but are actually natural. The twist in S2 is genuinely novel, not a restatement.",
+    "sections": {
+      "HOOK": "Nvidia, CoreWeave, and Nebius are lending each other billions. The collateral? GPUs.",
+      "S1_CONTEXT": "An investigation revealed circular financing deals where GPU cloud companies use hardware as collateral for loans from their own suppliers and partners.",
+      "S1_CORE": "Nvidia sells GPUs to CoreWeave on credit, CoreWeave pledges those GPUs as collateral for a loan from Nebius, and Nebius uses the loan proceeds to buy more GPUs from Nvidia. The circle closes.",
+      "S1_TWIST": "If GPU prices drop by even twenty percent, the collateral falls below loan value and the whole chain unwinds at once.",
+      "S2_HOOK": "From financial engineering to actual engineering, distributed AI just took a strange turn.",
+      "S2_CORE": "Mesh LLM runs inference across a swarm of consumer devices connected through iroh, a peer-to-peer networking library. No data center needed.",
+      "S2_TWIST": "The latency is surprisingly good for small models \u2014 under 200 milliseconds for seven-billion-parameter inference across three laptops on the same Wi-Fi.",
+      "S3_HOOK": "And on a completely different scale, a single-board project is punching above its weight.",
+      "S3_CORE": "Someone built and ran an autoregressive language model on a 6502 processor. The same chip that powered the Apple II is now generating text, one token every four seconds.",
+      "CTA": "Hit follow for daily tech deep dives."
+    },
+    "word_count": 194,
+    "expected_verdict": "pass",
+    "expected_flagged": [],
+    "expected_cta_category": "A",
+    "_note": "This script talks about AI, distributed computing, and GPU financing \u2014 topics that could trigger false HUMAN_VOICE flags. But the writing is natural throughout. S2_TWIST adds genuinely new info (latency numbers) not in S2_CORE. Tests false-positive resistance.",
+    "expected_cta_ok": true
+  }
+]
