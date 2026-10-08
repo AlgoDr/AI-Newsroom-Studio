@@ -516,13 +516,17 @@ def run_eval() -> tuple[float, list[EvalResult]]:
 class ScriptQualityMetric(BaseMetric):
     """Composite script quality metric for Agent 5."""
 
-    def __init__(self):
-        self.threshold = THRESHOLD
-        self.score = None
-        self.reason = None
-        self.success = None
-        self._results = []
-        self._already_ran = False
+    def __init__(self, *, threshold=THRESHOLD, score=None, reason=None,
+                 success=None, _results=None, _already_ran=False, **_kw):
+        # Accept keyword args so DeepEval's copy_metrics() can clone state.
+        # copy_metrics() calls type(metric)(**vars(metric)) — without these
+        # params the copy starts blank and re-runs the entire eval.
+        self.threshold = threshold
+        self.score = score
+        self.reason = reason
+        self.success = success
+        self._results = _results if _results is not None else []
+        self._already_ran = _already_ran
 
     @property
     def __name__(self):
