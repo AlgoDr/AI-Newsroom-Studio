@@ -193,7 +193,7 @@ production gap was found):**
 | `_build_prompt()` | Assemble one prompt covering all 3 stories |
 | (LLM call) | `llama-3.3-70b-versatile`, temperature=0.4, one call |
 | `_enforce_word_count()` | Trim/expand if outside 150-225 words, max 2 attempts |
-| `_generate_script_local()` | Local fallback -- `gemma3:12b` via Ollama |
+| `_generate_script_local()` | Local fallback -- `gemma4:12b-mlx` via Ollama |
 | `_parse_script()` | Regex-extract 10 labelled sections |
 
 **Tone calibration -- driven entirely by Agent 3's credibility_score:**
@@ -277,8 +277,8 @@ actually flagged.
 
 | Stage | Primary | Fallback | Job |
 |---|---|---|---|
-| JUDGE | `openai/gpt-oss-120b` | `qwen2.5:7b` | Reasoning-tuned, finds problems across the whole script in one call |
-| REWRITE | `llama-3.3-70b-versatile` | `gemma3:12b`* | Creative fluency, fixes ONLY what was flagged |
+| JUDGE | `openai/gpt-oss-120b` | `qwen3.5:9b` | Reasoning-tuned, finds problems across the whole script in one call |
+| REWRITE | `llama-3.3-70b-versatile` | `gemma4:12b-mlx`* | Creative fluency, fixes ONLY what was flagged |
 
 *\* The `REWRITE_FALLBACK_MODEL` constant currently reads `gemma3:12b`.
 An earlier A/B test (`test_rewrite_fallback_models.py`) had selected

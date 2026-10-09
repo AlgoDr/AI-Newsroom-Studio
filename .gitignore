@@ -39,4 +39,4 @@ wandb/
 
 # stray debug files
 experiments/log1.txt
-EOF
+EOFexperiments/data/

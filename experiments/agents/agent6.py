@@ -169,8 +169,8 @@ Check each of these:
 4. CTA: classify into category A (follow/subscribe), B (comment/
    engage), or C (discover/link). Is it under 10 words and imperative?
 
-Respond in EXACTLY this format, one line per item, no extra text.
-Only use labels from the valid list above -- never invent a label:
+Do NOT explain your reasoning. Output ONLY these 4 lines, nothing
+else before or after them:
 FLAGGED_SECTIONS: <comma-separated labels from the valid list, or NONE>
 FLAGGED_REASONS: <one reason per flagged section, separated by |>
 CTA_CATEGORY: A or B or C or INVALID
@@ -186,7 +186,11 @@ CTA_OK: YES or NO"""
         )
         raw = (resp.choices[0].message.content or "").strip()
         finish_reason = resp.choices[0].finish_reason
-        if not raw:
+        if raw and finish_reason == "length":
+            # Truncated but may still have usable structured lines
+            print(f"  [qc] JUDGE truncated (finish_reason=length), "
+                  f"attempting parse of partial output")
+        elif not raw:
             print(f"  [qc] JUDGE empty content, finish_reason={finish_reason}")
     except Exception as e:
         print(f"  [qc] JUDGE (gpt-oss-120b) call failed: {e}")
@@ -258,7 +262,9 @@ def _parse_judgment(raw: str, valid_labels: list = None) -> dict:
         reasons_raw = lines.get("FLAGGED_REASONS", "")
         flagged_sections = {}
         if flagged_raw.upper() != "NONE" and flagged_raw.strip():
-            labels = [l.strip() for l in flagged_raw.split(",") if l.strip()]
+            # Normalize delimiters: qwen3.5:9b outputs pipe-separated
+            # labels (e.g. "S1_TWIST|S2_TWIST") instead of commas
+            labels = [l.strip() for l in flagged_raw.replace("|", ",").split(",") if l.strip()]
             reasons = [r.strip() for r in reasons_raw.split("|") if r.strip()] if reasons_raw else []
 
             for i, label in enumerate(labels):

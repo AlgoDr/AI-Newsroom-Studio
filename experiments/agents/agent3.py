@@ -3,7 +3,7 @@ import dotenv
 import ollama
 from urllib.parse import urlparse
 from groq import Groq
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 import time
 
 dotenv.load_dotenv(".env")
@@ -476,3 +476,105 @@ def check_credibility(story: dict) -> dict:
     story["_cred_regime"]      = regime   # audit trail: which weights fired
     story["_weights_used"]     = f"{w_src}/{w_llm}/{w_verify}"  # src/llm/verify
     return story
+
+
+
+
+
+
+
+
+
+
+
+
+
+#changes done  here to run the evals-quality here
+
+def build_credibility_prompt(title: str, content: str) -> str:
+    return f"""Classify what this article is about.
+
+TITLE: {title}
+
+ARTICLE:
+{content}
+
+Categories:
+- REAL: a genuine product, technology, company, research finding, or event
+        (real things can have promotional tone -- that is still REAL)
+- OPINION: a personal essay, rant, or opinion piece (not reporting a thing)
+- SPAM: scam, clickbait, or misinformation with no real substance
+
+Respond with ONLY one word: REAL, OPINION, or SPAM.
+
+Verdict:"""
+
+
+def _call_groq(prompt: str) -> str | None:
+
+    try:
+        resp = groq_client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=600,
+        )
+        raw = resp.choices[0].message.content
+        print(f"  [llm_cred_check DEBUG] raw={repr(raw[:80] if raw else None)}")
+    except Exception as e:
+        print(f"  [llm_cred_check] Groq failed: {e}")
+        raw = None
+
+    return raw
+
+    # The try/except around groq_client.chat.completions.create,
+    # moved here unchanged. Return raw text, or None on exception.
+
+
+
+
+
+def llm_credibility_check(title: str, content: str) -> float:
+    if not content or len(content) < 100:
+        print(f"  [llm_cred_check] empty content -> 0.0 neutral")
+        return 0.0
+
+    if len(content) < 500:
+        print(f"  [llm_cred_check] thin content ({len(content)} chars) -> 0.0 neutral")
+        return 0.0
+
+    label = classify_credibility(title, content, "groq")
+    if label is None:
+        print(f"  [llm_cred_check] gpt-oss-120b gave no usable label -> "
+              f"falling back to local {CREDIBILITY_FALLBACK_MODEL}")
+        label = classify_credibility(title, content, "local")
+
+    if label is None:
+        print(f"  [llm_cred_check] failed on both cloud and local -> 0.0 neutral")
+        return 0.0
+    
+    return LABEL_SCORES[label]
+
+
+
+def _parse_credibility_label(raw, title: str) -> str | None:
+    if not raw or not raw.strip():
+        return None
+    label = raw.strip().upper()
+    for word in ["REAL", "OPINION", "SPAM"]:
+        if word in label:
+            print(f"  [llm_cred_check] {title[:40]!r} -> {word!r}")
+            return word
+    print(f"  [llm_cred_check] unparseable {label[:30]!r}")
+    return None
+
+
+def classify_credibility(title, content, backend) -> str | None:
+    prompt = build_credibility_prompt(title, content)
+    if backend == "groq":   raw = _call_groq(prompt)
+    elif backend == "local": raw = _llm_credibility_check_local(prompt)
+    else: raise ValueError(f"unknown backend: {backend}")
+    return _parse_credibility_label(raw, title)
+
+
+
