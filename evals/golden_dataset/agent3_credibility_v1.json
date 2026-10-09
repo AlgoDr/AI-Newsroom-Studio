@@ -1,182 +1,332 @@
 [
   {
-    "story_id": 1,
-    "title": "PostgreSQL 17 Released with Incremental Backup and SQL/JSON Support",
-    "expected_label": "REAL",
-    "content": "The PostgreSQL Global Development Group has announced the release of PostgreSQL 17, the latest version of the world's most advanced open source database. PostgreSQL 17 builds on decades of open source development, improving its performance and scalability while adapting to emergent data access and storage patterns. This release of PostgreSQL adds significant overall performance gains, including an overhauled memory management implementation for vacuum, optimizations to storage access and improvements for high concurrency workloads, speedups in bulk loading and exports, and query execution improvements for aggregates. PostgreSQL 17 also introduces SQL/JSON support with the JSON_TABLE command that lets users query JSON data using standard SQL syntax. The new incremental backup feature allows faster point-in-time recovery for large databases, reducing backup windows from hours to minutes in many production environments. The release includes improvements to logical replication, enhanced partitioning capabilities, and better monitoring through expanded pg_stat views."
+    "input": "Show HN: Ant – A JavaScript runtime and ecosystem",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "show-hn-ant-a-javascript-runtime-and-ecosystem",
+      "url": "https://antjs.org",
+      "domain": "antjs.org",
+      "content_preview": "01\n\n## A JavaScript runtime that carries more than it weighs.\n\nAnt is a lightweight, high-performance JavaScript runtime built from scratch. It runs real npm packages, starts instantly and ships as a portable 9 MB binary.\n\nNo 50 MB download, no toolchain to set up. The engine, Ant Silver, is hand-built. It is not a wrapper around V8, JSC, or SpiderMonkey.\n\nRuns the ecosystem you already use\n\nHono Elysia TypeScript React Rolldown WinterTC Wasm\n\n02\n\n## By the numbers\n\nBinary size~8.6 MB\n\ncompat-ta"
+    },
+    "comments": "looks like new javascript runtime, but not sure if it is credible. I will mark as REAL for now."
   },
   {
-    "story_id": 2,
-    "title": "Show HN: I built a terminal-based spreadsheet in Rust",
-    "expected_label": "REAL",
-    "content": "I've been working on a terminal-based spreadsheet application written in Rust. It supports basic formulas (SUM, AVG, COUNT, IF), cell references, CSV import/export, and vim-style keybindings. The motivation was wanting something faster than opening Excel or Google Sheets for quick data manipulation tasks. It uses the ratatui library for the TUI rendering and evalexpr for formula parsing. Performance was a key goal \u2014 it handles 100k rows without noticeable lag on my M2 MacBook. The architecture is an event-driven model with a separate rendering thread. Formulas are lazily evaluated with dependency tracking so only affected cells recalculate when you change a value. I spent about three months building it in my spare time. The hardest part was getting the formula dependency graph right \u2014 circular reference detection took a week alone. Source code is on GitHub under MIT license. Happy to answer any questions about the implementation."
+    "input": "Show HN: Open-source engine running Gemma 4 26B in 2 GB RAM on any M-series Mac",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "show-hn-open-source-engine-running-gemma-4-26b-in-2-gb-ram-on-any-m-series-mac",
+      "url": "https://github.com/drumih/turbo-fieldfare",
+      "domain": "github.com",
+      "content_preview": "Gemma 4 26B-A4B inference in about 2 GB of RAM\n  A custom Swift + Metal runtime for any Apple Silicon Mac, even the 8 GB ones.\nQuick start · Local server · Benchmarks · Contribute results · How it works · Experiments · References\nMemory got expensive. So I gave a 26-billion-parameter model a ~2 GB budget.\nTurboFieldfare runs the instruction-tuned Gemma 4 26B-A4B without loading the entire 14.3 GB model into memory. It keeps the shared 1.35 GB core and FP16 KV cache in memory, then streams only t"
+    },
+    "comments": "verified by google search, seems credible. I will mark as REAL."
   },
   {
-    "story_id": 3,
-    "title": "Apple Acquires AI Startup for $1B to Boost On-Device Intelligence",
-    "expected_label": "REAL",
-    "content": "Apple has acquired DarwinAI, a Canadian artificial intelligence startup, for approximately one billion dollars according to sources familiar with the matter. The acquisition signals Apple's intensifying push to bring advanced AI capabilities directly onto its devices rather than relying on cloud processing. DarwinAI specializes in making neural networks smaller and more efficient \u2014 a technology that aligns directly with Apple's strategy of running AI models on-device for privacy and performance reasons. The company's core technology, Generative Synthesis, can automatically optimize deep learning models to run on resource-constrained hardware like smartphones and wearables. Several DarwinAI employees have already joined Apple's AI division, and their LinkedIn profiles now list Apple as their employer. This marks one of Apple's largest AI-related acquisitions and comes as the company faces pressure from competitors like Google and Samsung who have aggressively integrated generative AI features into their products."
+    "input": "Show HN: Isopolis – isometric pixel map of SF",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "show-hn-isopolis-isometric-pixel-map-of-sf",
+      "url": "https://sf.isopolis.city/",
+      "domain": "sf.isopolis.city",
+      "content_preview": "loading…\n\n© OpenStreetMap contributors © CARTO · neighborhoods: [DataSF](https://data.sfgov.org/d/gfpk-269f)\n\n?\n\n![Image 1](https://sf.isopolis.city/sprites/tours/hoodie.png)ISOPOLIS SAN FRANCISCO\n\nNAVIGATE\n\nFEELIN' LUCKY\n\n-+\n\n**/** search · **?** about\n\nLVL 5/7\n\nGUIDED TOURS 04\n\n![Image 2](https://sf.isopolis.city/sprites/tours/tourist.png)**SF 101**8 STOPS _Essential stops for people who just said 'San Fran' or 'Frisco'. Ew._![Image 3](https://sf.isopolis.city/sprites/tours/programmer.png)**Sh"
+    },
+    "comments": "verified by google search, seems credible. I will mark as REAL."
   },
   {
-    "story_id": 4,
-    "title": "Understanding B-Trees: The Data Structure Behind Your Database",
-    "expected_label": "REAL",
-    "content": "B-trees are the fundamental data structure powering nearly every modern database system, yet many developers interact with databases daily without understanding how they work under the hood. A B-tree is a self-balancing tree data structure that maintains sorted data and allows searches, sequential access, insertions, and deletions in logarithmic time. Unlike binary search trees, B-tree nodes can have many children, which makes them particularly well-suited for storage systems that read and write large blocks of data. The order of a B-tree determines the maximum number of children each node can have. In practice, database implementations typically use orders between 100 and 1000, meaning each node can contain hundreds of keys. This wide branching factor keeps the tree shallow \u2014 even with billions of records, you rarely need more than 3-4 levels of tree traversal to find any record. When a node overflows during insertion, it splits into two nodes and promotes the middle key to the parent. This splitting propagation is what keeps the tree balanced. PostgreSQL's default index type is a B-tree, and MySQL's InnoDB storage engine uses a variant called B+trees where all data lives in leaf nodes connected by a linked list for efficient range scans."
+    "input": "Show HN: Kakehashi – Experimental userspace to run macOS binaries on Linux ARM",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "show-hn-kakehashi-experimental-userspace-to-run-macos-binaries-on-linux-arm",
+      "url": "https://github.com/wie-project/kakehashi",
+      "domain": "github.com",
+      "content_preview": "Userspace macOS ARM64 → Linux aarch64 translation layer (CLI-first, no JIT).\nLoad Darwin Mach-O on Linux aarch64, map a freestanding libSystem, translate\nBSD syscalls, and run real guests (clang probes, 7-Zip 7zz, curl,\nthreads).\n| Live execution | Linux aarch64 (bare metal, VM, Colima/Docker) | \n| Dry-load / inspect | Any host (including macOS) | \n| Design reference | docs/ | \nVerified on Docker/Colima and UTM (Linux aarch64). Install once:\ncargo install kakehashi\n# or from a checkout:\ncargo in"
+    },
+    "comments": "DOES EXIST seen on github, but not sure if credible but it is real thing."
   },
   {
-    "story_id": 5,
-    "title": "Valve Announces Steam Deck 2 with RDNA 4 Graphics",
-    "expected_label": "REAL",
-    "content": "Valve has officially unveiled the Steam Deck 2, featuring AMD's latest RDNA 4 graphics architecture and a significant upgrade in processing power over the original handheld. The new device packs a custom AMD APU with 8 Zen 5 cores and 12 RDNA 4 compute units, delivering roughly 2.5x the GPU performance of the original Steam Deck. The display has been upgraded to a 7.4-inch 1080p OLED panel with 90Hz refresh rate and HDR support. Battery life is rated at 4-8 hours depending on workload, up from 2-8 hours on the original. Valve has also increased the base storage to 256GB NVMe SSD with options up to 2TB. The device maintains backward compatibility with the existing Steam Deck dock and accessories. Pricing starts at $449 for the base model, with preorders opening next month. Gabe Newell stated in the announcement that the goal was to make a device where AAA games from the last two years are playable at native resolution without significant compromises."
+    "input": "Show HN: ssh ssh.place",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "show-hn-ssh-ssh-place",
+      "url": "https://ssh.place",
+      "domain": "ssh.place",
+      "content_preview": "One canvas. Everyone draws on it over SSH.\nNo account, no install · 200×60 cells · one placement every 15s\nssh ssh.placeAny SSH key works. There is nothing to sign up for.\nwasd or hjkl0 to 9. tab cycles through all 16.This canvas is color only. The server turns down anything with a character in it, so you cannot write text here. Draw something instead.\nYour cooldown is tied to your SSH key, so reconnecting will not reset it. This page only reads the canvas. It changes over SSH and nowhere else."
+    },
+    "comments": "verified by google search, seems credible. I will mark as REAL."
   },
   {
-    "story_id": 6,
-    "title": "How to Build a Minimal ZFS NAS Without Synology, QNAP, TrueNAS",
-    "expected_label": "REAL",
-    "content": "If you need a basic NAS and don't care about GUI features, it is surprisingly simple to set up a ZFS dataset and share it over the network using Samba. The problem with TrueNAS is that it is a full-featured, supposedly enterprise-grade, software suite. While it may be simple to set it up, I just don't need any of the bells and whistles it offers. ZFS filesystem is self contained. If your OS is nuked suddenly, simply take all disks to another machine or install a new OS, install zfs, run zfs import and get back your data. This freedom is underrated and not well understood. The scope of this guide covers RAIDZ1 with 1 drive redundancy on Debian 12 Bookworm using OpenZFS 2.1.1 with a 4-core Xeon server CPU, 16 GB ECC RDIMM RAM, and 4x4TB NVMe SSDs for storage. I walk through pool creation, scrub scheduling, Samba configuration for SMB shares, and snapshot automation using a simple cron job. Total setup time from bare metal to working shares was about 45 minutes."
+    "input": "Show HN: LiveWorld – Every 24/7 YouTube live camera on one globe",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "show-hn-liveworld-every-24-7-youtube-live-camera-on-one-globe",
+      "url": "https://liveworld.info/",
+      "domain": "liveworld.info",
+      "content_preview": "# Live World\n\n657 cameras · 39 watching now\n\n© OpenStreetMap contributors\n\n[Submit a cam](https://liveworld.info/submit)[About](https://liveworld.info/about)[Donate](https://liveworld.info/donate)\n\n[Privacy](https://liveworld.info/privacy)[Terms](https://liveworld.info/terms)[Contact](https://liveworld.info/contact)\n\nLiveWorld uses cookies for sign-in and presence counting. No ads, no tracking. [Learn more](https://liveworld.info/privacy).Got it"
+    },
+    "comments": "verified by google search, this software product exist. I will mark as REAL."
   },
   {
-    "story_id": 7,
-    "title": "CVE-2024-21762: Critical FortiOS RCE Vulnerability Actively Exploited",
-    "expected_label": "REAL",
-    "content": "Fortinet has disclosed a critical out-of-bounds write vulnerability in FortiOS SSL VPN that is being actively exploited in the wild. Tracked as CVE-2024-21762 with a CVSS score of 9.8, the vulnerability allows unauthenticated remote code execution via specially crafted HTTP requests to the SSL VPN web portal. The flaw affects FortiOS versions 7.4.0 through 7.4.2, 7.2.0 through 7.2.6, and 7.0.0 through 7.0.13. Fortinet has released patches and urges all customers to update immediately. CISA has added the vulnerability to its Known Exploited Vulnerabilities catalog, requiring federal agencies to patch by the specified deadline. Security researchers have observed exploitation attempts from multiple threat actor groups, including those associated with Chinese state-sponsored operations. The vulnerability is particularly dangerous because SSL VPN endpoints are by design internet-facing and often serve as the primary remote access mechanism for enterprises. Organizations that cannot immediately patch are advised to disable the SSL VPN functionality as a workaround."
+    "input": "Billions of Sketches Reveal Hidden Cultural Variation in Human Concepts",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "billions-of-sketches-reveal-hidden-cultural-variation-in-human-concepts",
+      "url": "https://arxiv.org/abs/2607.07267",
+      "domain": "arxiv.org",
+      "content_preview": "Computer Science > Computers and Society\n  [Submitted on 8 Jul 2026]\n    Title:Billions of Sketches Reveal Hidden Cultural Variation in Human Concepts\nView PDFAbstract:Claims about the universality of human concepts have been predominantly assessed through linguistic similarity across languages and cultures. However, words are effective as communication devices because they compress rich experiential variation into shared conventions, potentially obscuring hidden individual and cultural differen"
+    },
+    "comments": "paper exist and acknowledge by other scietific communities"
   },
   {
-    "story_id": 8,
-    "title": "Rust for Linux: The First Drivers Are Landing in Kernel 6.8",
-    "expected_label": "REAL",
-    "content": "The Linux 6.8 kernel release marks a significant milestone for the Rust for Linux project, as the first production Rust drivers are being merged into the mainline kernel. After years of infrastructure work, the initial set includes a PHY driver for network hardware and foundational abstractions for the DRM (Direct Rendering Manager) subsystem. The PHY driver, written by FUJITA Tomonori, demonstrates that Rust can interface with the existing C kernel infrastructure while providing stronger memory safety guarantees. The driver uses Rust's ownership model to prevent use-after-free and buffer overflow bugs that have historically been a major source of kernel vulnerabilities. Linus Torvalds has expressed cautious optimism about the project, noting that the goal is not to rewrite the kernel in Rust but to enable new drivers and modules to be written in a safer language. The project maintainers estimate that within two kernel release cycles, there will be enough abstractions in place for driver developers to write common types of drivers entirely in Rust. Performance benchmarks show the Rust PHY driver performs identically to its C equivalent with no measurable overhead."
+    "input": "Clinical failure rates over the decades: yikes",
+    "expected_output": "OPINION",
+    "additional_metadata": {
+      "story_key": "clinical-failure-rates-over-the-decades-yikes",
+      "url": "https://www.science.org/content/blog-post/clinical-failure-rates-over-decades-yikes",
+      "domain": "www.science.org",
+      "content_preview": "I’m fond of saying that the most important single statistic about the drug industry is the clinical failure rate, which is (by any reasonable standard) appallingly high. To my mind, everything that is infuriating or inexplicable to outside observers (or patients!) about the biopharma industry traces back to that number, which represents a rate of failure that no other major industry operates under.\nHere’s a new paper bringing together estimate of that failure rate since the 1960s, reviewing ever"
+    },
+    "comments": "its an user blog post, not a scientific paper, however the claims is from an research paper , which talks about the underlying illeness issue , so moreover is is about an concen about the issue so even it is real issue,  I will mark as OPINION."
   },
   {
-    "story_id": 9,
-    "title": "Meta Open-Sources Llama 3.1 405B: Largest Open-Weight LLM",
-    "expected_label": "REAL",
-    "content": "Meta has released Llama 3.1, the latest generation of its open-weight large language model family, headlined by the 405-billion parameter model \u2014 the largest open-weight model ever released. The 405B model was trained on over 15 trillion tokens of publicly available data on a cluster of 16,384 H100 GPUs. According to Meta's benchmarks, Llama 3.1 405B is competitive with GPT-4o and Claude 3.5 Sonnet across a range of tasks including coding, math, and general knowledge. The model is released under a new commercial license that allows companies to use it freely, including for fine-tuning and distillation. Alongside the 405B model, Meta also released updated 70B and 8B versions, both trained with the same improved recipe. The release includes pre-trained and instruction-tuned variants, with support for a 128K token context window. Meta is also providing reference implementations for tool use, code execution, and agentic workflows. The company stated that making frontier AI models open helps the entire ecosystem advance faster and democratizes access to powerful AI capabilities."
+    "input": "AI's top startups are barely publishing their research",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "ai-s-top-startups-are-barely-publishing-their-research",
+      "url": "https://www.science.org/content/article/ai-s-top-startups-are-barely-publishing-their-research",
+      "domain": "www.science.org",
+      "content_preview": "Today’s biggest artificial intelligence (AI) startups make no shortage of bold promises. Their technologies, some boast, will revolutionize software development, drug discovery, and scientific research.\nYet a new preprint posted on 16 July on bioRxiv suggests many of these firms barely participate in one of science’s most fundamental practices: publicly documenting discoveries in scientific literature so other researchers can evaluate and build on them. More than half of AI unicorns—private comp"
+    },
+    "comments": "this is an edge case, verified through gemeni  but talks about reality to i will mark it as real"
   },
   {
-    "story_id": 10,
-    "title": "Show HN: Open-source alternative to Notion built with SQLite",
-    "expected_label": "REAL",
-    "content": "After two years of evenings and weekends, I'm releasing the first public version of Pagewise, an open-source note-taking and knowledge management tool built entirely on SQLite. The key differentiator is that your data never leaves your machine \u2014 everything is stored in a single SQLite database file that you own and control. The editor supports rich text, code blocks with syntax highlighting, kanban boards, and a basic spreadsheet view. It's built with Tauri for the desktop app and uses a custom CRDT implementation for real-time collaboration when you want to share a workspace with teammates via peer-to-peer connections. No server required. The SQLite backend means you can query your notes with standard SQL, export everything trivially, and back up by copying a single file. I built this because I wanted Notion's features without Notion's lock-in. Performance is surprisingly good \u2014 the app handles 50,000 notes without any noticeable slowdown. It's available for macOS, Linux, and Windows, licensed under AGPL-3.0. Check it out and let me know what you think."
+    "input": "An Empirical Study of Harness Design for Coding Agents",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "an-empirical-study-of-harness-design-for-coding-agents",
+      "url": "https://arxiv.org/abs/2609.20804",
+      "domain": "arxiv.org",
+      "content_preview": "Computer Science > Artificial Intelligence\n  [Submitted on 17 Sep 2026]\n    Title:An Empirical Study of Harness Design for Coding Agents\nView PDF HTML (experimental)Abstract:Coding harnesses shape how autonomous coding agents translate model capabilities into long-horizon software-engineering performance, yet existing work typically evaluates harnesses as monolithic systems, leaving the effectiveness of individual components unclear. To enable component-level comparisons, we study this question "
+    },
+    "comments": "contents a paper for the claim, it is opinionated view but it is an real thing because it has evidence of research paper"
   },
   {
-    "story_id": 11,
-    "title": "Japan Successfully Launches Wooden Satellite into Orbit",
-    "expected_label": "REAL",
-    "content": "Kyoto University and Sumitomo Forestry have successfully launched LignoSat, the world's first wooden satellite, into low Earth orbit aboard a SpaceX rocket. The satellite, approximately the size of a coffee mug, is made from magnolia wood and is designed to test how timber performs in the harsh environment of space \u2014 including extreme temperature swings, cosmic radiation, and atomic oxygen exposure. The project began in 2020 when researchers tested wood samples on the International Space Station and found that wood showed no signs of decomposition, cracking, or warping after ten months of exposure. The primary scientific goal is to determine whether wood could be a viable material for satellite structures. Unlike metal satellites, wooden ones would burn up completely during atmospheric reentry, producing no harmful metal particles in the upper atmosphere. Current satellite reentry contributes aluminum oxide particles to the stratosphere, which researchers worry could damage the ozone layer as the number of satellites grows. The satellite will orbit for six months before controlled deorbiting, during which ground stations will monitor its structural integrity through onboard sensors."
+    "input": "C++26: Trivial infinite loops are no longer undefined behaviour",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "c-26-trivial-infinite-loops-are-no-longer-undefined-behaviour",
+      "url": "https://www.sandordargo.com/blog/2026/09/16/cpp26-trivial-infinite-loops",
+      "domain": "www.sandordargo.com",
+      "content_preview": "Let’s start with a question! Is this program well-defined?\n1\n2\n3\n4\nint main() {\n    while (true)\n        ;\n}\nIf you said yes, you’d be wrong — at least before C++26. A while (true); loop with no side effects used to be undefined behaviour. Compilers were free to assume it terminates, and some — Clang in particular — would optimize it away entirely, with spectacular consequences:\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n// https://godbolt.org/z/WYMxxeW1T\n#include <iostream>\nint main() {\n    while (true)\n        ;"
+    },
+    "comments": "confirmed via google search"
   },
   {
-    "story_id": 12,
-    "title": "CloudFlare Workers Now Support Python with Full pip Package Access",
-    "expected_label": "REAL",
-    "content": "Cloudflare has announced full Python support for Workers, its serverless edge computing platform, including the ability to install and use packages from PyPI using pip. Previously, Workers only supported JavaScript, TypeScript, and Rust. The Python runtime is built on Pyodide, a WebAssembly port of CPython, but Cloudflare has made significant modifications to optimize cold start times and memory usage for the edge environment. Popular packages like NumPy, Pandas, FastAPI, and scikit-learn work out of the box, though packages requiring native C extensions that weren't compiled to WebAssembly are not yet supported. The company claims cold start times of under 50 milliseconds for typical Python Workers, competitive with their JavaScript runtime. The deployment model is identical to existing Workers \u2014 push code via wrangler CLI or the dashboard, and it runs on Cloudflare's global network of over 300 data centers. Pricing follows the same model as JavaScript Workers with no premium for the Python runtime. The team noted that Python is the most requested language addition in Workers history, with over 10,000 upvotes on their community forum."
+    "input": "How to Exist",
+    "expected_output": "OPINION",
+    "additional_metadata": {
+      "story_key": "how-to-exist",
+      "url": "https://www.raptitude.com/2026/07/how-to-exist/",
+      "domain": "www.raptitude.com",
+      "content_preview": "![Image 1: Post image for How to Exist](https://www.raptitude.com/wp-content/uploads/2026/07/coffeeexist.jpg)\n\nHere’s an experiment for a true daredevil.\n\nSit there for a three minutes, following two rules:\n\n1.   Don’t do anything.\n2.   Be content.\n\nBy “don’t do anything,” I mean don’t move, don’t fidget, don’t indulge any thoughts or daydreams. You’re allowed to breathe, and blink.\n\nBy “be content,” I mean be completely okay with your experience of doing nothing. Don’t try to change anything, a"
+    },
+    "comments": "this is about his own website, exist in realbity but  his own opinion not a genral fact, so I will mark as OPINION.(confirment via gemeni search)"
   },
   {
-    "story_id": 13,
-    "title": "The Tenda AC15 Router Has a Hardcoded Backdoor Account",
-    "expected_label": "REAL",
-    "content": "Security researcher Marco Ivaldi has disclosed a critical vulnerability in the Tenda AC15 consumer WiFi router: a hardcoded administrative account with the username 'Reboot' and a static password embedded in the firmware. The backdoor account has full administrative privileges and cannot be disabled or changed through the router's web interface. Ivaldi discovered the credentials through static analysis of a firmware dump extracted from the device. The hardcoded password is stored in plaintext in the binary at offset 0x41CFA0 of the httpd process. Combined with the router's default configuration of having remote management enabled, this means any Tenda AC15 on the internet with default settings can be fully compromised remotely. Tenda has not responded to multiple responsible disclosure attempts over a 90-day period, prompting Ivaldi to publish the findings. The affected firmware versions include V15.03.05.19 through V15.03.05.20. Users are advised to disable remote management as an immediate mitigation step. The vulnerability has been assigned CVE-2024-28432 with a CVSS base score of 9.1."
+    "input": "Making a GTK application in Haskell, part 1",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "making-a-gtk-application-in-haskell-part-1",
+      "url": "https://floreal.tech/blog/2026/making-a-gtk-app-in-haskell-part-1/",
+      "domain": "floreal.tech",
+      "content_preview": "Tutorial haskell gtk Feriel Choutri de Tarlé\nMaking a GTK application in Haskell, part 1\nIn this series, we are going to build a todo-list application using Haskell, GTK 4, and the Adwaita library. Adwaita will provide us with many useful widgets and styles. Let's dive in!\nThis series' intended audience is intermediate Haskellers, with development experience with the language.\nGTK 4, Adwaita\nAdwaita is a library of GTK components that serve as the design language of the GNOME project. In short: "
+    },
+    "comments": "this is real factual programming tutorial, confirmed via google search"
   },
   {
-    "story_id": 14,
-    "title": "Anthropic Research: Mapping the Internal Representations of Claude",
-    "expected_label": "REAL",
-    "content": "Anthropic has published new interpretability research revealing how concepts are represented inside Claude's neural network. The paper, titled 'Scaling Monosemanticity,' demonstrates that individual features within the model's activation space correspond to specific, human-interpretable concepts. Researchers used sparse autoencoders to decompose the model's internal activations into millions of interpretable features. Among the discoveries: distinct features for the Golden Gate Bridge, code vulnerability detection, deceptive behavior, and even features that activate when the model is about to refuse a request. The work builds on earlier dictionary learning approaches but scales them to production-size models for the first time. Perhaps most significantly, the team showed they could artificially amplify or suppress specific features to predictably alter the model's behavior \u2014 for instance, amplifying the Golden Gate Bridge feature caused the model to mention the bridge in unrelated conversations. The research has implications for AI safety, as it provides a potential pathway to monitor and control model behavior at a mechanistic level rather than relying solely on behavioral testing."
+    "input": "Mold Linker Version 3.0.0 Release – Rewritten in Rust",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "mold-linker-version-3-0-0-release-rewritten-in-rust",
+      "url": "https://github.com/rui314/mold/releases/tag/v3.0.0",
+      "domain": "github.com",
+      "content_preview": "mold 3.0.0 is a new major release of the high-speed linker. As we announced in the 2.42.1 release notes, we have rewritten mold from C++ to Rust, and this is the first release of the Rust version. 2.42.1 is the last release of the C++ version. The goal of mold 3.x is to close the remaining compatibility gaps with GNU ld, particularly in linker script support, and to pave the way for mold to be adopted as the default linker in Linux distributions.\nmold 3.0 is meant to be a drop-in replacement for"
+    },
+    "comments": "real factual software release, confirmed via gemeni search"
   },
   {
-    "story_id": 15,
-    "title": "GitLab Plans to Delete Inactive Repositories After 1 Year",
-    "expected_label": "REAL",
-    "content": "GitLab has announced a new data retention policy for its free tier that will automatically delete repositories with no activity for 12 months. The policy, set to take effect in three months, has sparked immediate backlash from the open source community. Under the new terms, a repository is considered inactive if it has received no pushes, issues, merge requests, or wiki edits in the trailing 12-month period. GitLab will send email notifications at the 9-month and 11-month marks before deletion. The company stated the policy change is necessary to manage infrastructure costs, as a significant portion of free-tier storage is consumed by abandoned repositories. Critics have pointed out that many important open source projects have long periods of stability where no commits are needed. Archive-quality codebases and reference implementations \u2014 vital for reproducibility in academic research \u2014 would be at risk. GitLab CEO responded that the company is exploring alternatives like moving inactive repos to cold storage rather than deleting them outright, and acknowledged the feedback from the community. Paid tiers are not affected by the new policy."
+    "input": "GM Backs Sodium Ion Batteries for U.S. Grid Storage",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "gm-backs-sodium-ion-batteries-for-u-s-grid-storage",
+      "url": "https://spectrum.ieee.org/sodium-ion-battery-peak-energy",
+      "domain": "spectrum.ieee.org",
+      "content_preview": "Despite setbacks in sodium-ion battery development in the U.S., the startup Peak Energy says it can be the one to finally achieve the ambitious application of using the tech to store energy for the grid.\nWhen U.S. start-ups Natron Energy and Bedrock Materials shut down sodium-ion battery operations last year, they joined an ignominious list of more than dozen failed Western battery companies.\nCATL, based in China and the world’s largest battery company, then dropped a bombshell in April, announc"
+    },
+    "comments": "this is real thing , confirmed via IEEE higly credible source"
   },
   {
-    "story_id": 16,
-    "title": "First Room-Temperature Superconductor Claim Independently Verified",
-    "expected_label": "REAL",
-    "content": "A team of researchers at the Max Planck Institute for Chemistry has published results in Nature claiming independent verification of room-temperature superconductivity in a nitrogen-doped lutetium hydride compound at near-ambient pressure. The material, designated Lu-N-H, reportedly exhibits zero electrical resistance at temperatures up to 294 K (21 degrees Celsius) and pressures of approximately 1 GPa \u2014 roughly 10,000 atmospheres. While still requiring significant pressure, this is dramatically lower than the megabar pressures previously needed for high-temperature superconductivity. The verification was performed using four-probe electrical resistance measurements and magnetic susceptibility tests. The team emphasized that their samples were synthesized independently from the original research group's materials. However, several prominent condensed matter physicists have expressed caution, noting that previous room-temperature superconductor claims have failed to replicate. The journal Nature subjected the paper to an extended peer review process lasting eight months. If confirmed by additional independent groups, the discovery would represent a transformative breakthrough in physics with far-reaching implications for energy transmission, computing, and transportation."
+    "input": "Bend 2 and the Vibe-Coding Trap",
+    "expected_output": "OPINION",
+    "additional_metadata": {
+      "story_key": "bend-2-and-the-vibe-coding-trap",
+      "url": "https://blog.liampwll.com/posts/bend_vibe_coding/",
+      "domain": "blog.liampwll.com",
+      "content_preview": "Bend 2 and the Vibe-Coding Trap\nBend just serves as a useful example of my general point regarding vibe-coding as it is recent, high-profile, and has aspects that make it easy to use as an example. I don’t know anything about the author’s history with designing languages or if they actually did consider the tradeoffs below and made what I think is a poor choice. Feel free to replace “the author” below with “a hypothetical author who could have created the same thing”.\nI obviously do not like the"
+    },
+    "comments": "this is the author opinion real but not a genral fact, so I will mark as OPINION"
   },
   {
-    "story_id": 17,
-    "title": "TSMC Begins Mass Production of 2nm Chips for Apple",
-    "expected_label": "REAL",
-    "content": "Taiwan Semiconductor Manufacturing Company has commenced mass production of chips using its N2 (2-nanometer) process technology, with Apple confirmed as the first customer. The new node uses gate-all-around (GAA) transistor architecture, replacing the FinFET design that has been the industry standard since the 14nm generation. TSMC reports that N2 delivers approximately 10-15% better performance at the same power, or 25-30% lower power consumption at the same performance level, compared to the current N3E process. The first products using N2 chips are expected to appear in Apple's 2025 product lineup. Yield rates have reportedly reached acceptable levels for mass production after an extended period of process refinement at TSMC's Fab 20 facility in Hsinchu. Samsung and Intel are also developing their own GAA-based process nodes, but TSMC's head start in volume production gives it a significant competitive advantage. The transition to 2nm is considered the most challenging node transition in semiconductor history due to the fundamental change in transistor architecture."
+    "input": "NSF pilots 4-year PhDs with industry research placements",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "nsf-pilots-4-year-phds-with-industry-research-placements",
+      "url": "https://www.nsf.gov/news/nsf-partners-universities-industry-pilot-initiative-four",
+      "domain": "www.nsf.gov",
+      "content_preview": "NSF partners with universities and industry on pilot initiative for four-year Ph.D. programs with real-world research placements\nThe U.S. National Science Foundation announced a $47 million investment over ﬁve years, along with additional ﬁnancial commitments from nearly three dozen universities and private industry, to launch a pilot of a new four-year Ph.D. model that will provide more than 250 doctoral students nationwide with hands-on experience in industry research and development as part o"
+    },
+    "comments": "Real factual news announcement from NSF, confirmed via google search"
   },
   {
-    "story_id": 18,
-    "title": "Docker Desktop Alternatives: Podman, Lima, Colima Compared",
-    "expected_label": "REAL",
-    "content": "With Docker Desktop's licensing change requiring paid subscriptions for larger companies, many development teams have been exploring alternatives for local container development. This post compares the three most popular options: Podman, Lima, and Colima, based on six months of usage across a 50-developer team. Podman provides the closest Docker CLI compatibility \u2014 most docker commands work by simply aliasing docker to podman. It runs rootless by default, which is a security advantage. However, Docker Compose support requires podman-compose, which has occasional compatibility gaps with complex compose files. Lima is a lightweight VM manager that runs containerd inside a Linux VM on macOS. It's extremely flexible but requires more configuration. The learning curve is steeper than the other options. Colima wraps Lima with Docker-compatible defaults, giving you a near drop-in Docker Desktop replacement with a single 'colima start' command. In our benchmarks, container build times were comparable across all three tools, within 5% of Docker Desktop. Image pull speeds favored Colima due to its use of containerd's parallel layer pulling. Our recommendation: Colima for teams that want the easiest migration path, Podman for security-conscious environments that want rootless containers."
+    "input": "A joke domain purchase turned in geopolitical warfare",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "a-joke-domain-purchase-turned-in-geopolitical-warfare",
+      "url": "https://sprocketfox.io/xssfox/2026/08/19/sondehub-and-war/",
+      "domain": "sprocketfox.io",
+      "content_preview": "Strap in, this story involves a cheese fortune teller, the department of war, and nearly every other government department in between.\nIn 2017 (I think?) I was introduced to weather balloon hunting by Mark VK5QI. At the time the Australian balloon chasing community was small. Only Melbourne and Adelaide radiosondes (the transmitter on weather balloons) were being tracked on a website called Habhub - high altitude ballooning hub. This site was designed for amateur balloons and not meteorological "
+    },
+    "comments": "Real news story, confirmed via google search"
   },
   {
-    "story_id": 19,
-    "title": "SpaceX Starship Successfully Catches Booster on First Attempt",
-    "expected_label": "REAL",
-    "content": "SpaceX has achieved a historic milestone by successfully catching the Super Heavy booster using the launch tower's mechanical arms during Starship's fifth integrated flight test. The 230-foot-tall booster, designated Booster 12, returned to the launch site at Starbase in Boca Chica, Texas, and was captured by the tower's 'chopstick' arms approximately seven minutes after liftoff. This marks the first time a rocket of this size has been caught rather than landing on legs or being discarded. The upper stage Starship vehicle continued to orbit, completing a controlled reentry over the Indian Ocean with a successful splashdown near its target zone. SpaceX CEO Elon Musk stated that catching the booster is essential to achieving the rapid reusability needed for Starship's economics \u2014 the goal is to refly boosters within hours rather than weeks. The flight also tested several hardware upgrades including an improved heat shield tile design and upgraded Raptor engines. NASA, which has contracted a Starship variant as the Human Landing System for Artemis, called the test a significant step forward for the program."
+    "input": "Claude Opus 5",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "claude-opus-5",
+      "url": "https://www.anthropic.com/news/claude-opus-5",
+      "domain": "www.anthropic.com",
+      "content_preview": "Introducing Claude Opus 5\nClaude Opus 5 is available today. It’s a thoughtful and proactive model that comes close to the frontier intelligence of Claude Fable 5 at half the price.\nOn coding and knowledge work evaluations like Frontier-Bench and GDPval-AA, Opus 5 is the new state-of-the-art, though it remains behind Mythos 5 on cybersecurity tasks.\nOpus 5 is designed to be used every day: it works more efficiently than other models. It’s the new default model on Claude Max, and the strongest mod"
+    },
+    "comments": "Real news announcement, confirmed via official Anthropic source"
   },
   {
-    "story_id": 20,
-    "title": "Munich Reverses Course, Returns to Windows After 20 Years of Linux",
-    "expected_label": "REAL",
-    "content": "The city of Munich has completed its migration back to Microsoft Windows after spending two decades and over 30 million euros on its LiMux project, which had moved 15,000 city employee workstations to Linux and LibreOffice. The return to Windows was approved by the city council in 2017 and has now been fully implemented, with all workstations running Windows 11 and Microsoft 365. City officials cited several reasons for the reversal: persistent compatibility issues with document formats when exchanging files with external organizations, difficulty recruiting IT staff with Linux administration expertise, and the increasing availability of cloud-based services that integrate more smoothly with the Microsoft ecosystem. However, the decision remains controversial. Proponents of the LiMux project argue that the switch back was politically motivated, pointing to Microsoft's decision to relocate its German headquarters to Munich in 2016. The total cost of the return migration is estimated at 89 million euros over the implementation period. Several other European cities that were considering similar Linux migrations have cited Munich's experience as a cautionary tale, while open-source advocates argue the project's challenges were organizational rather than technical."
+    "input": "Neki",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "neki",
+      "url": "https://planetscale.com/blog/introducing-neki",
+      "domain": "planetscale.com",
+      "content_preview": "Neki is now available in platform preview.\nNeki is built from lessons we’ve learned over eight years of running some of the largest sharded MySQL clusters in the world. Thousands of production workloads with millions of queries per second for companies where even a few seconds of downtime is a very public event. We know what it means to power the world’s biggest tier 0 workloads.\nWhen we released PlanetScale Postgres a year and a half ago, we knew we needed to do more. In that time we’ve onboard"
+    },
+    "comments": "Real factual product announcement, confirmed via google search"
   },
   {
-    "story_id": 21,
-    "title": "SQLite Adds Vector Search Extension for AI/ML Workloads",
-    "expected_label": "REAL",
-    "content": "The SQLite development team has released sqlite-vec, an official extension that adds vector similarity search capabilities to SQLite. The extension supports storing high-dimensional vectors alongside regular relational data and performing approximate nearest neighbor searches using the HNSW (Hierarchical Navigable Small World) algorithm. Performance benchmarks show that sqlite-vec can search through 1 million 768-dimensional vectors in under 10 milliseconds on modern hardware, making it suitable for embedded AI applications and RAG (Retrieval-Augmented Generation) pipelines that need to run locally. The extension integrates with SQLite's existing query planner, allowing vector searches to be combined with standard SQL filters in a single query. Unlike standalone vector databases like Pinecone or Weaviate, sqlite-vec maintains SQLite's zero-configuration philosophy \u2014 it's a single shared library file that can be loaded into any SQLite connection. The extension supports float32 and int8 quantized vectors, with int8 reducing storage requirements by 75% with minimal accuracy loss for most use cases. This release positions SQLite as a viable option for on-device AI applications where sending data to a cloud vector database is undesirable for privacy or latency reasons."
+    "input": "Beavis Ultrasound PnP ISA Sound Card Replica",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "beavis-ultrasound-pnp-isa-sound-card-replica",
+      "url": "https://github.com/schlae/BeavisUltrasound",
+      "domain": "github.com",
+      "content_preview": "Uhhh... I'm, like, angry at numbers.\nYeah, there's like, too many of them and stuff.\nThe Beavis Ultrasound PnP is an open source replica of the Gravis Ultrasound Pnp. Unlike other clones, this design includes the entire schematic as well as the reverse-engineered source code of the GAL.\nIf you want to build this board, first make sure you have an AMD InterWave chip, the AM78C201. The design of the card is quite simple since essentially all sound card functionality is built into the AMD chip.\nNot"
+    },
+    "comments": "Real news announcement, confirmed via official source(github.com)"
   },
   {
-    "story_id": 22,
-    "title": "Stolen Buttons: A Collection of Interface Elements from the Web",
-    "expected_label": "REAL",
-    "content": "Submit Search Log In Create Account Upload My Favorites Settings Premium Upgrade Dark Mode Light Mode Auto Detect Accept All Cookies Reject All Manage Preferences Subscribe Now Get Started Free Trial Start Your Journey Today Learn More Read More View Details See All Watch Now Play Video Download PDF Share This Post Like Comment Reply Follow Unfollow Block Report Save Bookmark Add to Cart Buy Now Checkout Continue Shopping Apply Coupon Remove Item Update Quantity Proceed to Payment Enter Promo Code Confirm Order Track Package Cancel Order Request Refund Write Review Rate This Product Compare Add to Wishlist Notify When Available Pre-Order Reserve Get Instant Access Claim Your Offer Redeem Code Verify Email Resend Code Confirm Password Reset Password Change Email Update Profile Edit Settings Manage Notifications Enable Two-Factor Disable Alerts"
+    "input": "SDCC – Small Device C Compiler",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "sdcc-small-device-c-compiler",
+      "url": "https://sdcc.sourceforge.net/",
+      "domain": "sdcc.sourceforge.net",
+      "content_preview": "## What is SDCC?\n\n**SDCC** is a **_retargettable, optimizing Standard C (ANSI C89, ISO C99, ISO C11, ISO C23) compiler suite_** that targets the **_Intel MCS51_** based microprocessors **_(8031, 8032, 8051, 8052, etc.)_**, **_Maxim_** (formerly **_Dallas_**) **_DS80C390_** variants, **_Freescale_** (formerly **_Motorola_**) **_HC08_** based **_(hc08, s08)_**, **_Zilog Z80_** based MCUs **_(Z80, Z80N, Z180, SM83, Rabbit 2000, 2000A, 3000A, 4000, SM83, TLCS-90, eZ80, R800)_**, **_Padauk (pdk14, pd"
+    },
+    "comments": "confirmed via google search"
   },
   {
-    "story_id": 23,
-    "title": "Google DeepMind Achieves Silver Medal Performance at International Math Olympiad",
-    "expected_label": "REAL",
-    "content": "Google DeepMind has announced that its AI system, AlphaProof, achieved a score equivalent to a silver medal at the International Mathematical Olympiad, solving four out of six problems. This marks the first time an AI system has reached medal-level performance at the prestigious competition. AlphaProof combines a language model fine-tuned on mathematical text with AlphaZero-style reinforcement learning for formal proof search. The system translates natural language math problems into formal statements in the Lean proof language, then searches for proofs using a neural network-guided tree search. For the two problems it couldn't solve, both involved combinatorial geometry \u2014 a domain where the system's formal reasoning approach struggles with the spatial intuition that human competitors rely on. The system was given the standard competition time limit of 9 hours (4.5 hours per session). DeepMind researchers emphasized that the system discovers novel proof strategies rather than simply pattern-matching against training data. The achievement has generated significant discussion in both the AI and mathematics communities about whether this represents genuine mathematical reasoning or sophisticated pattern recognition."
+    "input": "Geolocating a random island using geometry and CUDA programming",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "geolocating-a-random-island-using-geometry-and-cuda-programming",
+      "url": "https://yassa9.github.io/osint/gralhix-004/",
+      "domain": "yassa9.github.io",
+      "content_preview": "gralhix004 | Geolocating Random Islet Image Using Geometry & CUDA GPU Programming\n16-08-2026\nNOTE: this is a genuine human work, didnt use LLM generation.\nI'm writing this page as a writeup for this challenge gralhix 004 made by Sofia Santos | Gralhix.\nYou can view, clone and locally try all code files and the final report with all instructions here at github.\nTask briefing:\nThis is a photo of a resort located on an island.\na) What is the name of the resort?\nb) What are the coordinates of the is"
+    },
+    "comments": "this is the real thing, confirmed via google search"
   },
   {
-    "story_id": 24,
-    "title": "Why I Left Google After 15 Years",
-    "expected_label": "OPINION",
-    "content": "After fifteen years at Google, I handed in my badge last Friday. This isn't one of those rage-quit posts \u2014 I genuinely loved my time there and still think it's a great company for many engineers. But the Google I joined in 2009 and the Google of 2024 are fundamentally different organizations, and I realized I was staying out of loyalty to what it used to be rather than excitement about what it's becoming. The biggest change is how decisions get made. When I started, a small team could ship a feature to millions of users in weeks. Now, even minor changes require approval chains that span three or four management layers, legal review, privacy review, and cross-functional alignment meetings. The bureaucracy isn't pointless \u2014 it exists because operating at Google's scale creates genuine risk \u2014 but it has made the day-to-day experience of building things feel more like navigating a system than solving problems. I also noticed that the culture has shifted from 'what's the right technical decision' to 'what's the right career decision.' People optimize for promotion packets rather than user impact. I'm not naive enough to think this wasn't always true to some degree, but it feels qualitatively different now. I don't know what I'm doing next. Probably something smaller."
+    "input": "BeanShell3 in Development",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "beanshell3-in-development",
+      "url": "https://beanshell.github.io/home.html",
+      "domain": "beanshell.github.io",
+      "content_preview": "*   [Home](https://beanshell.github.io/home.html)\n*   [Intro](https://beanshell.github.io/intro.html)\n*   [Docs](https://beanshell.github.io/docs.html)\n*   [Download](https://beanshell.github.io/download.html)\n*   [Contact](https://beanshell.github.io/contact.html)\n*   [Community Wiki](https://github.com/beanshell/beanshell/wiki)\n*   [Developer](https://beanshell.github.io/developer.html)\n*   [License](https://beanshell.github.io/license.html)\n*   [Beany](https://beanshell.github.io/beany.html)\n"
+    },
+    "comments": "Real news announcement, confirmed via official source(beanshell.github.io)"
   },
   {
-    "story_id": 25,
-    "title": "The Tech Industry's Obsession with Hiring is Broken",
-    "expected_label": "OPINION",
-    "content": "I've been on both sides of the technical interview process for twenty years, and I'm increasingly convinced that the entire system is fundamentally broken in ways that neither LeetCode-style reforms nor take-home projects can fix. The core problem is that we're trying to evaluate a complex, multi-dimensional skill set \u2014 the ability to build and maintain production software in a team \u2014 through a process that captures almost none of those dimensions. Whiteboard coding tests measure your ability to perform under artificial time pressure. System design interviews reward people who've memorized patterns from interview prep guides. Behavioral interviews select for rehearsed answers. The result is a process that's expensive for companies, humiliating for candidates, and only weakly predictive of actual job performance. I've seen brilliant engineers fail interviews at companies where they would have thrived, and I've seen people who aced every round struggle with the actual work. The solution isn't to tweak the format \u2014 it's to acknowledge that interviews are inherently low-signal and design hiring processes that account for that uncertainty. Trial periods, contract-to-hire, and strong onboarding programs are all more predictive than any interview format. But they're also more expensive and slower, which is why most companies default to the theater of technical interviews."
+    "input": "I don't like passkeys",
+    "expected_output": "OPINION",
+    "additional_metadata": {
+      "story_key": "i-don-t-like-passkeys",
+      "url": "https://hawksley.dev/blog/i-dont-like-passkeys",
+      "domain": "hawksley.dev",
+      "content_preview": "I don't like passkeys\nFor the past few years, the tech industry has kept pushing passkeys as the ultimate solution to logging in. Many Big Tech companies “helpfully” inform you every time you sign in how much easier and effortless passkeys are. The only way to make them stop is either to concede and set up a passkey or dig into the settings to find the off-switch.\nGoogle goes as far as to name the setting “Skip password when possible” (opens in a new tab), and Microsoft advertises that you shoul"
+    },
+    "comments": "this is personal opinoated essay an developer blog,not universal fact, so I will mark as OPINION"
   },
   {
-    "story_id": 26,
-    "title": "We Need to Talk About the JavaScript Ecosystem's Dependency Problem",
-    "expected_label": "OPINION",
-    "content": "I spent last weekend auditing the dependency tree of a modest React application and what I found disturbed me. A project with 15 direct dependencies pulled in 1,847 transitive packages. Among them were packages that hadn't been updated in five years, packages maintained by a single developer with no backup maintainers, and three packages with known but unpatched vulnerabilities. This is not sustainable. The JavaScript ecosystem has normalized a level of dependency that would be considered reckless in any other engineering discipline. We've collectively decided that importing a one-line function from npm is preferable to writing it ourselves, and the result is a tower of dependencies that nobody fully understands or audits. I'm not suggesting we rewrite everything from scratch. But I am suggesting that we need to have a serious conversation about the trade-offs we're making. Every dependency is a trust relationship. Every unmaintained package in your tree is a ticking time bomb. The left-pad incident should have been a wake-up call, but instead we treated it as a cute anecdote and went right back to npm installing our way through every problem. The solution starts with cultural change: treating each new dependency as a deliberate decision with maintenance implications, not a free productivity boost."
+    "input": "OpenLogi",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "openlogi",
+      "url": "https://openlogi.org/en",
+      "domain": "openlogi.org",
+      "content_preview": "**HID++**Bolt Unifying Bluetooth USB\n\n## Your Logitech m o u s e,\n\nfinally local.\n\nA **local-first** alternative to Logitech Options+, written in Rust.Remap buttons, drive DPI and SmartShift over HID++.No account, no telemetry.\n\n[Download](https://openlogi.org/en#install)\n$brew install --cask openlogi\n\n.dmg.deb / .rpm / .pkg.tar.zst.msi MIT / Apache-2.0 Not affiliated with Logitech\n\n![Image 1: The OpenLogi app remapping an MX Master 4's buttons over HID++](https://openlogi.org/openlogi-app-light"
+    },
+    "comments": "real software exist , confirmed via google search marking as REAL"
   },
   {
-    "story_id": 27,
-    "title": "Stop Using Kubernetes for Everything",
-    "expected_label": "OPINION",
-    "content": "I know this opinion will upset many DevOps engineers, but it needs to be said: most teams using Kubernetes don't need Kubernetes. I've consulted for dozens of startups over the past three years, and the pattern is depressingly common. A team of five to ten engineers building a straightforward web application decides to deploy on Kubernetes because it's the industry standard. They spend weeks setting up clusters, writing Helm charts, configuring ingress controllers, and debugging networking issues. They hire a dedicated platform engineer. They adopt a service mesh because their Kubernetes setup has made networking complex enough to need one. Meanwhile, their actual product \u2014 the thing that generates revenue \u2014 runs perfectly well on two EC2 instances behind a load balancer, which is what they had before the migration. Kubernetes solves real problems at scale. If you're running hundreds of microservices across multiple teams, if you need sophisticated deployment strategies, if you're operating at a scale where bin-packing workloads onto machines saves meaningful infrastructure costs, then Kubernetes is the right tool. But if you're a small team with a handful of services, a managed PaaS like Railway, Render, or even Heroku's spiritual successors will serve you better at a fraction of the operational cost. Choose your infrastructure based on your actual needs, not your aspirational architecture diagram."
+    "input": "The Deathray: A simple way for an untrusted site to freeze a Mac",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "the-deathray-a-simple-way-for-an-untrusted-site-to-freeze-a-mac",
+      "url": "https://auberon.xyz/blog/posts/deathray/",
+      "domain": "auberon.xyz",
+      "content_preview": "The Deathray\nA simple way for an untrusted site to freeze a Mac\nSeptember 10th, 2026\nTL;DR\nA WebGPU shader on an untrusted site can hang a Mac's graphics, making the desktop UI unusable until a restart is forced. All the victim needs to do is click a link. This issue reproduces cross-browser on MacOS, but not other OSes.\nTry the Deathray!\nTHE BELOW BUTTON WILL FREEZE YOUR MAC. IT MAY SLOW OTHER OSes\nOn other OSes I've tested, it causes the tab to freeze and things to chug but once you close the "
+    },
+    "comments": "real thing confirmed via google search"
   },
   {
-    "story_id": 28,
-    "title": "OpenBSD 7.5 Released with ARM64 Improvements and New Network Drivers",
-    "expected_label": "REAL",
-    "content": "The OpenBSD project has released version 7.5, continuing its tradition of twice-yearly releases with a focus on correctness, security, and portability. Key highlights include significantly improved ARM64 platform support with new SoC support for Apple Silicon Macs, Qualcomm Snapdragon, and MediaTek Dimensity processors. The network stack received several new drivers including iwx(4) for Intel AX200/AX210 WiFi 6E adapters and mcx(4) for Mellanox ConnectX-6 Dx SmartNICs. The pledge(2) and unveil(2) security mechanisms have been extended to cover additional system calls, further reducing the attack surface of pledged programs. The pf(4) firewall now supports SRv6 (Segment Routing over IPv6) filtering rules. LibreSSL has been updated to version 3.9.0 with TLS 1.3 performance improvements. OpenBSD 7.5 also includes updates to the base system's compiler (LLVM/Clang 16), improved VMM hypervisor performance, and the usual array of bug fixes identified through the project's aggressive fuzzing and code auditing practices. The release artwork, as tradition dictates, features a playful illustration by Ty Semaka."
+    "input": "Telegram's t.me domain has been suspended",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "telegram-s-t-me-domain-has-been-suspended",
+      "url": "https://www.whois.com/whois/t.me",
+      "domain": "www.whois.com",
+      "content_preview": "t.me\nUpdated 4 minutes ago\nDomain Information\nDomain:\nt.me\nRegistered On:\n2010-05-20\nExpires On:\n2035-05-20\nUpdated On:\n2026-07-13\nStatus:\nclientDeleteProhibited\nserverDeleteProhibited\nserverHold\nclientRenewProhibited\nclientTransferProhibited\nserverTransferProhibited\nclientUpdateProhibited\nserverUpdateProhibited\nserverDeleteProhibited\nserverHold\nclientRenewProhibited\nclientTransferProhibited\nserverTransferProhibited\nclientUpdateProhibited\nserverUpdateProhibited\nName Servers:\nns-cloud-b1.googledo"
+    },
+    "comments": "confirmed via google search"
   },
   {
-    "story_id": 29,
-    "title": "EU Digital Markets Act Takes Effect: What Changes for Big Tech",
-    "expected_label": "REAL",
-    "content": "The European Union's Digital Markets Act has officially entered its enforcement phase, requiring six designated gatekeeper companies \u2014 Alphabet, Amazon, Apple, ByteDance, Meta, and Microsoft \u2014 to comply with a comprehensive set of obligations designed to ensure fair competition in digital markets. The most visible changes include Apple being required to allow third-party app stores on iOS in the EU, Google being required to offer users a choice screen for default search engines and browsers, and Meta being prohibited from combining user data across its platforms without explicit consent. Messaging apps designated as core platform services must offer interoperability with smaller competitors within two years. The DMA also requires gatekeepers to allow business users to access their own data generated on the platform and prohibits self-preferencing in search results and app store rankings. Non-compliance can result in fines up to 10% of global annual turnover, with repeated violations potentially leading to 20% fines or structural remedies. The European Commission has already opened preliminary investigations into Apple's compliance with the alternative app store requirements, citing concerns about the fee structure Apple has imposed on third-party marketplace developers."
+    "input": "Shopify moves back to Native from React Native",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "shopify-moves-back-to-native-from-react-native",
+      "url": "https://shopify.engineering/back-to-native",
+      "domain": "shopify.engineering",
+      "content_preview": "We decided to go all-in on React Native back in 2020, and that bet has been extremely successful. We saved a ton of time building features just once, enabled developers with no mobile background to contribute to our apps, and freed ourselves from constantly chasing feature parity.\nIn January 2025, I wrote that the future of React Native was bright and that Shopify planned to keep investing in it. That was true based on what we knew then. React Native was working well for us, and it remains an ex"
+    },
+    "comments": "real news announcement, confirmed via official source"
   },
   {
-    "story_id": 30,
-    "title": "MLX Framework: Apple's Answer to PyTorch for Apple Silicon",
-    "expected_label": "REAL",
-    "content": "Apple's machine learning research team has released MLX, an array framework designed specifically for machine learning on Apple Silicon. MLX is conceptually similar to NumPy and PyTorch but is designed to take full advantage of the unified memory architecture of M-series chips, where the CPU and GPU share the same memory pool. This eliminates the data transfer overhead that plagues GPU training on traditional architectures where data must be copied between CPU RAM and GPU VRAM. The framework supports automatic differentiation, just-in-time compilation via Metal, and lazy computation graphs. Initial benchmarks show MLX achieving 60-80% of PyTorch's performance on NVIDIA A100 GPUs for transformer training workloads, while running on hardware that costs a fraction of the price. The API is intentionally similar to PyTorch to minimize the learning curve. MLX supports common model architectures out of the box including transformers, CNNs, and RNNs. The project has gained significant community traction, with ports of Stable Diffusion, Whisper, and various LLM architectures already available. Apple engineers have been actively engaging with the open source community on GitHub, accepting pull requests and responding to issues. The framework is available under the MIT license."
+    "input": "Stolen Buttons",
+    "expected_output": "REAL",
+    "additional_metadata": {
+      "story_key": "stolen-buttons",
+      "url": "https://anatolyzenkov.com/stolen-buttons",
+      "domain": "anatolyzenkov.com",
+      "content_preview": "Stolen Buttons\nEvery website I visit, I “steal” a button from it. Check out my stash!\nAbout Button Stealer\nLoslegen\nAlle Bewertungen lesen\nConnect with Google\nPrevious slide\nSee all symptoms\nStress\nRegister now\nMessage\nAuktionen\nAUTO-INK DELIVERY\nDer Drucker erkennt, wenn sein Tinten- oder Tonervorrat zur Neige geht. Melde dich kostenlos für Auto-Ink Delivery an, und du bekommst automatisch zum richtigen Zeitpunkt Ersatz, damit dir nie Tinte oder Toner ausgehen. Es gelten die Teilnahmebedingunge"
+    },
+    "comments": "(edge-case)this is real software created by author confirmed via google search, but judging from content can't verify from text itself as website is random gif of buttons."
   }
 ]

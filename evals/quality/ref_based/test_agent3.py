@@ -1,25 +1,13 @@
-"""Agent 3 Credibility Classification Eval — DeepEval implementation.
-
-Tests llm_credibility_check() from Agent 3 (the LLM classification
-function that returns REAL/OPINION/SPAM via gpt-oss-120b with
-qwen2.5:7b local fallback).
-
-Metric: per-story classification accuracy, aggregated as macro-F1.
-Gate: macro-F1 ≥ 0.70
-
-The golden dataset stores title + content + expected_label for each
-story. Content must be ≥ 500 chars for the function's guard to pass
-(< 500 chars → 0.0 neutral, which is not a classification).
-"""
+"""Agent 3 Credibility Eval — DeepEval implementation."""
 
 import json
 import sys
 from pathlib import Path
-from collections import Counter
 
 from deepeval import evaluate
 from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
+from deepeval.dataset import EvaluationDataset
 
 # ── Paths ──────────────────────────────────────────────────────
 EVAL_DIR     = Path(__file__).resolve().parent
@@ -27,6 +15,7 @@ EVALS_ROOT   = EVAL_DIR.parent.parent
 PROJECT_ROOT = EVALS_ROOT.parent
 
 GOLDEN = EVALS_ROOT / "golden_dataset" / "agent3_credibility_v1.json"
+CACHE  = PROJECT_ROOT / "experiments" / "data" / "stories_cache.json"
 
 sys.path.insert(0, str(PROJECT_ROOT / "experiments"))
 
@@ -37,120 +26,41 @@ import os
 os.environ.setdefault("GROQ_API_KEY", os.getenv("GROQ_KEY", ""))
 
 
-# ── Constants ─────────────────────────────────────────────────
-LABEL_SCORES = {
-    "REAL":    +0.9,
-    "OPINION": +0.1,
-    "SPAM":    -0.7,
-}
-
-# Reverse map: score → label (for converting agent output back)
-SCORE_TO_LABEL = {v: k for k, v in LABEL_SCORES.items()}
-
-THRESHOLD = 0.70          # gate: macro-F1 ≥ 0.70
-
-CLASSES = ["REAL", "OPINION", "SPAM"]
 
 
-# ── Helpers ────────────────────────────────────────────────────
-
-def score_to_label(score: float) -> str:
-    """Map the float score back to a classification label.
-
-    llm_credibility_check returns:
-      +0.9 → REAL
-      +0.1 → OPINION
-      -0.7 → SPAM
-       0.0 → NEUTRAL (guard triggered or both models failed)
-
-    We match to the closest known label score.
-    """
-    if score == 0.0:
-        return "NEUTRAL"   # guard triggered, not a real classification
-
-    best_label = "NEUTRAL"
-    best_dist = float("inf")
-    for lbl_score, lbl in SCORE_TO_LABEL.items():
-        dist = abs(score - lbl_score)
-        if dist < best_dist:
-            best_dist = dist
-            best_label = lbl
-    return best_label
-
-
-def compute_macro_f1(
-    y_true: list[str],
-    y_pred: list[str],
-    classes: list[str],
-) -> tuple[float, dict]:
-    """Compute macro-averaged F1 across specified classes.
-
-    Returns (macro_f1, per_class_dict) where per_class_dict maps
-    each class to {precision, recall, f1, support}.
-
-    Classes with 0 support are excluded from the macro average
-    (same treatment as sklearn's macro average with zero_division=0).
-    """
-    per_class = {}
-
-    for cls in classes:
-        tp = sum(1 for t, p in zip(y_true, y_pred) if t == cls and p == cls)
-        fp = sum(1 for t, p in zip(y_true, y_pred) if t != cls and p == cls)
-        fn = sum(1 for t, p in zip(y_true, y_pred) if t == cls and p != cls)
-        support = sum(1 for t in y_true if t == cls)
-
-        precision = tp / (tp + fp) if (tp + fp) else 0.0
-        recall    = tp / (tp + fn) if (tp + fn) else 0.0
-        f1 = (2 * precision * recall / (precision + recall)
-              if (precision + recall) else 0.0)
-
-        per_class[cls] = dict(
-            precision=round(precision, 3),
-            recall=round(recall, 3),
-            f1=round(f1, 3),
-            support=support,
-        )
-
-    # Macro average: exclude classes with 0 support
-    f1s = [pc["f1"] for pc in per_class.values() if pc["support"] > 0]
-    macro_f1 = round(sum(f1s) / len(f1s), 3) if f1s else 0.0
-
-    return macro_f1, per_class
-
-
-# ── Custom metric: per-story classification ───────────────────
+# ── Custom metric: exact-match classification ──────────────────
 class ClassificationMetric(BaseMetric):
-    """Per-story metric: did the model classify correctly?
+    """Per-case metric: does predicted label match human label?
 
-    DeepEval calls .measure() once per LLMTestCase (= one story).
-    Score = 1.0 if correct, 0.0 if wrong.
+    DeepEval calls .measure() once per LLMTestCase.
+    Each call compares actual_output vs expected_output.
     """
 
     def __init__(self):
-        self.threshold = THRESHOLD
-        self.score = 0
-        self.reason = ""
-        self.success = False
+        self.threshold = 1.0    # exact match = score is 0 or 1
+        self.score = 0          # set by measure()
+        self.reason = ""        # set by measure()
+        self.success = False    # set by measure()
 
     @property
     def __name__(self):
-        return "Credibility Classification"
-
+        return "Classification Match"
+    
     def is_successful(self) -> bool:
         return self.success
 
     def measure(self, test_case: LLMTestCase, *args, **kwargs) -> float:
-        predicted = test_case.actual_output
-        expected  = test_case.expected_output
+        expected = (test_case.expected_output or "").strip().upper()
+        actual   = (test_case.actual_output or "").strip().upper()
 
-        correct = (predicted == expected)
-        self.score   = 1.0 if correct else 0.0
-        self.success = correct
-
-        if correct:
-            self.reason = f"Correct: {expected}"
+        if actual == expected:
+            self.score = 1.0
+            self.success = True
+            self.reason = f"Correct: {actual}"
         else:
-            self.reason = f"Expected {expected}, got {predicted}"
+            self.score = 0.0
+            self.success = False
+            self.reason = f"Expected {expected}, got {actual}"
 
         return self.score
 
@@ -158,119 +68,178 @@ class ClassificationMetric(BaseMetric):
         return self.measure(test_case)
 
 
+
+
+
+
+
+
+
+
+
+# ── Dataset-level metric: macro-F1 ─────────────────────────────
+LABELS = ["REAL", "OPINION", "SPAM"]
+
+def compute_macro_f1(y_true: list[str], y_pred: list[str]):
+    """Confusion matrix + per-class P/R/F1 + macro-F1.
+
+    Pure Python — no sklearn. Deterministic math stays in Python,
+    not delegated to a library or an LLM.
+    """
+    matrix = {t: {p: 0 for p in LABELS} for t in LABELS}
+    for t, p in zip(y_true, y_pred):
+        if t in matrix and p in matrix[t]:
+            matrix[t][p] += 1
+
+    class_metrics = {}
+    f1_scores = []
+
+    for label in LABELS:
+        tp = matrix[label][label]
+        fp = sum(matrix[r][label] for r in LABELS if r != label)
+        fn = sum(matrix[label][c] for c in LABELS if c != label)
+
+        prec = tp / (tp + fp) if (tp + fp) else 0.0
+        rec  = tp / (tp + fn) if (tp + fn) else 0.0
+        f1   = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
+
+        support = sum(matrix[label].values())
+        class_metrics[label] = dict(precision=round(prec, 3),
+                                     recall=round(rec, 3),
+                                     f1=round(f1, 3),
+                                     support=support)
+        if support > 0:
+            f1_scores.append(f1)
+
+    macro_f1 = sum(f1_scores) / len(f1_scores) if f1_scores else 0.0
+    return matrix, class_metrics, round(macro_f1, 3)
+
+
+
+
+
+
+
 # ── Build test cases and run ───────────────────────────────────
+THRESHOLD = 0.70
 
-def run_eval():
-    from agents.agent3 import llm_credibility_check
+def run_eval(backend: str = "groq"):
+    from agents.agent3 import classify_credibility
 
+    # Load data
     with open(GOLDEN) as f:
         golden = json.load(f)
+    with open(CACHE) as f:
+        cache = json.load(f)
 
+    # ── Step 1: Run agent, build LLMTestCase objects ───────────
     test_cases = []
-    y_true = []
-    y_pred = []
-    story_results = []
+    skipped = []
 
-    for item in golden:
-        story_id  = item["story_id"]
-        title     = item["title"]
-        content   = item["content"]
-        expected  = item["expected_label"]
+    for i, item in enumerate(golden):
+        title     = item["input"]
+        expected  = item["expected_output"]
+        story_key = item["additional_metadata"]["story_key"]
 
-        print(f"\n  Story {story_id}: {title[:50]}...")
+        story   = cache.get(story_key, {})
+        content = story.get("content", "")
 
-        # Call the actual classification function
-        score = llm_credibility_check(title, content)
-        predicted = score_to_label(score)
+        if not content or len(content) < 50:
+            skipped.append((i, title, "content missing or < 50 chars"))
+            continue
 
-        correct = (predicted == expected)
-        y_true.append(expected)
-        y_pred.append(predicted)
+        # Call the actual agent
+        predicted = classify_credibility(title, content, backend)
+        if predicted is None:
+            skipped.append((i, title, "model returned None"))
+            predicted = "NONE"
 
-        story_results.append(dict(
-            story_id=story_id,
-            title=title[:50],
-            expected=expected,
-            predicted=predicted,
-            score=score,
-            correct=correct,
-        ))
-
-        # DeepEval test case
+        # Package as DeepEval test case
         tc = LLMTestCase(
             input=title,
             actual_output=predicted,
             expected_output=expected,
+            context=[content[:200]],   # first 200 chars for DeepEval report
         )
         test_cases.append(tc)
 
-    # ── DeepEval evaluate() ────────────────────────────────────
+    # ── Step 2: Run DeepEval evaluate() ────────────────────────
     metric = ClassificationMetric()
-    evaluate(test_cases=test_cases, metrics=[metric])
+    results = evaluate(test_cases=test_cases, metrics=[metric])
 
-    # ── Macro-F1 ──────────────────────────────────────────────
-    macro_f1, per_class = compute_macro_f1(y_true, y_pred, CLASSES)
-    accuracy = sum(1 for r in story_results if r["correct"]) / len(story_results)
+    # ── Step 3: Dataset-level macro-F1 ─────────────────────────
+    y_true = [tc.expected_output for tc in test_cases]
+    y_pred = [tc.actual_output   for tc in test_cases]
+
+    matrix, class_metrics, macro_f1 = compute_macro_f1(y_true, y_pred)
     passed = macro_f1 >= THRESHOLD
 
-    # ── Per-story report ──────────────────────────────────────
-    print(f"\n{'═' * 75}")
-    print(f"  {'#':>3} {'Title':>50}  {'Exp':>8} {'Pred':>8}  {'Score':>6}")
-    print(f"{'─' * 75}")
+    # ── Report ─────────────────────────────────────────────────
+    present = [l for l in LABELS if class_metrics[l]["support"] > 0
+               or any(matrix[r][l] for r in LABELS)]
 
-    for sr in story_results:
-        mark = "✓" if sr["correct"] else "✗"
-        print(f"  {sr['story_id']:>3} {sr['title']:>50}  "
-              f"{sr['expected']:>8} {sr['predicted']:>8}  "
-              f"{sr['score']:>6.2f} {mark}")
+    print(f"\n{'─' * 50}")
+    print("  Confusion Matrix  (rows = actual, cols = predicted)")
+    print(f"{'─' * 50}")
+    header = f"{'':>10}" + "".join(f"{l:>10}" for l in present)
+    print(header)
+    for row_label in present:
+        row = f"{row_label:>10}"
+        for col_label in present:
+            row += f"{matrix[row_label][col_label]:>10d}"
+        print(row)
 
-    # ── Confusion matrix ──────────────────────────────────────
-    print(f"\n{'═' * 75}")
-    print(f"  Confusion Matrix:")
-    print(f"  {'':>12} {'REAL':>8} {'OPINION':>8} {'SPAM':>8}")
+    print(f"\n{'─' * 50}")
+    print(f"  {'Class':>10}  {'Prec':>7} {'Recall':>7} {'F1':>7} {'N':>5}")
+    print(f"{'─' * 50}")
+    for label in present:
+        m = class_metrics[label]
+        print(f"  {label:>10}  {m['precision']:>7.3f} {m['recall']:>7.3f} "
+              f"{m['f1']:>7.3f} {m['support']:>5d}")
 
-    for true_cls in CLASSES:
-        row = []
-        for pred_cls in CLASSES:
-            count = sum(1 for t, p in zip(y_true, y_pred)
-                       if t == true_cls and p == pred_cls)
-            row.append(count)
-        print(f"  {true_cls:>12} {row[0]:>8} {row[1]:>8} {row[2]:>8}")
+    correct = sum(1 for t, p in zip(y_true, y_pred) if t == p)
+    print(f"\n{'═' * 50}")
+    print(f"  Macro-F1:  {macro_f1:.3f}  (gate ≥ {THRESHOLD})")
+    print(f"  Accuracy:  {correct}/{len(y_true)} = "
+          f"{correct/len(y_true):.3f}  (reference only)")
+    print(f"  Verdict:   {'PASS ✓' if passed else 'FAIL ✗'}")
+    print(f"{'═' * 50}")
 
-    # ── Per-class metrics ─────────────────────────────────────
-    print(f"\n  Per-Class Metrics:")
-    print(f"  {'Class':>12} {'P':>8} {'R':>8} {'F1':>8} {'Support':>8}")
-    for cls in CLASSES:
-        pc = per_class[cls]
-        print(f"  {cls:>12} {pc['precision']:>8.3f} {pc['recall']:>8.3f} "
-              f"{pc['f1']:>8.3f} {pc['support']:>8}")
-
-    # ── Summary ────────────────────────────────────────────────
-    print(f"\n{'═' * 75}")
-    print(f"  Macro-F1:   {macro_f1:.3f}  (gate ≥ {THRESHOLD})")
-    print(f"  Accuracy:   {sum(1 for r in story_results if r['correct'])}"
-          f"/{len(story_results)} ({accuracy:.1%})")
-    print(f"  Verdict:    {'PASS ✓' if passed else 'FAIL ✗'}")
-    print(f"{'═' * 75}")
-
-    # ── Failures ──────────────────────────────────────────────
-    failures = [r for r in story_results if not r["correct"]]
-    if failures:
-        print(f"\n  Failures ({len(failures)}):")
-        for f in failures:
-            print(f"    {f['title']} — expected {f['expected']}, "
-                  f"got {f['predicted']} (score={f['score']:.2f})")
+    if skipped:
+        print(f"\n  Skipped ({len(skipped)}):")
+        for idx, title, reason in skipped:
+            print(f"    [{idx+1}] {title[:50]} — {reason}")
 
     return macro_f1, passed
 
 
+
+
+
 # ── pytest (DeepEval style) ────────────────────────────────────
-def test_agent3_credibility():
-    macro_f1, passed = run_eval()
+def test_agent3_credibility_groq():
+    macro_f1, passed = run_eval("groq")
+    assert passed, f"macro-F1 {macro_f1:.3f} < {THRESHOLD}"
+
+def test_agent3_credibility_local():
+    macro_f1, passed = run_eval("local")
     assert passed, f"macro-F1 {macro_f1:.3f} < {THRESHOLD}"
 
 
 # ── CLI ────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    f1, ok = run_eval()
-    sys.exit(0 if ok else 1)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--backend", default="groq",
+                        choices=["groq", "local", "both"])
+    args = parser.parse_args()
+
+    if args.backend == "both":
+        g_f1, g_ok = run_eval("groq")
+        l_f1, l_ok = run_eval("local")
+        print(f"\n  Summary: groq={g_f1:.3f} {'✓' if g_ok else '✗'}"
+              f" | local={l_f1:.3f} {'✓' if l_ok else '✗'}")
+        sys.exit(0 if (g_ok and l_ok) else 1)
+    else:
+        _, ok = run_eval(args.backend)
+        sys.exit(0 if ok else 1)
