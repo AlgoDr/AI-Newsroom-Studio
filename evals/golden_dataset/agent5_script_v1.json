@@ -165,5 +165,339 @@
       "n_sections": 10,
       "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
     }
+  },
+  {
+    "test_id": "t6",
+    "description": "3 stories, infrastructure focus — straightforward generation",
+    "difficulty": "easy",
+    "stories": {
+      "s1": {
+        "title": "Caddy 3.0 Introduces Native gRPC and WebSocket Reverse Proxy",
+        "content": "Caddy, the popular Go web server known for automatic HTTPS, has released version 3.0 with native gRPC and WebSocket reverse proxy support. The new release eliminates the need for separate Envoy or Nginx sidecars in microservice architectures. Caddy 3.0 can automatically negotiate HTTP/2 for gRPC traffic and seamlessly upgrade HTTP/1.1 connections to WebSocket, all while maintaining its signature automatic TLS certificate management via Let's Encrypt and ZeroSSL. Benchmarks show Caddy 3.0 handling 85,000 concurrent WebSocket connections on a single 4-core VM with 512MB RAM overhead. The configuration remains in Caddyfile format with new directives for gRPC load balancing including round-robin, least-connections, and consistent-hashing strategies. Plugin authors can now hook into the connection lifecycle for custom middleware.",
+        "background": "Caddy was created by Matt Holt in 2015 and was the first major web server to support automatic HTTPS by default. It competes with Nginx and Traefik in the reverse proxy space. gRPC adoption has grown significantly in cloud-native architectures, driving demand for simpler proxy configurations.",
+        "credibility_score": 0.80,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "PostgreSQL 18 Beta Ships with Native Column-Level Encryption",
+        "content": "PostgreSQL 18 beta 1 has been released with native column-level encryption, allowing developers to encrypt individual columns at rest without application-level changes. The feature uses AES-256-GCM with per-row initialization vectors managed transparently by the database engine. Encrypted columns support equality searches via a deterministic encryption mode and range queries through a new order-preserving encryption option. The key management integrates with AWS KMS, HashiCorp Vault, and PKCS#11 hardware security modules out of the box. Performance impact is estimated at 8-15% for encrypted column reads, depending on column size. The feature was developed over 18 months by a team at AWS and contributed upstream.",
+        "background": "Column-level encryption has been available in commercial databases like Oracle and SQL Server for years. PostgreSQL users previously relied on pgcrypto or application-level encryption. The feature addresses compliance requirements like GDPR and HIPAA that mandate encryption of sensitive data at rest.",
+        "credibility_score": 0.85,
+        "selected": true,
+        "selection_rank": 2
+      },
+      "s3": {
+        "title": "Grafana 12 Adds AI-Powered Alert Correlation Across Data Sources",
+        "content": "Grafana Labs has released Grafana 12 with an AI-powered alert correlation engine that automatically groups related alerts across Prometheus, Loki, Tempo, and custom data sources. The system uses a lightweight transformer model running locally within the Grafana backend to identify causal chains — for example, linking a disk I/O spike in Prometheus to error log bursts in Loki and increased trace latency in Tempo. In internal testing at Grafana Labs, the correlation engine reduced mean-time-to-root-cause by 62% across 50 incident scenarios. The feature works entirely on-premise with no cloud dependency. Grafana 12 also adds native support for ClickHouse as a first-class data source and a new canvas panel for building custom topology diagrams.",
+        "background": "Alert fatigue is a persistent problem in observability. Most organizations receive hundreds of alerts during major incidents, many of which are symptoms of the same root cause. AIOps tools from vendors like BigPanda and Moogsoft address this, but Grafana's approach integrates directly into the most widely used open-source observability stack.",
+        "credibility_score": 0.73,
+        "selected": true,
+        "selection_rank": 3
+      }
+    },
+    "expected": {
+      "n_sections": 10,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
+    }
+  },
+  {
+    "test_id": "t7",
+    "description": "2 stories — tests 8-section format with privacy/ethics theme",
+    "difficulty": "easy",
+    "stories": {
+      "s1": {
+        "title": "Firefox 135 Blocks All Third-Party Cookies by Default, No Exceptions",
+        "content": "Mozilla has released Firefox 135 with total third-party cookie blocking enabled by default for all users, with no exceptions list. Unlike Chrome's approach of maintaining an exceptions list for sites that break, Firefox 135 uses a partitioned cookie jar that isolates third-party storage per first-party site. This means embedded widgets and social media buttons still function but cannot track users across sites. The change affects approximately 12% of websites that previously relied on third-party cookies for login flows, which must now use the Storage Access API to request permission explicitly. Firefox's market share has stabilized at 6.8% after years of decline, and Mozilla is positioning the browser as the privacy-first choice. The release also includes container tabs improvements that allow different identities per tab with separate cookie jars, proxy settings, and DNS configurations.",
+        "background": "Third-party cookie deprecation has been an ongoing industry shift. Google delayed Chrome's cookie deprecation multiple times before partially reversing course in 2024. Safari has blocked third-party cookies since 2020 via ITP. Firefox's ETP (Enhanced Tracking Protection) previously blocked known trackers but allowed unclassified third-party cookies.",
+        "credibility_score": 0.86,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "EU Digital Identity Wallet App Launches in 5 Countries with Biometric Verification",
+        "content": "The European Commission has launched the EU Digital Identity Wallet as a pilot in Germany, France, Spain, Italy, and the Netherlands. The app stores government-issued identification, driving licenses, educational credentials, and health insurance cards in a cryptographically secured enclave on the user's phone. Verification uses on-device biometric matching — face or fingerprint — that never transmits biometric data to any server. The wallet supports selective disclosure, allowing users to prove they are over 18 without revealing their birth date or address. Cross-border recognition is immediate among pilot countries. Airlines, banks, and telecom providers in the pilot countries are required to accept the digital wallet as equivalent to physical documents by Q2 2027. The underlying architecture uses the ARF (Architecture and Reference Framework) standard developed by the EU Toolbox consortium.",
+        "background": "The EU Digital Identity framework was established by the eIDAS 2.0 regulation adopted in 2024. The regulation requires all EU member states to offer a digital identity wallet by 2026. Privacy advocates have raised concerns about centralized identity systems, though the EU wallet uses decentralized verification without a central database.",
+        "credibility_score": 0.79,
+        "selected": true,
+        "selection_rank": 2
+      }
+    },
+    "expected": {
+      "n_sections": 8,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "CTA"]
+    }
+  },
+  {
+    "test_id": "t8",
+    "description": "3 stories, one very low credibility — hedge-language stress test",
+    "difficulty": "medium",
+    "stories": {
+      "s1": {
+        "title": "Zig 0.14 Self-Hosts Its Compiler, Drops LLVM Backend",
+        "content": "The Zig programming language has released version 0.14, a landmark release in which the compiler is fully self-hosted and no longer depends on the LLVM backend for code generation. The new native x86-64 backend generates code that runs 22% faster in compile time and produces binaries within 5% of LLVM's optimization quality on the Benchmarks Game suite. The self-hosted compiler compiles itself in 47 seconds on a Ryzen 7 7800X3D, down from 8 minutes with the LLVM-based bootstrap. ARM64 and RISC-V backends are in development. Andrew Kelley, Zig's creator, described the release as 'the point where Zig becomes a real language — we no longer depend on the C++ ecosystem for anything.' The release also stabilizes the package manager, adds comptime interfaces, and drops the last remaining C dependency (zlib, replaced with a Zig implementation).",
+        "background": "Self-hosting — where a compiler can compile itself — is a traditional milestone for programming languages. Rust self-hosted in 2011, Go in 2015. Zig's approach of replacing LLVM entirely is more radical, as most new languages use LLVM for code generation.",
+        "credibility_score": 0.88,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "Show HN: I Built a Mechanical Keyboard That Generates Entropy for Cryptographic Keys",
+        "content": "I designed and built a custom mechanical keyboard that uses the analog variation in keypress force to generate cryptographic entropy. Each Cherry MX switch is fitted with a strain gauge that measures force to 0.01 newton precision. The analog noise from typing naturally produces approximately 4 bits of entropy per keypress, accumulating to 256 bits (sufficient for AES-256) in about 64 keypresses of normal typing. The entropy is mixed with timing jitter and fed through a BLAKE3 hash before being made available to the OS as a hardware random number generator via a USB HID interface. The PCB design and firmware are open source. I validated the output using NIST SP 800-22 and dieharder test suites. The total build cost is about $180 including the custom PCB.",
+        "background": "Hardware random number generators are used in security-critical applications where software pseudo-random generators are insufficient. Most existing HRNGs use thermal noise, shot noise, or radioactive decay. Using keystroke force as an entropy source is a novel approach that piggybacks on an existing input device.",
+        "credibility_score": 0.70,
+        "selected": true,
+        "selection_rank": 2
+      },
+      "s3": {
+        "title": "Unverified: Former Tesla Engineer Claims FSD v13 Achieves L4 Autonomy in Internal Testing",
+        "content": "A person claiming to be a former Tesla Autopilot engineer posted on Reddit that Full Self-Driving v13, currently in internal testing, has achieved Level 4 autonomous driving capability in geofenced areas of San Francisco and Austin. The poster says the system uses a new vision transformer architecture that replaces the previous HydraNet multi-head design. They claim v13 handles unprotected left turns, construction zones, and emergency vehicle yielding without intervention. Tesla has not commented. The Reddit account was created three days before the post and has no other activity. Several r/selfdrivingcars moderators flagged the post as unverifiable. Independent Tesla researcher @greentheonly noted that recent firmware updates show no evidence of a major architecture change in the neural network weights.",
+        "background": "Tesla has a history of ambitious autonomy claims that take longer than projected to materialize. FSD v12 moved to an end-to-end neural network approach in 2024. Level 4 autonomy requires no human attention in defined operational domains. No automaker has achieved widespread L4 deployment.",
+        "credibility_score": 0.06,
+        "selected": true,
+        "selection_rank": 3
+      }
+    },
+    "expected": {
+      "n_sections": 10,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
+    }
+  },
+  {
+    "test_id": "t9",
+    "description": "3 stories, science/research heavy — jargon simplification test",
+    "difficulty": "hard",
+    "stories": {
+      "s1": {
+        "title": "DeepMind AlphaProtein Predicts Multi-Chain Protein Complexes with 0.8 Angstrom Accuracy",
+        "content": "DeepMind has published a paper in Science describing AlphaProtein, a successor to AlphaFold3 that predicts the 3D structure of multi-chain protein complexes with 0.8 angstrom backbone RMSD accuracy on the CASP16 test set. The model uses a diffusion-based architecture that jointly predicts all chains in a complex simultaneously, rather than predicting individual chains and then docking them. AlphaProtein also predicts post-translational modifications including phosphorylation, glycosylation, and ubiquitination sites. The training set includes 280,000 experimentally resolved complex structures from the PDB plus 12 million predicted structures from AlphaFold2. Inference takes approximately 3 minutes per complex on a single A100 GPU. The model weights and code are released under a non-commercial license. Drug discovery company Recursion Pharmaceuticals reports that early access to AlphaProtein reduced their hit-to-lead pipeline from 14 months to 4 months for two antibody programs.",
+        "background": "Protein structure prediction was revolutionized by AlphaFold2 in 2020, which solved the single-chain folding problem. Multi-chain complex prediction remains harder because protein-protein interfaces involve weaker interactions. Drug discovery relies heavily on understanding how proteins interact in complexes.",
+        "credibility_score": 0.90,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "CERN Reports Anomalous Excess in Higgs Boson Decay Channel at 3.8 Sigma",
+        "content": "The CMS experiment at CERN has reported a 3.8-sigma excess in the Higgs boson decay to two muons channel, exceeding the Standard Model prediction by approximately 40%. The result, presented at the Moriond conference, is based on the full Run 3 dataset of 300 inverse femtobarns collected between 2022 and 2025. A 3.8-sigma result has roughly a 1-in-14,000 probability of occurring by chance. The 5-sigma threshold conventionally required for a discovery claim has not been reached. ATLAS, the other major LHC detector, has not yet reported its independent analysis of the same decay channel. CMS spokesperson Dr. Patricia McBride cautioned that systematic uncertainties in muon reconstruction efficiency could account for part of the excess. Theorists have proposed several beyond-Standard-Model explanations including an extended Higgs sector with a second Higgs doublet.",
+        "background": "The Higgs boson was discovered in 2012. Since then, physicists have been precisely measuring its properties to look for deviations from Standard Model predictions. The di-muon decay channel is particularly sensitive to new physics because it involves second-generation fermions. Previous anomalies at similar significance levels have disappeared with more data.",
+        "credibility_score": 0.82,
+        "selected": true,
+        "selection_rank": 2
+      },
+      "s3": {
+        "title": "MIT Demonstrates Photonic Chip That Trains Neural Networks at 1/100th the Energy",
+        "content": "Researchers at MIT have demonstrated a photonic processor that trains neural networks using approximately 1/100th the electrical energy of equivalent GPU-based training. The chip uses arrays of Mach-Zehnder interferometers to perform matrix multiplications optically at the speed of light. A 64x64 photonic matrix multiply unit achieves 100 TOPS at 2 watts, compared to approximately 200 watts for the same operation on an H100 GPU. The prototype was fabricated in a standard 45nm SOI process at GlobalFoundries. The main limitation is precision — the current design supports 4-bit effective precision due to optical crosstalk, compared to the 16-bit or higher precision used in conventional training. The researchers showed that a combination of 4-bit photonic forward passes with 16-bit electronic backward passes achieves within 2% accuracy of full-precision training on ImageNet. A commercial spinoff, Lightmatter, plans to sell photonic accelerator cards by 2028.",
+        "background": "Energy consumption of AI training is a growing concern. Training GPT-4 is estimated to have consumed approximately 50 GWh of electricity. Photonic computing has been theorized as an energy-efficient alternative for decades but has struggled with precision and integration challenges. Several startups including Lightmatter, Luminous Computing, and Celestial AI are pursuing commercial photonic processors.",
+        "credibility_score": 0.71,
+        "selected": true,
+        "selection_rank": 3
+      }
+    },
+    "expected": {
+      "n_sections": 10,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
+    }
+  },
+  {
+    "test_id": "t10",
+    "description": "3 stories, consumer/lifestyle — tone contrast from technical sets",
+    "difficulty": "easy",
+    "stories": {
+      "s1": {
+        "title": "Framework Laptop 16 Now Ships with RISC-V Expansion Module",
+        "content": "Framework has launched a RISC-V expansion module for the Framework Laptop 16, making it the first mainstream laptop to offer RISC-V computing as a hot-swappable module. The module uses the SiFive P670 processor with 4 performance cores running at 2.2 GHz and 8GB of dedicated LPDDR5 RAM. Users can swap between the x86 AMD module and the RISC-V module in under 30 seconds without tools. The RISC-V module runs a custom Ubuntu-based Linux distribution with full desktop support including Firefox, LibreOffice, and VS Code. Performance is roughly equivalent to a 2018 Intel Core i5 for single-threaded workloads. Framework CEO Nirav Patel said the module is aimed at developers who want to test RISC-V compatibility without dedicated hardware. The module is priced at $299 and is compatible with all existing Framework Laptop 16 chassis.",
+        "background": "Framework has built a reputation for modular, repairable laptops. RISC-V is an open-source instruction set architecture that has gained traction in embedded and server applications but has limited desktop and laptop presence. The Framework RISC-V module represents one of the most accessible ways to run RISC-V on a daily-driver laptop.",
+        "credibility_score": 0.77,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "Pebble Watch Relaunches as Open-Source Project with New E-Paper Hardware",
+        "content": "Eric Migicovsky, original creator of the Pebble smartwatch, has relaunched the brand as an open-source project with new hardware. The Pebble Core uses a 1.3-inch Sharp memory LCD (the same always-on e-paper-like display technology as the original), a Nordic nRF5340 SoC, and claims 14 days of battery life. The firmware, hardware schematics, and 3D-printable case files are all released under CERN-OHL-S and GPLv3 licenses. The watch runs a new RTOS called PebbleOS-next written in Rust, replacing the original C-based PebbleOS. It supports BLE 5.3, has a built-in GPS, and maintains backward compatibility with the Pebble app ecosystem through a compatibility shim. The relaunch was funded through a Crowd Supply campaign that raised $2.8 million from 18,000 backers. First shipments are expected in Q1 2027.",
+        "background": "Pebble was a pioneering smartwatch company that raised $10.3 million on Kickstarter in 2012 and was acquired by Fitbit in 2016, which discontinued the product line. The Pebble community has kept the platform alive through Rebble, a volunteer-run replacement for Pebble's cloud services.",
+        "credibility_score": 0.74,
+        "selected": true,
+        "selection_rank": 2
+      },
+      "s3": {
+        "title": "Raspberry Pi 6 Announced with 16GB RAM and PCIe 3.0 x4 Slot",
+        "content": "The Raspberry Pi Foundation has announced the Raspberry Pi 6, featuring a Broadcom BCM2714 quad-core Cortex-A78AE at 3.0 GHz, up to 16GB LPDDR5 RAM, and a physical PCIe 3.0 x4 slot that accepts standard M.2 NVMe drives and low-profile GPU cards. The board retains the credit-card form factor and the GPIO header. Pricing starts at $45 for the 4GB model and $75 for 16GB. The PCIe slot opens up use cases previously impractical on Pi hardware: NVMe storage delivers 3.5 GB/s sequential reads (vs 40 MB/s on Pi 5's microSD), and community testing shows an AMD Radeon RX 550 running at half speed through the x4 link. The Pi 6 launches with official support for Ubuntu 24.04 LTS, Raspberry Pi OS (Debian 13 based), and Android 15. USB-C power delivery is now required, with a minimum 27W adapter.",
+        "background": "The Raspberry Pi has sold over 60 million units since its 2012 launch, primarily for education, hobbyist projects, and light industrial applications. The Pi 5, released in 2023, was the first model with a PCIe connection (single lane via FPC connector). The Pi 6's full x4 slot represents a major expansion of the platform's capabilities.",
+        "credibility_score": 0.81,
+        "selected": true,
+        "selection_rank": 3
+      }
+    },
+    "expected": {
+      "n_sections": 10,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
+    }
+  },
+  {
+    "test_id": "t11",
+    "description": "2 stories, security focus — tests compact 8-section format on sensitive topics",
+    "difficulty": "medium",
+    "stories": {
+      "s1": {
+        "title": "Cloudflare Discloses Unauthorized Access to Internal Atlassian Instance",
+        "content": "Cloudflare has disclosed that an unauthorized party accessed its internal Atlassian Confluence and Jira instances between November 14 and November 24 using credentials stolen in the 2023 Okta breach that Cloudflare had failed to rotate. The attacker accessed 120 code repositories in Cloudflare's Bitbucket instance, internal wiki pages documenting the architecture of Cloudflare's DDoS mitigation system, and 4 Jira tickets related to vulnerability management. Cloudflare CTO John Graham-Cumming stated in a blog post that no customer data was accessed and no Cloudflare services were compromised. The company has since rotated all 5,000+ production credentials, implemented hardware key requirements for all internal systems, and engaged CrowdStrike for forensic review. The blog post includes unusually detailed technical indicators of compromise including the attacker's IP addresses and the specific API tokens used.",
+        "background": "Cloudflare processes approximately 20% of all internet traffic. The company has a history of transparent incident disclosure, including the 2017 Cloudbleed memory leak. The Okta breach in October 2023 affected multiple Cloudflare vendors, and the company previously reported mitigating that breach successfully.",
+        "credibility_score": 0.93,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "Signal Protocol Vulnerability Allows Message Forgery in Group Chats (Patched)",
+        "content": "Researchers at ETH Zurich have published a paper describing a vulnerability in the Signal Protocol's group messaging implementation that allowed a compromised group member to forge messages appearing to come from other group members. The attack exploits the Sender Key distribution mechanism: a member who controls a Sender Key can construct messages with valid MACs that attribute the content to any other member of the group. The vulnerability affects Signal, WhatsApp, and any application using the Signal Protocol's group messaging. Signal released a patch within 72 hours of responsible disclosure, adding per-sender key verification that prevents forgery even if a member's Sender Key is compromised. The researchers note the attack requires an already-compromised group member, which limits practical exploitability. The paper was presented at IEEE S&P 2026.",
+        "background": "The Signal Protocol is widely considered the gold standard for end-to-end encrypted messaging. It underpins Signal, WhatsApp, Facebook Messenger, and Skype. Previous academic analyses have generally validated the protocol's security properties, though implementation vulnerabilities have been found.",
+        "credibility_score": 0.89,
+        "selected": true,
+        "selection_rank": 2
+      }
+    },
+    "expected": {
+      "n_sections": 8,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "CTA"]
+    }
+  },
+  {
+    "test_id": "t12",
+    "description": "3 stories with very short content — tests synthesis under minimal input",
+    "difficulty": "hard",
+    "stories": {
+      "s1": {
+        "title": "Bun 2.0 Ships with Built-In SQLite and S3 Client",
+        "content": "Bun 2.0 is out. Key additions: built-in SQLite driver (bun:sqlite), native S3 client, and a test runner that runs Jest tests 5x faster. The runtime now passes 98% of the Node.js test suite. Windows support is stable.",
+        "background": "Bun is a JavaScript runtime created by Jarred Sumner as a faster alternative to Node.js and Deno. Version 1.0 shipped in 2023.",
+        "credibility_score": 0.78,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "WireGuard Added to Windows Kernel, No More Userspace Tunnel",
+        "content": "WireGuard is now a native Windows kernel driver, shipping in Windows 11 24H2. Jason Donenfeld ported the module from the Linux kernel implementation. Performance doubles compared to the userspace wireguard-windows tunnel. Configuration uses the same wg-quick syntax.",
+        "background": "WireGuard has been in the Linux kernel since 2020. The Windows version previously ran as a userspace application using the Wintun virtual adapter.",
+        "credibility_score": 0.84,
+        "selected": true,
+        "selection_rank": 2
+      },
+      "s3": {
+        "title": "1Password Acquires Passage for Passkey Infrastructure",
+        "content": "1Password acquired Passage, a startup providing passkey authentication APIs, for an undisclosed sum. Passage's SDK will be integrated into 1Password's developer tools, offering WebAuthn and passkey support as a hosted service. The team of 12 joins 1Password's developer platform division.",
+        "background": "Passkeys are a FIDO Alliance standard for passwordless authentication adopted by Apple, Google, and Microsoft. The ecosystem needs developer-friendly integration tools.",
+        "credibility_score": 0.80,
+        "selected": true,
+        "selection_rank": 3
+      }
+    },
+    "expected": {
+      "n_sections": 10,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
+    }
+  },
+  {
+    "test_id": "t13",
+    "description": "3 stories, policy/regulatory — factual accuracy matters, editorializing risk",
+    "difficulty": "hard",
+    "stories": {
+      "s1": {
+        "title": "EU AI Act Enforcement Begins: First Fines Issued to Three Companies",
+        "content": "The European Commission has issued the first enforcement actions under the EU AI Act, fining three companies for non-compliance with the transparency requirements that took effect in August 2026. Clearview AI was fined 20 million euros for deploying prohibited real-time biometric identification in public spaces without authorization. An unnamed recruitment platform was fined 5 million euros for using an AI system to screen job applicants without providing the required human oversight mechanism. A social media company received a 2 million euro fine for deploying a recommender system classified as high-risk without completing the mandatory conformity assessment. All three companies have 60 days to comply or face daily penalties of 1% of global revenue. The European AI Office, which oversees enforcement, said 42 additional investigations are ongoing.",
+        "background": "The EU AI Act was adopted in March 2024 and is being implemented in phases. Prohibited AI practices (Article 5) took effect in February 2025. Transparency requirements for general-purpose AI took effect in August 2025. High-risk system requirements take full effect in August 2026. The Act classifies AI systems into risk categories with corresponding obligations.",
+        "credibility_score": 0.87,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "California Passes SB-1047 Successor Requiring AI Training Run Disclosure",
+        "content": "California Governor signed SB-2112, a revised version of last year's vetoed SB-1047, into law. The new bill requires companies conducting AI training runs exceeding 10^26 FLOP to file a disclosure with the newly created California AI Safety Board within 30 days. The disclosure must include the training compute used, the intended use case, and safety evaluation results, but does not include model weights or proprietary techniques. Companies must also maintain a 'responsible capability scaling plan' updated annually. Penalties for non-disclosure are capped at $500,000 per violation. The bill was supported by Anthropic and opposed by Meta and the Chamber of Progress. It takes effect January 1, 2028.",
+        "background": "SB-1047, which would have imposed liability on AI developers for catastrophic harms, was vetoed by then-Governor Newsom in 2024, citing concerns about stifling innovation. SB-2112 takes a disclosure-based approach rather than a liability-based one, addressing many of the objections to the original bill.",
+        "credibility_score": 0.76,
+        "selected": true,
+        "selection_rank": 2
+      },
+      "s3": {
+        "title": "FTC Sues Data Broker for Selling Location Data from Mental Health Apps",
+        "content": "The Federal Trade Commission has filed a complaint against Radaris Data Solutions for purchasing and reselling precise location data harvested from three mental health and addiction recovery apps. The data allowed buyers to identify individuals visiting psychiatric facilities, methadone clinics, and AA meeting locations. The FTC complaint alleges Radaris purchased the data from an SDK embedded in the apps' code by a third-party analytics firm. Approximately 280,000 users were affected. The proposed consent order would permanently ban Radaris from selling location data derived from health, religious, and reproductive health facilities, and require deletion of all previously collected data. FTC Chair Lina Khan called the case 'a textbook example of why we need comprehensive federal privacy legislation.'",
+        "background": "The FTC has increasingly targeted data brokers selling sensitive location data. In 2024, the agency took action against X-Mode Social for selling location data from prayer apps. Mental health app data is particularly sensitive because it can reveal conditions that carry social stigma. No comprehensive federal privacy law exists in the US.",
+        "credibility_score": 0.91,
+        "selected": true,
+        "selection_rank": 3
+      }
+    },
+    "expected": {
+      "n_sections": 10,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
+    }
+  },
+  {
+    "test_id": "t14",
+    "description": "3 stories, all medium credibility — balanced hedging test",
+    "difficulty": "medium",
+    "stories": {
+      "s1": {
+        "title": "Tailscale Raises $200M Series C, Valued at $2.5B",
+        "content": "Tailscale, the company behind the WireGuard-based mesh VPN, has raised $200 million in Series C funding at a $2.5 billion valuation, led by CRV and Accel. The company reports 250,000 businesses using its network, up from 100,000 a year ago, and $80 million in ARR. Tailscale's free tier, which allows up to 100 devices per tailnet, drives adoption among individual developers who then bring the product into their organizations. CEO Avery Pennarun said the funding will go toward building Tailscale Kubernetes Gateway, a product that replaces traditional ingress controllers with Tailscale's identity-aware networking. The company has 180 employees, all remote.",
+        "background": "Tailscale was founded in 2019 by Avery Pennarun and Brad Fitzpatrick, who previously created LiveJournal. The product builds on WireGuard, the open-source VPN protocol in the Linux kernel. Competitors include Cloudflare's WARP and ZeroTier. The mesh VPN market has grown as remote work creates demand for zero-trust network access.",
+        "credibility_score": 0.72,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "Oxide Computer Ships First On-Prem Cloud Server, Starting at $180K",
+        "content": "Oxide Computer Company has shipped its first commercial rack-scale cloud computer, priced starting at $180,000. The Oxide rack integrates custom hardware (compute sleds, network switches, and a BMC replacement called the Service Processor) with an open-source control plane that provides an AWS-like API for on-premises deployment. Each rack contains up to 32 compute sleds with AMD EPYC processors and supports automated provisioning, live migration, and software-defined networking. Oxide's first customer is a national laboratory that required air-gapped cloud infrastructure for classified workloads. CEO Steve Tuck, formerly of Joyent and Dell, said the company is targeting enterprises that need cloud-like agility but cannot or will not use public cloud for regulatory, security, or latency reasons. The company has raised $145 million to date.",
+        "background": "Oxide was founded in 2019 by Bryan Cantrill (former Sun Microsystems CTO) and Steve Tuck. The company has been developing its hardware and software stack for over five years. The on-premises cloud market is served primarily by VMware, Nutanix, and OpenStack deployments, all of which Oxide positions against as legacy approaches.",
+        "credibility_score": 0.69,
+        "selected": true,
+        "selection_rank": 2
+      },
+      "s3": {
+        "title": "Stack Overflow Traffic Down 48% Year-Over-Year, Company Pivots to Enterprise AI",
+        "content": "Stack Overflow's public Q&A platform has seen a 48% decline in traffic year-over-year according to SimilarWeb data, driven by developers increasingly using AI coding assistants for technical questions. The company has responded by pivoting to OverflowAI for Enterprise, a product that combines Stack Overflow's 58 million answered questions with RAG-based retrieval for internal company knowledge. CEO Prashanth Chandrasekar said enterprise revenue now exceeds advertising revenue for the first time. The free public site will continue to operate but the company laid off 28% of staff in May, primarily from the community and advertising teams. Stack Overflow's community moderators have expressed concern that declining participation creates a 'knowledge debt' — if fewer experts answer questions, the knowledge base becomes stale, reducing the value of both the public site and the enterprise product.",
+        "background": "Stack Overflow was founded in 2008 by Joel Spolsky and Jeff Atwood. It became the dominant Q&A platform for developers. The rise of ChatGPT and GitHub Copilot in 2023-2024 led to measurable declines in Stack Overflow usage. The company was acquired by Prosus for $1.8 billion in 2021.",
+        "credibility_score": 0.68,
+        "selected": true,
+        "selection_rank": 3
+      }
+    },
+    "expected": {
+      "n_sections": 10,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
+    }
+  },
+  {
+    "test_id": "t15",
+    "description": "3 stories, hardware/maker niche — tests obscure topic simplification",
+    "difficulty": "medium",
+    "stories": {
+      "s1": {
+        "title": "RISC-V Laptop from DeepComputing Ships, Runs Ubuntu with JH7110 Quad-Core",
+        "content": "DeepComputing has started shipping the DC-ROMA RISC-V Laptop II, a $299 notebook running Ubuntu 24.04 on a StarFive JH7110 quad-core RISC-V processor at 1.5 GHz with 8GB LPDDR4X RAM and a 256GB NVMe SSD. The 14-inch 1080p IPS display is adequate for development work. Performance is roughly comparable to a Raspberry Pi 4 — web browsing is functional but not snappy, compilation of medium projects takes 3-5x longer than an x86 laptop, and video playback is limited to 1080p30 via hardware decode. The laptop's value proposition is not performance but compatibility testing: it runs the mainline Linux kernel with no out-of-tree patches, and the RISC-V ecosystem needs real hardware for developers to test their software against. LibreOffice, Firefox, VS Code (via code-server), and Python scientific computing stacks all run natively.",
+        "background": "RISC-V is an open-source instruction set architecture developed at UC Berkeley. While widely adopted in embedded systems and beginning to appear in data center accelerators, RISC-V has very limited desktop and laptop presence. The DeepComputing laptop is one of only three RISC-V laptops commercially available.",
+        "credibility_score": 0.75,
+        "selected": true,
+        "selection_rank": 1
+      },
+      "s2": {
+        "title": "ESP32-S3 Gets MicroPython Camera Support, Enables $8 AI Vision Projects",
+        "content": "MicroPython has merged official camera support for the ESP32-S3 microcontroller, enabling developers to build camera-based projects using Python on an $8 module. The driver supports the OV2640 and OV5640 camera sensors and can capture JPEG frames at up to 15 fps at VGA resolution. Combined with TensorFlow Lite Micro, the setup can run simple image classification models (MobileNet v1 quantized) at 2 inferences per second. A complete camera module with ESP32-S3, OV2640 sensor, and USB-C costs approximately $12 from Seeed Studio. Example projects in the MicroPython documentation include a motion-detecting doorbell camera, a plant disease identifier, and a barcode scanner. Memory is the primary constraint: the ESP32-S3's 512KB SRAM limits model size to about 250KB after accounting for camera buffers.",
+        "background": "The ESP32 family from Espressif is the most popular microcontroller platform for IoT projects. MicroPython makes embedded development accessible to Python programmers. TinyML — running machine learning models on microcontrollers — has been a growing trend enabled by TensorFlow Lite Micro and similar frameworks.",
+        "credibility_score": 0.79,
+        "selected": true,
+        "selection_rank": 2
+      },
+      "s3": {
+        "title": "Bambu Lab P1S Firmware Update Adds LAN-Only Mode After Privacy Backlash",
+        "content": "Bambu Lab has released a firmware update for its P1S 3D printer that adds a LAN-only mode, allowing the printer to operate without connecting to Bambu's cloud servers. The update comes after security researchers demonstrated that the printer's default cloud connection transmitted print job metadata, filament usage statistics, and camera thumbnails to Bambu's servers in China. The LAN-only mode disables cloud printing, remote monitoring, and OTA updates but preserves local network printing via the Bambu Studio slicer. Users must manually update firmware in LAN-only mode by loading update files from a USB drive. Bambu Lab CEO Dr. Ye Tao published an open letter acknowledging the privacy concerns and committing to a privacy audit by a third-party firm. The company says 15% of users have switched to LAN-only mode since the update.",
+        "background": "Bambu Lab has rapidly become a leading consumer 3D printer brand since launching in 2022, competing with established players like Prusa and Creality. The company's printers are praised for print quality and speed but have faced criticism for their closed-source firmware and mandatory cloud connectivity. Privacy concerns around IoT devices with cameras are common across the smart home industry.",
+        "credibility_score": 0.83,
+        "selected": true,
+        "selection_rank": 3
+      }
+    },
+    "expected": {
+      "n_sections": 10,
+      "expected_sections": ["HOOK", "S1_CONTEXT", "S1_CORE", "S1_TWIST", "S2_HOOK", "S2_CORE", "S2_TWIST", "S3_HOOK", "S3_CORE", "CTA"]
+    }
   }
 ]

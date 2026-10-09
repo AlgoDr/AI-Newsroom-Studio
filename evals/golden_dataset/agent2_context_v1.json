@@ -1,0 +1,148 @@
+[
+  {
+    "test_id": 1,
+    "title": "PostgreSQL 17 Released with Incremental Backup and SQL/JSON Support",
+    "content": "The PostgreSQL Global Development Group has announced the release of PostgreSQL 17, the latest version of the world's most advanced open source database. PostgreSQL 17 builds on decades of open source development, improving its performance and scalability while adapting to emergent data access and storage patterns. This release adds significant overall performance gains, including an overhauled memory management implementation for vacuum, optimizations to storage access and improvements for high concurrency workloads, speedups in bulk loading and exports, and query execution improvements for aggregates. PostgreSQL 17 also introduces SQL/JSON support with the JSON_TABLE command that lets users query JSON data using standard SQL syntax. The new incremental backup feature allows faster point-in-time recovery for large databases, reducing backup windows from hours to minutes in many production environments.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-09-15", "title": "PostgreSQL 17 release highlights", "body": "PostgreSQL 17 is the latest major release focusing on performance improvements and SQL/JSON compliance. Key features include incremental backups and the JSON_TABLE command."},
+      {"source": "Wikipedia", "date": "", "title": "PostgreSQL", "body": "PostgreSQL is a free and open-source relational database management system emphasizing extensibility and SQL compliance. It has been developed for over 35 years by a community of contributors."}
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "test_id": 2,
+    "title": "Show HN: I built a terminal-based spreadsheet in Rust",
+    "content": "I've been working on a terminal-based spreadsheet application written in Rust. It supports basic formulas (SUM, AVG, COUNT, IF), cell references, CSV import/export, and vim-style keybindings. The motivation was wanting something faster than opening Excel or Google Sheets for quick data manipulation tasks. It uses the ratatui library for the TUI rendering and evalexpr for formula parsing. Performance was a key goal — it handles 100k rows without noticeable lag on my M2 MacBook. The architecture is an event-driven model with a separate rendering thread. Formulas are lazily evaluated with dependency tracking so only affected cells recalculate when you change a value.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-09-10", "title": "Rust TUI frameworks gaining traction", "body": "The ratatui library for building terminal UIs in Rust has seen rapid adoption, with over 3000 GitHub stars. It is a maintained fork of the original tui-rs."}
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "test_id": 3,
+    "title": "Linux Kernel 6.12 Adds Real-Time PREEMPT_RT Support",
+    "content": "The Linux kernel 6.12 release has merged the long-awaited PREEMPT_RT patchset into mainline. This represents over 20 years of development effort led by Thomas Gleixner and others. Real-time scheduling guarantees bounded latency for critical tasks, which is essential for industrial control systems, audio processing, and robotics. The patchset replaces spinlocks with RT-mutexes, makes interrupt handlers threaded by default, and introduces priority inheritance to prevent priority inversion. Benchmarks show worst-case latency under 50 microseconds on commodity x86 hardware, down from millisecond-range jitter with the standard kernel.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-10-01", "title": "PREEMPT_RT finally merged into Linux mainline", "body": "After two decades of out-of-tree development, the real-time preemption patches have been merged into Linux 6.12. Thomas Gleixner led the effort."},
+      {"source": "Wikipedia", "date": "", "title": "RTLinux", "body": "RTLinux is a hard real-time operating system microkernel that runs the entire Linux operating system as a fully preemptive process. The PREEMPT_RT patch set is a separate effort to add real-time capabilities directly to the mainline Linux kernel."},
+      {"source": "DDG News", "date": "2026-09-28", "title": "Linux 6.12 rc1 released with RT support", "body": "Linus Torvalds announced the first release candidate of Linux 6.12, which includes PREEMPT_RT, NTSYNC for Windows gaming compatibility, and sched_ext BPF scheduling."}
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "test_id": 4,
+    "title": "Cloudflare Reports 71% of Internet Traffic Is Now Encrypted with TLS 1.3",
+    "content": "Cloudflare's annual Internet report reveals that 71% of all HTTPS traffic observed across their network now uses TLS 1.3, up from 53% a year ago. The company processes over 57 million HTTP requests per second on average. TLS 1.3 reduces handshake round-trips from two to one, cutting connection setup time by roughly 100ms on average. The report also notes that TLS 1.2 still accounts for 28% of traffic, while legacy TLS 1.0 and 1.1 combined have dropped below 1%. Cloudflare attributes the acceleration to major browser vendors removing TLS 1.0/1.1 support and cloud providers defaulting new deployments to TLS 1.3.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-09-20", "title": "Cloudflare Internet Report 2026", "body": "Cloudflare published its annual state-of-the-Internet report showing TLS 1.3 adoption at 71%, with automated bot traffic comprising 38% of all requests."}
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "test_id": 5,
+    "title": "Researchers Achieve 99.9% Fidelity on Trapped-Ion Quantum Gates",
+    "content": "A team at Oxford University has demonstrated two-qubit gate fidelity of 99.9% using trapped calcium-43 ions in a cryogenic Paul trap. The result sets a new record for entangling gate operations, surpassing the previous best of 99.8% from Quantinuum's H2 system. The key innovation is a novel laser pulse sequence that compensates for motional decoherence during the gate operation. The experiment used 13 ions in a linear chain with individual addressing via a multi-channel acousto-optic modulator. Error rates were characterized using randomized benchmarking with over 10,000 random Clifford circuits. The team projects that scaling to 50 qubits while maintaining this fidelity would enable fault-tolerant surface codes with a code distance of 7.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-09-25", "title": "Oxford trapped-ion quantum gate record", "body": "Oxford researchers set new two-qubit gate fidelity record of 99.9% using calcium-43 ions, surpassing Quantinuum's previous best of 99.8%."},
+      {"source": "Wikipedia", "date": "", "title": "Trapped ion quantum computer", "body": "A trapped ion quantum computer is one of a number of approaches to constructing a quantum computer. Ions, or charged atomic particles, can be confined and suspended in free space using electromagnetic fields. Qubits are stored in stable electronic states of each ion, and quantum information can be transferred through the collective quantized motion of the ions in a shared trap."}
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "test_id": 6,
+    "title": "Apple Deprecates OpenGL ES on iOS 18, Pushes Metal-Only Development",
+    "content": "Apple has officially deprecated OpenGL ES across iOS 18, macOS 15, and visionOS 2, completing a transition that began with the introduction of Metal in 2014. New app submissions using OpenGL ES will be rejected starting January 2027. Existing apps will continue to run through a translation layer but may see performance degradation. Apple's Metal API provides lower overhead, better GPU utilization, and features like mesh shaders and ray tracing that have no OpenGL equivalent. The deprecation affects an estimated 15,000 apps in the App Store, many of which are cross-platform games using engines like Unity and Unreal that already have Metal backends available.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-09-18", "title": "Apple drops OpenGL ES in iOS 18", "body": "Apple has deprecated OpenGL ES, giving developers until January 2027 to migrate to Metal. An estimated 15,000 apps are affected."},
+      {"source": "DDG News", "date": "2026-09-19", "title": "Unity and Unreal already support Metal", "body": "Both Unity and Unreal Engine have supported Apple Metal for years, so most game developers can simply rebuild with the Metal backend enabled."}
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "test_id": 7,
+    "title": "Mozilla Lays Off 60 Employees, Restructures Around AI Products",
+    "content": "Mozilla Corporation has laid off approximately 60 employees, representing about 5% of its workforce, as part of a strategic restructuring to focus on AI-integrated products. The layoffs primarily affect the platform engineering and developer tools teams. CEO Laura Chambers stated that Mozilla needs to invest in AI features for Firefox to remain competitive against Chrome and Edge, both of which have integrated AI assistants. The company reported $593 million in revenue for 2025, with 86% still coming from the Google search deal. Mozilla's AI efforts include a local inference engine for on-device text summarization and a privacy-preserving ad relevance system that processes data entirely on the user's device.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-10-02", "title": "Mozilla layoffs: 60 jobs cut", "body": "Mozilla lays off 60 employees as it pivots toward AI features in Firefox. Platform engineering and developer tools teams most affected."},
+      {"source": "Wikipedia", "date": "", "title": "Mozilla Corporation", "body": "Mozilla Corporation is a wholly owned subsidiary of the Mozilla Foundation that coordinates and integrates the development of Internet-related applications such as the Firefox web browser."}
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "test_id": 8,
+    "title": "Go 1.23 Introduces Iterators and Range-Over-Function",
+    "content": "The Go programming language version 1.23 has been released with first-class support for iterators through the new range-over-function feature. Functions matching the signature func(yield func(K) bool) can now be used directly in for-range loops, eliminating the need for channels or custom iteration patterns. The standard library's slices, maps, and strings packages have been updated with iterator-returning functions. The release also includes a new unique package for value interning, improvements to the toolchain including better PGO support, and timer changes that eliminate the need for manual timer.Stop calls. The Go team emphasized that iterators were designed to be pull-based to avoid the goroutine overhead of channel-based iteration.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-08-15", "title": "Go 1.23 released with iterators", "body": "Go 1.23 adds range-over-function, bringing proper iterator support to the language. The slices and maps packages gain iterator-returning functions."},
+      {"source": "Wikipedia", "date": "", "title": "Go (programming language)", "body": "Go is a statically typed, compiled high-level programming language designed at Google by Robert Griesemer, Rob Pike, and Ken Thompson. It is syntactically similar to C, but also has memory safety, garbage collection, structural typing, and CSP-style concurrency."}
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "test_id": 9,
+    "title": "Signal Adds Post-Quantum Key Exchange Using PQXDH Protocol",
+    "content": "Signal has deployed post-quantum key exchange in its messaging protocol, using a hybrid scheme called PQXDH that combines the existing X25519 elliptic curve Diffie-Hellman with CRYSTALS-Kyber, a lattice-based key encapsulation mechanism selected by NIST for post-quantum standardization. The upgrade protects against harvest-now-decrypt-later attacks where adversaries store encrypted traffic today to decrypt it once large quantum computers exist. Signal's implementation adds approximately 2.5KB to initial key exchange messages and 1KB to ratchet messages. Performance benchmarks show less than 5ms additional computation on modern smartphones. The protocol has been formally verified using the Tamarin prover. Signal noted that other messaging apps using the Signal Protocol, including WhatsApp, will need to adopt the update independently.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-09-30", "title": "Signal upgrades to post-quantum encryption", "body": "Signal rolls out PQXDH, a hybrid post-quantum key exchange combining X25519 with CRYSTALS-Kyber. The upgrade adds minimal overhead to message sizes."},
+      {"source": "Wikipedia", "date": "", "title": "Post-quantum cryptography", "body": "Post-quantum cryptography refers to cryptographic algorithms that are thought to be secure against cryptanalytic attacks by quantum computers. In August 2024, NIST published three post-quantum cryptographic standards including CRYSTALS-Kyber for key encapsulation."}
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "test_id": 10,
+    "title": "TSMC Reports 5nm Yield Reaches 90% at Arizona Fab",
+    "content": "TSMC has announced that its Arizona fabrication facility has achieved 90% die yield on its N5 (5nm) process, matching the yield rates at its primary fabs in Taiwan's Hsinchu Science Park. The milestone comes 18 months after the fab began volume production in early 2025. The $40 billion facility currently produces Apple's A-series and M-series chips exclusively. TSMC Chairman C.C. Wei stated that the Arizona team has reduced defect density to 0.09 defects per square centimeter, which the company considers production-grade. A second fab building for N3 (3nm) production is scheduled to begin equipment installation in Q1 2027.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-10-03", "title": "TSMC Arizona reaches production-grade yield", "body": "TSMC's Arizona 5nm fab hits 90% yield, matching Taiwan operations. The $40B facility produces Apple chips exclusively."}
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "test_id": 11,
+    "title": "Controversial Paper Claims LLM Benchmarks Are Fundamentally Broken",
+    "content": "A preprint from researchers at ETH Zurich argues that current LLM benchmarks like MMLU, HumanEval, and GSM8K are fundamentally unreliable for comparing model capabilities. The paper demonstrates that benchmark leaderboard rankings change dramatically based on minor prompt formatting changes, including whitespace, capitalization of answer choices, and whether few-shot examples are included. In their experiments, the relative ranking of GPT-4, Claude 3.5, and Llama 3.1 70B reversed on 4 out of 7 benchmarks when prompt templates were varied. The authors propose a new evaluation framework called RobustBench that averages scores across 50 prompt variations and reports confidence intervals. They also found evidence that at least two of the models tested had likely seen portions of GSM8K and MMLU during training.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-09-22", "title": "ETH Zurich questions LLM benchmarks", "body": "New research from ETH Zurich shows LLM benchmark rankings are unstable across minor prompt variations, calling into question the reliability of standard evaluations."},
+      {"source": "DDG News", "date": "2026-09-23", "title": "RobustBench proposed as benchmark alternative", "body": "ETH researchers propose RobustBench, averaging scores across 50 prompt templates to produce stable rankings. The paper found evidence of training data contamination in popular benchmarks."}
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "test_id": 12,
+    "title": "Docker Acquires Testcontainers, Makes Integration Testing Free",
+    "content": "Docker has completed its acquisition of AtomicJar, the company behind the popular Testcontainers library, and announced that all Testcontainers Cloud features will be free for individual developers. Testcontainers allows developers to spin up lightweight, throwaway instances of databases, message brokers, and other services as Docker containers during integration tests. The library supports Java, Python, Go, Node.js, Rust, and .NET. Docker plans to integrate Testcontainers directly into Docker Desktop, eliminating the need for separate CLI tools. The combined company reports over 75 million monthly Testcontainers downloads across all language SDKs.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-09-12", "title": "Docker acquires Testcontainers maker AtomicJar", "body": "Docker acquires AtomicJar and makes Testcontainers Cloud free for individual developers. Integration planned with Docker Desktop."},
+      {"source": "Wikipedia", "date": "", "title": "Testcontainers", "body": "Testcontainers is an open-source framework for providing throwaway, lightweight instances of databases, message brokers, web browsers, or just about anything that can run in a Docker container, for use in integration testing."}
+    ],
+    "difficulty": "easy"
+  },
+  {
+    "test_id": 13,
+    "title": "Show HN: Real-Time Collaborative Terminal Using WebRTC",
+    "content": "I built a tool that lets multiple developers share a terminal session in real-time using WebRTC for peer-to-peer communication. Unlike tmux or screen sharing, there's no central server — terminals connect directly between peers with end-to-end encryption. Each participant gets their own cursor and can type simultaneously, with conflict resolution handled by a CRDT-based input buffer. The tool supports up to 8 concurrent users with sub-50ms latency on the same continent. It's written in Go with a thin TypeScript client. I've been using it for pair programming and it feels much more responsive than VS Code Live Share for terminal-heavy workflows. The signaling server (needed only for initial connection) is self-hostable and the entire project is MIT licensed.",
+    "snippets": [],
+    "difficulty": "hard"
+  },
+  {
+    "test_id": 14,
+    "title": "EU Digital Markets Act Forces WhatsApp to Support Cross-Platform Messaging",
+    "content": "WhatsApp has published its interoperability API as required by the European Union's Digital Markets Act, allowing third-party messaging apps to send and receive messages with WhatsApp users. The initial implementation supports text messages and images, with group messaging and voice/video calls planned for 2027. Meta's technical specification requires connecting apps to implement the Signal Protocol for end-to-end encryption, with key exchange handled through WhatsApp's servers. Privacy advocates have raised concerns that the interoperability requirement could weaken encryption guarantees if third-party apps implement the protocol incorrectly. WhatsApp has set a rate limit of 1000 messages per day per connected app during the initial rollout.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-09-27", "title": "WhatsApp opens interoperability API under DMA", "body": "WhatsApp publishes its interoperability API to comply with the EU Digital Markets Act. Third-party apps can now exchange text and images with WhatsApp users."},
+      {"source": "DDG News", "date": "2026-09-28", "title": "Privacy concerns over WhatsApp interoperability", "body": "Security researchers warn that WhatsApp's interoperability mandate could weaken end-to-end encryption if third-party implementations are flawed."},
+      {"source": "Wikipedia", "date": "", "title": "Digital Markets Act", "body": "The Digital Markets Act is a European Union regulation aimed at making the digital sector fairer and more contestable. It establishes a set of obligations for designated 'gatekeeper' platforms, including interoperability requirements for messaging services."}
+    ],
+    "difficulty": "medium"
+  },
+  {
+    "test_id": 15,
+    "title": "Leaked Internal Email Reveals Google Considered Dropping Chromium for WebKit",
+    "content": "An internal Google email chain from 2024, surfaced during the DOJ antitrust trial, reveals that senior Chrome engineers briefly considered migrating Chrome back to the WebKit rendering engine to reduce engineering costs. The emails show that maintaining Blink (Google's WebKit fork) requires approximately 400 full-time engineers and costs over $200 million annually. One engineering VP argued that the divergence between Blink and WebKit had become so significant that the two codebases share less than 15% common code. The proposal was ultimately rejected because it would have required Google to adopt Apple's contribution review process for WebKit changes. A Google spokesperson stated that the emails represent internal brainstorming and do not reflect any actual plans.",
+    "snippets": [
+      {"source": "DDG News", "date": "2026-10-01", "title": "Google considered returning to WebKit", "body": "Internal emails from Google's antitrust trial reveal Chrome engineers briefly debated dropping Blink for WebKit to save $200M in annual engineering costs."},
+      {"source": "Wikipedia", "date": "", "title": "Blink (browser engine)", "body": "Blink is a browser engine developed as part of the Chromium project. Google announced Blink in April 2013, as a fork of the WebKit layout engine."}
+    ],
+    "difficulty": "hard"
+  }
+]

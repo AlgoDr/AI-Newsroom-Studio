@@ -141,15 +141,106 @@ def eval_agent2_strip_citation_artifacts() -> tuple[bool, str]:
 # ══════════════════════════════════════════════════════════════════
 
 def eval_agent6_humanize_dates() -> tuple[bool, str]:
+    """Multi-bucket exact-output test for _humanize_dates.
+
+    Known defect (Production Plan #3): the old test only checked for
+    'days ago' as a substring, so 'Announced on 3 days ago' passed.
+    This version tests exact output across all time buckets and catches
+    real phrasings from cached stories (e.g. 'on July 16, 2026').
+    """
     from agents.agent6 import _humanize_dates
-    three_days_ago = (datetime.now(timezone.utc) - timedelta(days=3))
-    date_str = three_days_ago.strftime("%B %d, %Y").replace(" 0", " ")
-    out = _humanize_dates(f"Announced on {date_str}, the update ships today.")
-    if out.count("days ago") == 0:
-        return False, f"expected relative phrasing, got: {out!r}"
-    if three_days_ago.strftime("%B") in out:
-        return False, f"absolute month name still present: {out!r}"
-    return True, f"'{date_str}' -> '{out[:60]}...'"
+
+    now = datetime.now(timezone.utc)
+    failures = []
+
+    def _make_date_str(dt_obj):
+        """Format as 'Month DD, YYYY' matching DATE_PATTERN."""
+        return dt_obj.strftime("%B %d, %Y").replace(" 0", " ")
+
+    # ── Test cases: (delta_days, input_template, expected_substring) ──
+    # Each tests a different bucket in _humanize_dates
+    cases = [
+        # today bucket
+        (0, "Released on {date}.",
+         "today", "today"),
+        # yesterday bucket
+        (1, "Published on {date}, the paper gained traction.",
+         "yesterday", "yesterday"),
+        # N days ago (3 days)
+        (3, "Announced on {date}, the update ships next week.",
+         "3 days ago", "days ago"),
+        # last week (10 days)
+        (10, "First reported on {date} by Reuters.",
+         "last week", "last week"),
+        # N weeks ago (18 days = ~2.5 weeks)
+        (18, "The vulnerability was disclosed on {date}.",
+         "2 weeks ago", "weeks ago"),
+        # last month (45 days)
+        (45, "Apple acquired the startup on {date}.",
+         "last month", "last month"),
+        # N months ago (120 days = ~4 months)
+        (120, "The RFC was published on {date} and ratified shortly after.",
+         "4 months ago", "months ago"),
+        # last year (400 days)
+        (400, "Originally launched on {date}, it has since grown.",
+         "last year", "last year"),
+        # almost two years ago (600 days)
+        (600, "First proposed on {date} at a conference.",
+         "almost two years ago", "almost two years"),
+        # N years ago (1100 days = ~3 years)
+        (1100, "The project started on {date} as a research prototype.",
+         "3 years ago", "years ago"),
+    ]
+
+    passed = 0
+    for delta, template, expected_phrase, check_substr in cases:
+        dt = now - timedelta(days=delta)
+        date_str = _make_date_str(dt)
+        raw = template.format(date=date_str)
+        out = _humanize_dates(raw)
+
+        # The absolute date string must NOT survive
+        if date_str in out:
+            failures.append(
+                f"delta={delta}d: absolute date still present: {out!r}"
+            )
+            continue
+
+        # The month name must NOT survive (catches "Announced on 3 days ago" bug)
+        month_name = dt.strftime("%B")
+        if month_name in out:
+            failures.append(
+                f"delta={delta}d: month name '{month_name}' still in output: {out!r}"
+            )
+            continue
+
+        # The expected relative phrase must be present
+        if check_substr not in out:
+            failures.append(
+                f"delta={delta}d: expected '{check_substr}' in output, got: {out!r}"
+            )
+            continue
+
+        passed += 1
+
+    # ── Real cached-story phrasing tests ──
+    # Real stories use "on July 16, 2026" and "by July 27, 2026" patterns
+    real_phrasings = [
+        f"on {_make_date_str(now - timedelta(days=5))},",
+        f"by {_make_date_str(now - timedelta(days=14))},",
+    ]
+    for phrase in real_phrasings:
+        out = _humanize_dates(f"The feature was announced {phrase} the team said.")
+        month = (now - timedelta(days=5)).strftime("%B")
+        if month in out and "days ago" not in out and "last week" not in out:
+            failures.append(f"real phrasing not converted: {phrase!r} -> {out!r}")
+        else:
+            passed += 1
+
+    total = len(cases) + len(real_phrasings)
+    if failures:
+        return False, f"{passed}/{total} passed. First failure: {failures[0]}"
+    return True, f"All {total} buckets passed (today through {len(cases[-1])}+ years)"
 
 
 def eval_agent6_qc_script_compliance() -> tuple[bool, str]:

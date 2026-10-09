@@ -148,8 +148,143 @@ def content_eval_cost_guardrail() -> tuple[bool, str]:
     return True, f"word_count={wc} within guardrail {config.MAX_WORDS_PER_RUN}"
 
 
+# ══════════════════════════════════════════════════════════════════
+# Phase A Quality Evals — DeepEval-based, per-agent golden datasets
+# ══════════════════════════════════════════════════════════════════
+#
+# These wrap the DeepEval pytest tests from evals/quality/ into the
+# (passed, detail) interface used by run_all.py. Each calls the
+# agent's synthesis/judge function on frozen golden data and scores
+# the output with an LLM judge or reference comparison.
+#
+# They SKIP (not fail) if deepeval or required APIs are unavailable.
+
+
+def _quality_eval_wrapper(test_fn, label: str):
+    """Run a DeepEval quality eval test function, catch assertion failures."""
+    try:
+        test_fn()
+        return True, f"{label}: PASS"
+    except AssertionError as e:
+        return False, f"{label}: FAIL — {e}"
+    except ImportError as e:
+        return False, f"SKIPPED: {label} — missing dependency: {e}"
+    except Exception as e:
+        return False, f"{label}: CRASHED — {type(e).__name__}: {e}"
+
+
+def quality_eval_agent2_faithfulness() -> tuple[bool, str]:
+    """Agent 2 — background synthesis faithfulness (G-Eval, ref-free)."""
+    try:
+        from deepeval.metrics import BaseMetric  # noqa: F401 — check deepeval installed
+    except ImportError:
+        return False, "SKIPPED: deepeval not installed"
+    key = os.getenv("GROQ_KEY")
+    if not key:
+        return False, "SKIPPED: GROQ_KEY not set (needed for judge)"
+
+    # Import path: evals/ is a sibling of experiments/ — add project root
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+
+    from evals.quality.ref_free.test_agent2 import test_agent2_background_faithfulness
+    return _quality_eval_wrapper(test_agent2_background_faithfulness,
+                                 "Agent 2 background faithfulness")
+
+
+def quality_eval_agent3_accuracy() -> tuple[bool, str]:
+    """Agent 3 — credibility label accuracy (macro-F1, ref-based)."""
+    try:
+        from deepeval.metrics import BaseMetric  # noqa: F401
+    except ImportError:
+        return False, "SKIPPED: deepeval not installed"
+    key = os.getenv("GROQ_KEY")
+    if not key:
+        return False, "SKIPPED: GROQ_KEY not set (needed for Agent 3)"
+
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+
+    from evals.quality.ref_based.test_agent3 import test_agent3_credibility_accuracy
+    return _quality_eval_wrapper(test_agent3_credibility_accuracy,
+                                 "Agent 3 credibility accuracy (macro-F1)")
+
+
+def quality_eval_agent4_dedup() -> tuple[bool, str]:
+    """Agent 4 — dedup merge precision/recall (micro-F1, ref-based)."""
+    try:
+        from deepeval.metrics import BaseMetric  # noqa: F401
+    except ImportError:
+        return False, "SKIPPED: deepeval not installed"
+
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+
+    from evals.quality.ref_based.test_agent4 import test_agent4_dedup_accuracy
+    return _quality_eval_wrapper(test_agent4_dedup_accuracy,
+                                 "Agent 4 dedup merge (micro-F1)")
+
+
+def quality_eval_agent5_script() -> tuple[bool, str]:
+    """Agent 5 — script generation composite (7 dimensions, ref-based)."""
+    try:
+        from deepeval.metrics import BaseMetric  # noqa: F401
+    except ImportError:
+        return False, "SKIPPED: deepeval not installed"
+    key = os.getenv("GROQ_KEY")
+    if not key:
+        return False, "SKIPPED: GROQ_KEY not set (needed for Agent 5)"
+
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+
+    from evals.quality.ref_based.test_agent5 import test_agent5_script_quality
+    return _quality_eval_wrapper(test_agent5_script_quality,
+                                 "Agent 5 script quality (composite)")
+
+
+def quality_eval_agent6_judge() -> tuple[bool, str]:
+    """Agent 6 — JUDGE agreement on pass/fail (micro-F1, ref-based)."""
+    try:
+        from deepeval.metrics import BaseMetric  # noqa: F401
+    except ImportError:
+        return False, "SKIPPED: deepeval not installed"
+    key = os.getenv("GROQ_KEY")
+    if not key:
+        return False, "SKIPPED: GROQ_KEY not set (needed for Agent 6)"
+
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+
+    from evals.quality.ref_based.test_agent6 import test_agent6_judge_accuracy
+    return _quality_eval_wrapper(test_agent6_judge_accuracy,
+                                 "Agent 6 JUDGE agreement (micro-F1)")
+
+
 CONTENT_EVALS = [
+    # Checkpoint-based evals (existing)
     content_eval_faithfulness,
     content_eval_relevance,
     content_eval_cost_guardrail,
+    # Phase A quality evals (per-agent golden datasets)
+    quality_eval_agent2_faithfulness,
+    quality_eval_agent3_accuracy,
+    quality_eval_agent4_dedup,
+    quality_eval_agent5_script,
+    quality_eval_agent6_judge,
 ]
