@@ -32,7 +32,7 @@ Each task tests one agent against a human-labelled golden dataset. "Ref-based" m
 | A1 | Agent 3 | Credibility labels (REAL/OPINION/SPAM) | ref-based | Macro-F1 | ≥ 0.70 | **0.990** | PASS |
 | A2 | — | GroqJudge adapter for DeepEval | infra | — | — | — | Built, unused |
 | A3 | Agent 6 | Judge calibration (human vs LLM agreement) | calibration | Verdict agreement | ≥ 80% | — | Not yet run |
-| A4 | Agent 4 | Dedup merge accuracy | ref-based | Micro-F1 | ≥ 0.70 | **0.333** | FAIL |
+| A4 | Agent 4 | Dedup merge accuracy | ref-based | Micro-F1 | ≥ 0.70 | **0.800** | PASS |
 | A5 | Agent 6 | JUDGE section-flag agreement | ref-based | Micro-F1 | ≥ 0.60 | **0.615** | PASS |
 | A6 | Agent 5 | Script generation quality (7 dimensions) | ref-free | Composite mean | ≥ 0.70 | **0.890** | PASS |
 | A7 | — | Date humanizer unit test | unit | Exact match | all pass | — | PASS |
@@ -110,8 +110,8 @@ Every model swap requires a multi-run reliability test (N ≥ 5) using real cach
 
 | File | Task | Key finding |
 |------|------|------------|
-| `results/agent3_baseline.md` | A1 | Macro-F1 = 0.990. Both primary (gpt-oss-120b) and fallback (qwen2.5:7b) pass. 1 failure: "Stolen Buttons" art project misclassified as SPAM |
-| `results/agent4_baseline.md` | A4 | Micro-F1 = 0.333 — FAILING. Model misses product-family pairs, generates false merges from domain keywords |
+| `results/agent3_baseline.md` | A1 | Macro-F1 = 0.990. Both primary (gpt-oss-120b) and fallback (qwen3.5:9b) pass. 1 failure: "Stolen Buttons" art project misclassified as SPAM |
+| `results/agent4_baseline.md` | A4 | Micro-F1 = 0.800 with granite4.2:8b (PASS). Previous qwen baseline was 0.333. 6 models tested across 4 prompt versions |
 | `results/agent5_baseline.md` | A6 | Composite = 0.890 (n=15, expanded from n=5). Systematic issues: word count expansion (20%), CTA markdown (13%), hook specificity (13%) |
 | `results/agent6_baseline.md` | A5 | Micro-F1 = 0.615 (post bug fixes). Binary verdict 9/10. Transition over-flagging is the #1 precision issue |
 
@@ -161,7 +161,7 @@ Key findings:
 
 ## Known Issues & Next Steps
 
-1. **A4 is FAILING** (F1 = 0.333) — Agent 4 dedup needs a fundamentally different approach
+1. **A4 now PASS** (F1 = 0.800 with granite4.2:8b) — improved from 0.333 with qwen baseline
 2. **A3 judge calibration** — blocked on manual scoring of 10 scripts (~1 hour)
 3. **Transition over-flagging** — prompt calibration needed to reduce false positives on S2_HOOK/S3_HOOK
 4. **Agent 2 eval** — dataset ready, test script built, not yet run
