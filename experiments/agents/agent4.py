@@ -6,7 +6,7 @@ Role: "Which 3 stories should we actually cover today?"
 Responsibilities:
   1. filter_stories()       — remove Agent 3 discards (score < 0.0)
   2. score_editorially()    — compute editorial_score per story
-  3. deduplicate_topics()   — qwen3.5:9b clusters titles → keep best per topic
+  3. deduplicate_topics()   — granite4.2:8b clusters titles → keep best per topic
   4. select_top_stories()   — pick top 3 (or fewer) by editorial_score
   5. editorial_node()       — LangGraph node (orchestrates 1-4)
   6. route_after_editorial()— LangGraph conditional edge (→ Agent 5 or end)
@@ -15,7 +15,14 @@ What Agent 4 does NOT do:
   - Does not re-fetch content (Agent 2 did that)
   - Does not re-score credibility (Agent 3 did that)
   - Does not write scripts (Agent 5 will do that)
-  - Does not call any cloud API (qwen3.5:9b is local)
+  - Does not call any cloud API (granite4.2:8b is local)
+
+Model selection — granite4.2:8b + Prompt V3:
+  Tested 3 local models (qwen3.5:9b, gemma4:12b-mlx, granite4.2:8b)
+  across 3 prompt versions on 10-set golden dataset (80 titles, 5 pairs).
+  granite4.2:8b + V3 was the only combination to PASS the F1≥0.70 gate.
+  N=5 reliability test confirmed: 5/5 PASS, F1 avg=0.818, min=0.800.
+  See evals/results/agent4_baseline.md for full experiment history.
 
 Keys added to story dict:
   editorial_score   float  — composite editorial rank (0.0 to 1.0)
@@ -24,7 +31,7 @@ Keys added to story dict:
   selection_reason  str    — why this story was picked (audit trail)
   _vel_norm         float  — normalised velocity (audit trail)
   _bg_norm          float  — normalised background score (audit trail)
-  _topic_cluster    int    — which topic cluster phi3.5 assigned
+  _topic_cluster    int    — which topic cluster granite4.2:8b assigned
 """
 
 import os
@@ -141,22 +148,27 @@ def score_editorially(stories: dict) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def deduplicate_topics(stories: dict) -> dict:
-    """Cluster stories by topic using phi3.5 — one call, no context bleed.
+    """Cluster stories by topic using granite4.2:8b — one call, Prompt V3.
 
     Problem: 3 stories all about "AI model releases" → bad diversity
     Solution: group by topic, keep only the highest editorial_score
               from each topic cluster
 
-    Why phi3.5 (not 8B, not 120b):
-      - Classification task, not generation → small model sufficient
-      - One single call (all titles in one prompt) → NO context bleed
-      - Already in pipeline (Agent 2 wiki keyword extraction)
-      - ~3x faster than 8B for this task
+    Model: granite4.2:8b (local, Ollama)
+      - Selected via multi-model eval on 10-set golden dataset
+      - Only model to PASS F1≥0.70 gate (F1=0.800, 8/10 sets perfect)
+      - N=5 reliability test: 5/5 PASS, avg F1=0.818, deterministic
+      - Fastest of 3 tested models (~7.6s/set)
+      - See evals/results/agent4_baseline.md
+
+    Prompt V3 (integer few-shot):
+      - Fixed V2 format bug (string examples → model returned strings)
+      - Integer-only example [[1],[2,5],[3],[4],[6]]
+      - "When in doubt → SEPARATE groups" bias
 
     Why ONE call (not pairwise):
       - Pairwise: 8×8/2 = 28 calls → slow, wasteful
-      - One call: send all 8 titles → phi3.5 clusters them → done
-      - Context bleed only happens with sequential calls, not one call
+      - One call: send all 8 titles → model clusters them → done
 
     Returns stories with _topic_cluster field added.
     Stories that are duplicates within a cluster are marked:
@@ -173,102 +185,92 @@ def deduplicate_topics(stories: dict) -> dict:
         f"{i+1}. {title}" for i, (_, title) in enumerate(titles)
     )
 
-    prompt = f"""You are a news editor grouping stories by topic for a YouTube channel.
+    # ── Prompt V3: integer few-shot, product-family rules ─────────
+    prompt = f"""Group these numbered titles by SAME specific event or product.
 
-        Two stories belong in the SAME group ONLY if they are about the 
-        EXACT SAME news event, product release, or specific controversy.
-        
-        DIFFERENT topics — do NOT group these together:
-          - A story about building home storage ≠ a story about text-to-speech software
-          - A story about media accuracy ≠ a story about old computer science lectures
-          - A security vulnerability story ≠ a government policy story
-          - Two stories in the "tech" category does NOT make them the same topic
-        
-        SAME topic — only group if literally the same news:
-          - Two stories both covering the same product launch = same group
-          - Two stories both about the same CVE = same group
-          - Two stories both about the same court ruling = same group
-        
-        When in doubt → put stories in SEPARATE groups.
-        Prefer more groups over fewer groups.
-        
-        Titles:
-        {numbered_titles}
-        
-        Return ONLY a JSON array of arrays of integers.
-        Every number 1 to {len(titles)} must appear exactly once.
-        Default assumption: each story is its own group unless obviously the same news.
-        
-        JSON:"""
+Rules:
+- SAME group: same product launch, same CVE, same court ruling, same company announcement
+- SAME group: "ProductX 3" and "ProductX 3 Pro variant" = same product family
+- SAME group: two RFCs about the same standard (e.g. TLS 1.2 deprecation) = same effort
+- DIFFERENT: two stories that share a tech domain (both AI, both C++, both security) but are about different specific things
+- When in doubt → SEPARATE groups
+
+Titles:
+{numbered_titles}
+
+Return ONLY a JSON array of arrays of integers (1-indexed).
+Every number from 1 to {len(titles)} must appear exactly once.
+Example for 6 titles where 2 and 5 cover the same event:
+[[1],[2,5],[3],[4],[6]]
+
+JSON:"""
 
     try:
         resp = ollama.generate(
-        model="qwen3.5:9b",
-        prompt=prompt,
-        stream=False,
-        think=False,   # qwen3.5 thinks by default — hidden tokens cause multi-minute hangs; measured 8.2s with think=False
-        keep_alive=0,
-        options={"temperature": 0.1, "num_ctx": 4096})
+            model="granite4.2:8b",
+            prompt=prompt,
+            stream=False,
+            think=False,
+            keep_alive=0,
+            options={"temperature": 0.1, "num_ctx": 4096},
+        )
 
         raw = resp["response"].strip()
-        print(f"  [deduplicate] qwen3.5:9b raw output: {raw[:120]}")
+        print(f"  [deduplicate] granite4.2:8b raw: {raw[:120]}")
 
-        # ── LAYER 1: clean malformed JSON before parsing ──────────────
-        # phi3.5 sometimes adds trailing commas → invalid JSON
-        # e.g. [["1",], ["2",]] → [["1"], ["2"]]
+        # ── Clean malformed JSON ─────────────────────────────────────
         import re
         raw_clean = re.sub(r',\s*]', ']', raw)
         raw_clean = re.sub(r',\s*}', '}', raw_clean)
-        # ─────────────────────────────────────────────────────────────
-
-        # ── strip all whitespace so "[ [1,3]" becomes "[[1,3]" ──────────
-        # phi3.5 sometimes returns [ [1,3], [2,5] ] with spaces
-        # find("[[") fails on "[ [" — compacting fixes this
         raw_compact = raw_clean.replace(" ", "").replace("\n", "").replace("\t", "")
-        # ─────────────────────────────────────────────────────────────
 
-        # parse JSON — find the array in the compacted response
+        # ── Handle missing outer brackets: [1],[2],[3] → [[1],[2],[3]]
+        if "[[" not in raw_compact and re.match(r'\[\d', raw_compact):
+            raw_compact = "[" + raw_compact + "]"
+            print(f"  [deduplicate] wrapped missing outer brackets")
+
+        # ── Parse JSON array ─────────────────────────────────────────
         start = raw_compact.find("[[")
         end   = raw_compact.rfind("]]") + 2
         if start == -1 or end == 1:
-            raise ValueError("no JSON array found in response")
+            raise ValueError(f"no JSON array found in: {raw_compact[:80]}")
 
         clusters = json.loads(raw_compact[start:end])
 
-        # ── LAYER 2: extract integers — handles text mixed with numbers ─
-        # phi3.5 sometimes returns ["1", "title text"] instead of [1]
+        # ── Extract integers only (strict: pure digits only) ─────────
+        # V3 fix: r'^\d+$' not r'\d+' — prevents extracting leading
+        # digits from titles like "25 Gbps Thunderbolt..."
         clean_clusters = []
         for group in clusters:
             nums = []
             for item in group:
                 if isinstance(item, int):
                     nums.append(item)
-                else:
-                    m = re.match(r'\d+', str(item).strip())
+                elif isinstance(item, str):
+                    m = re.match(r'^\d+$', item.strip())
                     if m:
                         nums.append(int(m.group()))
             if nums:
                 clean_clusters.append(nums)
         clusters = clean_clusters
-        # ─────────────────────────────────────────────────────────────
 
         print(f"  [deduplicate] {len(clusters)} topic clusters found")
 
-        # assign cluster IDs and mark duplicates
+        # ── Assign cluster IDs and mark duplicates ───────────────────
         sid_list = [sid for sid, _ in titles]
+        assigned = set()
 
         for cluster_idx, group in enumerate(clusters):
-            # get all stories in this cluster
             cluster_sids = []
             for num in group:
                 idx = int(num) - 1
                 if 0 <= idx < len(sid_list):
                     cluster_sids.append(sid_list[idx])
+                    assigned.add(sid_list[idx])
 
             if not cluster_sids:
                 continue
 
-            # find the best story in this cluster by editorial_score
             best_sid = max(
                 cluster_sids,
                 key=lambda s: stories[s].get("editorial_score", 0)
@@ -283,8 +285,17 @@ def deduplicate_topics(stories: dict) -> dict:
                     print(f"  [deduplicate] cluster {cluster_idx} best → "
                           f"{stories[sid]['title'][:50]}")
 
+        # ── Safety: unassigned stories get their own cluster ─────────
+        # Prevents mega-cluster bug if model omits some numbers
+        next_cid = len(clusters)
+        for sid, story in stories.items():
+            if sid not in assigned:
+                story["_topic_cluster"] = next_cid
+                story["_is_duplicate"]  = False
+                next_cid += 1
+
     except Exception as e:
-        print(f"  [deduplicate] qwen3.5:9b failed ({type(e).__name__}: {e}) "
+        print(f"  [deduplicate] granite4.2:8b failed ({type(e).__name__}: {e}) "
               f"→ no deduplication, all stories eligible")
         # safe fallback: treat every story as its own cluster
         for i, (sid, story) in enumerate(stories.items()):
