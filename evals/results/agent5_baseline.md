@@ -1,11 +1,12 @@
 # Agent 5 — Script Writer Quality Eval Baseline
 
-**Date:** 2026-10-08
+**Date:** 2026-10-12 (expanded from 2026-10-08 baseline)
 **Script:** `evals/quality/ref_based/test_agent5.py`
-**Golden dataset:** `evals/golden_dataset/agent5_script_v1.json` (n=5 test input sets)
+**Golden dataset:** `evals/golden_dataset/agent5_script_v1.json` (n=15 test input sets)
 **Framework:** DeepEval (BaseMetric + custom ScriptQualityMetric)
 **Gate metric:** Composite mean ≥ 0.70
-**Model:** qwen/qwen3.8-27b via Groq (primary)
+**Judge model:** qwen/qwen3.8-27b via Groq
+**Generation model:** llama-3.3-70b-versatile via Groq (Agent 5 primary)
 
 ---
 
@@ -16,108 +17,153 @@ Reference-free generative eval — no "correct" script exists, so output quality
 **3 deterministic (pure Python):**
 - `structure` — all expected sections present (10 for 3 stories, 8 for 2, 5 for 1)
 - `word_count` — total words in 150–225 range
-- `cta_exact` — CTA text is exactly "Follow for daily tech news"
+- `cta_exact` — CTA text is exactly one of the valid CTAs
 
-**4 LLM-judged (qwen2.5:7b via Ollama):**
+**4 LLM-judged (qwen/qwen3.8-27b via Groq):**
 - `hook_specificity` — HOOK names a specific technology/event, not generic
 - `twist_quality` — each TWIST adds a genuine "so what" angle
 - `faithfulness` — claims traceable to source material
 - `story_alignment` — correct stories included, correct count
 
-Composite = mean of all 7 dimension scores across all 5 test cases.
+Composite = mean of all 7 dimension scores across all 15 test cases.
 
 ---
 
-## Results — 5 Runs
-
-| Run | Struct | WC | CTA | Hook | Twist | Faith | Align | Composite | Verdict |
-|-----|--------|----|-----|------|-------|-------|-------|-----------|---------|
-| 1 | 1.000 | 0.800 | 0.400 | 0.710 | 0.870 | 0.900 | 1.000 | **0.811** | PASS |
-| 2 | 1.000 | 1.000 | 0.800 | 0.740 | 0.880 | 0.950 | 1.000 | **0.910** | PASS |
-| 3 | 1.000 | 1.000 | 1.000 | 0.720 | 0.880 | 0.980 | 1.000 | **0.940** | PASS |
-| 4 | 1.000 | 1.000 | 0.800 | 0.740 | 0.880 | 0.950 | 1.000 | **0.910** | PASS |
-| 5 | 1.000 | 1.000 | 0.600 | 0.720 | 0.850 | 0.960 | 1.000 | **0.876** | PASS |
-
-**Mean composite: 0.889 ± 0.046**
-**All 5 runs PASS (gate ≥ 0.70)**
-
----
-
-## Per-Test Breakdown (Run 5 — representative)
+## Results — Expanded Run (15 test sets)
 
 | ID | Diff | Struct | WC | CTA | Hook | Twist | Faith | Align | Comp |
 |----|------|--------|----|-----|------|-------|-------|-------|------|
 | t1 | easy | 1.000 | 1.000 | 1.000 | 0.900 | 0.900 | 1.000 | 1.000 | 0.971 |
-| t2 | medium | 1.000 | 1.000 | 0.000 | 1.000 | 0.900 | 0.950 | 1.000 | 0.836 |
-| t3 | medium | 1.000 | 1.000 | 1.000 | 0.800 | 0.800 | 1.000 | 1.000 | 0.943 |
+| t2 | medium | 1.000 | 1.000 | 0.000 | 0.950 | 0.900 | 0.850 | 1.000 | 0.814 |
+| t3 | medium | 1.000 | 1.000 | 1.000 | 0.800 | 0.900 | 1.000 | 1.000 | 0.957 |
 | t4 | hard | 1.000 | 1.000 | 1.000 | 0.000 | 0.900 | 1.000 | 1.000 | 0.843 |
-| t5 | hard | 1.000 | 1.000 | 0.000 | 0.900 | 0.750 | 0.850 | 1.000 | 0.786 |
+| t5 | hard | 1.000 | 1.000 | 1.000 | 0.900 | 0.800 | 0.950 | 1.000 | 0.950 |
+| t6 | easy | 1.000 | 1.000 | 1.000 | 0.000 | 0.900 | 1.000 | 1.000 | 0.843 |
+| t7 | easy | 1.000 | 1.000 | 1.000 | 0.900 | 0.900 | 1.000 | 1.000 | 0.971 |
+| t8 | medium | 1.000 | 1.000 | 1.000 | 0.900 | 0.800 | 1.000 | 1.000 | 0.957 |
+| t9 | hard | 1.000 | 1.000 | 1.000 | 0.900 | 0.900 | 1.000 | 1.000 | 0.971 |
+| t10 | easy | 1.000 | 1.000 | 1.000 | 0.900 | 0.900 | 0.950 | 1.000 | 0.964 |
+| t11 | medium | 1.000 | 0.000 | 1.000 | 0.400 | 0.900 | 0.850 | 1.000 | 0.736 |
+| t12 | hard | 1.000 | 1.000 | 1.000 | 0.900 | 0.750 | 0.850 | 1.000 | 0.929 |
+| t13 | hard | 1.000 | 1.000 | 1.000 | 1.000 | 0.900 | 1.000 | 1.000 | 0.986 |
+| t14 | medium | 1.000 | 0.000 | 1.000 | 0.900 | 0.900 | 0.850 | 1.000 | 0.807 |
+| t15 | medium | 1.000 | 0.000 | 0.000 | 0.800 | 0.900 | 0.850 | 1.000 | 0.650 |
+
+**Composite: 0.890 (gate ≥ 0.70) — PASS**
+**Tests: 15 succeeded, 0 errored**
+**Runtime: 542s (~9 min)**
 
 ---
 
-## Consistent Patterns Across All Runs
+## Dimension Averages
 
-### Always perfect (5/5 runs)
-- **structure: 1.000** — Agent 5 always produces the correct section count
-- **alignment: 1.000** — always includes the right stories
-
-### Stable strengths
-- **faithfulness: 0.900–0.980** — rarely hallucinates claims
-- **twist_quality: 0.850–0.880** — generally adds genuine "so what" angles
-- **word_count: 0.800–1.000** — usually hits the 150–225 window (t5 occasionally overshoots on expansion)
-
-### Consistent weaknesses
-
-#### 1. CTA markdown contamination (Agent 5 bug)
-**cta_exact: 0.400–1.000 (high variance)**
-
-The model intermittently prepends `**` to the CTA text, producing `'** Follow for daily tech news'` or `'**\nFollow for daily tech news'` instead of the exact expected string. This appears most often on t2 (mixed credibility) and t5 (low credibility) — the harder inputs where the model needs expansion attempts.
-
-**Root cause:** Agent 5's prompt or parsing doesn't strip markdown bold markers from the CTA section. This is an `agent5.py` bug, not an eval issue.
-
-**Impact:** When it hits, cta_exact drops to 0.000 for that test case, pulling the composite down ~0.14 per affected test.
-
-#### 2. t4 hook always generic
-**hook_specificity: 0.000 on t4 in all 5 runs**
-
-Dense technical content (Linux kernel CVE, MLX framework, quantum computing) consistently produces a generic hook like "Three stories pushing tech forward" instead of naming a specific technology.
-
-**Root cause:** When all 3 stories are deeply technical and unrelated, the model defaults to a safe umbrella hook rather than picking one story to lead with.
-
-#### 3. t5 occasionally over-expands
-In Run 1, t5 hit 267 words (out of range), causing word_count = 0.000. The model's expansion logic sometimes overshoots when the initial generation is very short (119–135 words on low-credibility cautious content).
+| Dimension | Average | Status |
+|-----------|---------|--------|
+| structure | 1.000 | Perfect |
+| word_count | 0.800 | 3 failures (t11, t14, t15) |
+| cta_exact | 0.867 | 2 failures (t2, t15) |
+| hook_spec | 0.743 | Weakest dimension, 2 zeroes |
+| twist_qual | 0.877 | Solid |
+| faithfulness | 0.943 | Strong |
+| alignment | 1.000 | Perfect |
 
 ---
 
-## Test Case Difficulty Profile
+## Comparison: Original Baseline (n=5) vs Expanded (n=15)
 
-| Test | Stories | Difficulty | Purpose | Typical Composite |
-|------|---------|------------|---------|-------------------|
-| t1 | 3, all high cred | easy | Standard baseline | 0.96–0.97 |
-| t2 | 3, mixed cred | medium | Tone variation (confident vs hedged) | 0.81–0.99 (CTA variance) |
-| t3 | 2 stories | medium | 8-section format compliance | 0.94–0.96 |
-| t4 | 3, dense technical | hard | Simplification + hook specificity | 0.68–0.84 (hook=0 always) |
-| t5 | 3, all low cred | hard | Cautious framing + word count | 0.66–0.95 (CTA + WC variance) |
+| Metric | n=5 baseline (mean of 5 runs) | n=15 expanded | Delta |
+|--------|-------------------------------|---------------|-------|
+| Composite | 0.889 ± 0.046 | 0.890 | +0.001 |
+| structure | 1.000 | 1.000 | — |
+| word_count | 0.960 | 0.800 | -0.160 |
+| cta_exact | 0.720 | 0.867 | +0.147 |
+| hook_spec | 0.726 | 0.743 | +0.017 |
+| twist_qual | 0.872 | 0.877 | +0.005 |
+| faithfulness | 0.948 | 0.943 | -0.005 |
+| alignment | 1.000 | 1.000 | — |
+
+The composite held steady at 0.890 with 3x more test cases — good sign that the original 5 weren't cherry-picked. Word count got worse because the new test sets (t11, t14, t15) exposed the expansion overshoot more.
+
+---
+
+## Systematic Issues (ranked by impact)
+
+### 1. Word count expansion overshoot — 3/15 failures (20%)
+**Affected:** t11 (299w), t14 (144w), t15 (269w)
+
+Two failure modes:
+- **Overshoot:** Initial gen is short (~136w), expansion blows past 225 to 269-299w (t11, t15)
+- **Undershoot stuck:** Initial gen is very short (~112w), expansion only reaches 144w, still under 150 (t14)
+
+Both exit via "accepting as-is (Agent 6 will review)" after 2 attempts.
+
+**Root cause:** The expansion prompt doesn't specify a target word count — it just says "expand." The model either barely adds anything or rewrites the whole thing much longer.
+
+**Fix:** Specify target in expansion prompt: "Expand to approximately 170 words" (midpoint of 150-225). Add a third attempt if still out of range.
+
+### 2. CTA markdown contamination — 2/15 failures (13%)
+**Affected:** t2 (`'** Follow for daily tech news'`), t15 (`'**\nFollow for daily tech news'`)
+
+The model prepends bold markdown `**` to the CTA text. This was known from the original baseline and remains unfixed.
+
+**Root cause:** Agent 5's `_parse_script()` doesn't strip markdown formatting from the CTA section.
+
+**Fix:** Add `.lstrip('*').lstrip().strip()` to the CTA parsing in `agent5.py`.
+
+### 3. Hook specificity zeroes — 2/15 failures (13%)
+**Affected:** t4 (dense technical, 0.00), t6 (infrastructure, 0.00)
+
+When stories are all deeply technical or infrastructure-focused, the model defaults to a generic umbrella hook instead of naming a specific technology.
+
+**Root cause:** Prompt doesn't force the hook to name a specific story's technology.
+
+**Fix:** Add to prompt: "Your HOOK must name a specific technology, product, or event from Story 1."
+
+### 4. t11 weak hook (0.40) — not a zero but notably low
+Security-focused stories (Cloudflare breach + Signal vulnerability) produced a hook that was partially specific but not sharp enough. Likely compounded by the word count blowout on this same test.
+
+---
+
+## Test Case Difficulty Profile (expanded)
+
+| Test | Stories | Difficulty | Purpose | Composite |
+|------|---------|------------|---------|-----------|
+| t1 | 3, all high cred | easy | Standard baseline | 0.971 |
+| t2 | 3, mixed cred | medium | Tone variation | 0.814 |
+| t3 | 2 stories | medium | 8-section format | 0.957 |
+| t4 | 3, dense technical | hard | Simplification challenge | 0.843 |
+| t5 | 3, all low cred | hard | Cautious framing | 0.950 |
+| t6 | 3, infrastructure | easy | Straightforward generation | 0.843 |
+| t7 | 2, privacy/ethics | easy | 8-section + sensitive topics | 0.971 |
+| t8 | 3, one very low cred | medium | Hedge-language stress test | 0.957 |
+| t9 | 3, science/research | hard | Jargon simplification | 0.971 |
+| t10 | 3, consumer/lifestyle | easy | Tone contrast from technical | 0.964 |
+| t11 | 2, security focus | medium | Compact format + sensitive | 0.736 |
+| t12 | 3, very short content | hard | Synthesis under minimal input | 0.929 |
+| t13 | 3, policy/regulatory | hard | Factual accuracy priority | 0.986 |
+| t14 | 3, all medium cred | medium | Balanced hedging | 0.807 |
+| t15 | 3, hardware/maker | medium | Obscure topic simplification | 0.650 |
+
+**Best:** t13 (0.986) — policy/regulatory content, perfect hook + faithfulness
+**Worst:** t15 (0.650) — double failure (WC + CTA), only test below gate
+
+---
+
+## Improvement Paths (prioritized)
+
+1. **Fix CTA stripping in agent5.py** — strip `**` and whitespace from parsed CTA. Eliminates 2 failures, raises cta_exact from 0.867 to ~0.933. Estimated composite lift: +0.02.
+
+2. **Fix expansion prompt with target word count** — specify "expand to approximately 170 words" and add a 3rd attempt. Eliminates 3 failures, raises word_count from 0.800 to ~0.933. Estimated composite lift: +0.03.
+
+3. **Force specific hook** — add "HOOK must name a specific technology from Story 1" to prompt. Addresses t4 and t6 zeroes. Estimated hook_spec lift from 0.743 to ~0.85.
+
+4. **Combined impact:** All three fixes together would lift composite from 0.890 to ~0.940+.
 
 ---
 
 ## DeepEval Integration Notes
 
-- **copy_metrics() issue (fixed):** DeepEval's `assert_test()` internally calls `copy_metrics()` which creates a new metric instance via `type(metric)(**vars(metric))`. The `__init__()` must accept keyword args matching all instance attributes, or the copy starts fresh and re-runs the entire eval.
-- **Runtime:** ~2.5 min per run (5 test inputs × ~20s each for generation + LLM judging)
-- **No PytestCollectionWarning:** Dataclass renamed from `TestResult` to `EvalResult`
-
----
-
-## Improvement Paths (not yet attempted)
-
-1. **Fix CTA contamination in agent5.py** — strip markdown `**` from parsed CTA section before returning. This alone would raise mean composite by ~0.05–0.10.
-2. **Improve t4 hook specificity** — add a fallback instruction: "If stories are all technical, lead with the most impactful one by name." Or add a second prompt attempt for hooks that score below 0.5.
-3. **Tune expansion logic** — t5's overshoot suggests the expansion prompt should cap more aggressively (e.g., "expand to exactly 160 words" rather than just "expand").
-4. **Test fallback model (gemma4:12b-mlx)** — not yet evaluated; needs a dedicated multi-run reliability test per project policy.
-
----
-
-## Key Takeaway
-
-Agent 5 (qwen/qwen3.8-27b via Groq) is a strong script writer with a stable composite of **0.889 ± 0.046**, comfortably above the 0.70 gate. The two fixable issues — CTA markdown contamination and t4 generic hooks — are both addressable in `agent5.py` without model changes. Structure, alignment, and faithfulness are near-perfect across all runs.
+- ScriptQualityMetric subclasses BaseMetric with copy_metrics() guard pattern
+- Judge model: qwen/qwen3.8-27b via Groq (upgraded from qwen2.5:7b via Ollama in original baseline)
+- 1-second sleep between judge calls for rate limiting
+- Runtime: ~36s per test case (generation + 4 judge calls)

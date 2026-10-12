@@ -60,7 +60,7 @@ FALLBACK_MODEL = "gemma4:12b-mlx"                # local fallback, confirmed via
                                               # A/B test (see module docstring)
 TARGET_MIN  = 150    # minimum words (60 sec at 2.5 words/sec)
 TARGET_MAX  = 225    # maximum words (90 sec at 2.5 words/sec)
-MAX_ATTEMPTS = 2     # max word count correction attempts before accepting
+MAX_ATTEMPTS = 3     # max word count correction attempts before accepting
 
 # CLIENT -- module level, instantiated once
 
@@ -206,6 +206,7 @@ HOOK -- most important line in the script:
   GOOD: "Your router has a secret backdoor -- and the vendor won't fix it"
   GOOD: "You can build a crash-proof home server for under $500 -- no Synology needed"
   GOOD: "This 82-million-parameter model runs speech on a 12-year-old CPU"
+  Your HOOK must name a specific technology, product, or event from Story 1.
   Rule: if someone reads HOOK alone, they must know what the video is about.
 
 TWIST -- second most important line per story:
@@ -317,6 +318,11 @@ def _parse_script(raw: str) -> dict:
         label   = parts[i].strip()
         content = parts[i + 1].strip()
         if label in known_labels:
+            # Strip markdown bold artifacts (e.g. "** Follow for daily
+            # tech news") that the model sometimes prepends to the CTA.
+            # Eval showed 2/15 failures from this (t2, t15).
+            if label == "CTA":
+                content = content.lstrip("*").lstrip().strip()
             sections[label] = content
         i += 2
 
@@ -372,7 +378,8 @@ def _enforce_word_count(raw: str, attempt: int = 1) -> tuple:
         print(f"  [script] {word_count} > {TARGET_MAX} -> trimming...")
     else:
         correction_prompt = (
-            f"Expand this YouTube Shorts script to at least {TARGET_MIN} words. "
+            f"Expand this YouTube Shorts script to approximately 170 words "
+            f"(target range: {TARGET_MIN}-{TARGET_MAX}). "
             f"Keep ALL labelled sections. "
             f"Add one more specific detail to S1_CORE or S2_CORE.\n\n{raw}"
         )

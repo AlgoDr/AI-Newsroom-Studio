@@ -33,6 +33,7 @@ import re
 import dotenv
 import ollama
 from datetime import datetime, timezone
+from difflib import SequenceMatcher
 from groq import Groq
 
 dotenv.load_dotenv(".env")
@@ -67,6 +68,58 @@ DATE_PATTERN = re.compile(
 )
 
 groq_client = Groq(api_key=os.getenv("GROQ_KEY"))
+
+
+# ── TWIST restatement detection (ported from test_agent6.py) ─────
+# Signal phrases that mark a restatement twist (start of sentence).
+# A real twist reveals NEW consequences; a restatement just
+# rephrases the CORE with one of these connectors.
+_RESTATEMENT_STARTERS = [
+    "so basically",
+    "so ",           # "So the database proxy is now much faster"
+    "that means",
+    "in other words",
+    "essentially",
+    "basically",
+    "put simply",
+    "in short",
+    "which means",
+    "meaning ",
+    "this means",
+    "to put it simply",
+    "in summary",
+]
+
+
+def _twist_is_restatement(core_text: str, twist_text: str) -> bool:
+    """Detect when a TWIST section just restates its CORE.
+
+    Two-layer check (either triggers):
+      1. Signal-phrase detection — twist starts with a known
+         restatement connector ("So basically", "In other words", …)
+      2. SequenceMatcher word-overlap fallback (ratio ≥ 0.50) for
+         cases that lack a signal phrase but share lots of words.
+
+    Ported from test_agent6.py into production so the fix applies
+    during actual pipeline runs, not just in the eval wrapper.
+    """
+    twist_lower = twist_text.strip().lower()
+
+    # Layer 1: restatement signal phrase at the start
+    for starter in _RESTATEMENT_STARTERS:
+        if twist_lower.startswith(starter):
+            return True
+
+    # Layer 2: high word-overlap fallback
+    def _words(text: str) -> list[str]:
+        return re.findall(r"[a-z0-9]+", text.lower())
+
+    core_words = _words(core_text)
+    twist_words = _words(twist_text)
+    if not core_words or not twist_words:
+        return False
+
+    return SequenceMatcher(None, core_words, twist_words).ratio() >= 0.50
 
 
 def _humanize_dates(text: str) -> str:
@@ -182,7 +235,7 @@ CTA_OK: YES or NO"""
             model=JUDGE_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
-            max_tokens=1200,
+            max_tokens=1500,
         )
         raw = (resp.choices[0].message.content or "").strip()
         finish_reason = resp.choices[0].finish_reason
@@ -199,6 +252,8 @@ CTA_OK: YES or NO"""
     if not raw:
         print("  [qc] JUDGE empty/failed on gpt-oss-120b -> "
               f"falling back to local {JUDGE_FALLBACK_MODEL}")
+        print(f"  [qc-diag] CLOUD FALLBACK TRIGGERED — reason: "
+              f"{'empty content' if not raw else 'unknown'}")
         raw = _judge_script_local(prompt)
 
     print(f"  [qc] JUDGE raw: {raw[:150] if raw else '(still empty after fallback)'}")
@@ -228,6 +283,27 @@ CTA_OK: YES or NO"""
     if tts_issues:
         print(f"  [qc] TTS-readiness issues found in: {list(tts_issues.keys())}")
 
+    # ── Post-processing fix 1: TWIST restatement detection ────────
+    # Deterministic check catches restatements the LLM judge misses.
+    # Ported from test_agent6.py into production.
+    flagged = judgment["flagged_sections"]
+    for prefix in ("S1", "S2", "S3"):
+        core_key = f"{prefix}_CORE"
+        twist_key = f"{prefix}_TWIST"
+        if core_key in sections and twist_key in sections:
+            if twist_key not in flagged:
+                if _twist_is_restatement(sections[core_key],
+                                         sections[twist_key]):
+                    flagged[twist_key] = "twist restates core (detected by signal phrase)"
+                    print(f"  [qc] TWIST restatement detected: {twist_key}")
+
+    # ── Post-processing fix 2: CTA propagation ───────────────────
+    # If cta_ok=False, ensure CTA is in flagged_sections so the
+    # binary verdict and rewrite loop both see it.
+    if not judgment.get("cta_ok", True) and "CTA" not in flagged:
+        flagged["CTA"] = "CTA failed quality check (cta_ok=False)"
+        print(f"  [qc] CTA propagated to flagged_sections")
+
     return judgment
 
 
@@ -242,9 +318,23 @@ def _judge_script_local(prompt: str) -> str:
             keep_alive=0,
             options={"temperature": 0.1, "num_ctx": 4096},
         )
-        return (resp.get("response") or "").strip()
+        raw = (resp.get("response") or "").strip()
+        # Diagnostic logging: show full local model output for debugging
+        total_dur = resp.get("total_duration", 0) / 1e9  # nanoseconds → seconds
+        eval_dur = resp.get("eval_duration", 0) / 1e9
+        eval_count = resp.get("eval_count", 0)
+        prompt_eval_count = resp.get("prompt_eval_count", 0)
+        print(f"  [qc-diag] LOCAL model={JUDGE_FALLBACK_MODEL}")
+        print(f"  [qc-diag]   prompt_tokens={prompt_eval_count}, "
+              f"output_tokens={eval_count}, "
+              f"time={total_dur:.1f}s (eval={eval_dur:.1f}s)")
+        print(f"  [qc-diag]   FULL OUTPUT:\n{raw}")
+        if not raw:
+            print(f"  [qc-diag]   *** LOCAL RETURNED EMPTY ***")
+        return raw
     except Exception as e:
         print(f"  [qc] local JUDGE fallback also failed: {e}")
+        print(f"  [qc-diag]   EXCEPTION TYPE: {type(e).__name__}: {e}")
         return ""
 
 
