@@ -40,3 +40,18 @@ wandb/
 # stray debug files
 experiments/log1.txt
 EOFexperiments/data/
+
+logs/
+.deepeval/
+Claude outputs/
+memory.md
+plan.md
+inspect_notebook.py
+
+# Binary samples (keep local only)
+docs/samples/*.wav
+docs/video-samples/*.mp4
+
+# Binary samples (keep local only)
+docs/samples/*.wav
+docs/video-samples/*.mp4

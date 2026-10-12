@@ -7,19 +7,19 @@ Quality gate suite for the 10-agent pipeline. Every agent that classifies, judge
 ```bash
 cd /path/to/AI-Newsroom-Studio
 
-# Unit evals only (deterministic, no API keys needed)
-python evals/run_all.py
-
-# Unit + content evals (needs GROQ_KEY in experiments/.env)
-python evals/run_all.py --content
-
 # Single agent eval via pytest
 python -m pytest evals/quality/ref_based/test_agent3.py -v
 python -m pytest evals/quality/ref_based/test_agent5.py -v
 python -m pytest evals/quality/ref_based/test_agent6.py -v
+
+# Judge calibration (A3)
+python evals/calibration/run_calibration.py --judge
+python evals/calibration/run_calibration.py --agreement
 ```
 
 Exit code 0 = all pass. Non-zero = at least one failure.
+
+> **Note:** `run_all.py` (CI entry point) is planned but not yet built. Run individual evals via pytest for now.
 
 ---
 
@@ -92,8 +92,7 @@ Every model swap requires a multi-run reliability test (N ≥ 5) using real cach
 | `quality/ref_based/test_agent6.py` | A5 | Calls `_judge_script()` on 10 golden scripts via patched wrapper (TWIST restatement + CTA propagation), compares flagged sections to human labels, computes micro-F1 |
 | `quality/ref_based/test_agent5.py` | A6 | Calls `script_writer_node()` on 15 test inputs, scores output on 7 dimensions (3 deterministic + 4 LLM-judged), computes composite mean |
 | `quality/ref_free/test_agent2.py` | — | Agent 2 background synthesis faithfulness eval (dataset ready, not yet run) |
-| `run_all.py` | all | CI entry point — runs unit evals, optionally content evals. Returns exit code for CI |
-| `content_evals.py` | all | Wraps quality eval functions + checkpoint-based evals into `run_all.py`'s interface |
+| `content_evals.py` | all | Wraps quality eval functions + checkpoint-based evals (faithfulness, relevance, cost). Will plug into `run_all.py` when built |
 | `unit_evals.py` | A7+ | Deterministic unit tests (date humanizer, word count, section presence, velocity formula, etc.) |
 
 ### Golden Datasets (frozen inputs + human labels)
@@ -123,8 +122,6 @@ Every model swap requires a multi-run reliability test (N ≥ 5) using real cach
 | `golden_dataset/LABELING_GUIDE.md` | Instructions for manually labelling golden datasets |
 | `golden_dataset/label_helper.py` | Helper script for labelling workflow |
 | `golden_dataset/pull_candidates.py` | Pulls candidate stories from cache for golden set construction |
-| `config.py` | Shared config — judge model, thresholds, max tokens |
-| `dataset.py` | Data loading helpers for checkpoint-based evals |
 
 ---
 
@@ -168,4 +165,4 @@ Key findings:
 2. **A3 judge calibration** — blocked on manual scoring of 10 scripts (~1 hour)
 3. **Transition over-flagging** — prompt calibration needed to reduce false positives on S2_HOOK/S3_HOOK
 4. **Agent 2 eval** — dataset ready, test script built, not yet run
-5. **`run_all.py --content`** — needs all content evals wired up for CI
+5. **`run_all.py`** — CI entry point not yet built; individual evals run via pytest
