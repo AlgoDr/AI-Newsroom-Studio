@@ -100,9 +100,24 @@ def clean_jina(text: str) -> str:
 
 # Fetches the content of the article from url with 3 services:
 
-def fetch_url_content(url: str) -> str:
+def fetch_url_content(url: str, return_tier: bool = False):
+    """Fetch article content via 3-tier fallback: trafilatura → Jina → Tavily.
+
+    Args:
+        url: article URL to fetch
+        return_tier: if True, returns (content, tier_name) tuple instead of
+                     just content. tier_name is one of: "trafilatura", "jina",
+                     "tavily", "none". Default False for backward compatibility.
+
+    Returns:
+        str (content) if return_tier=False (default)
+        tuple (content, tier) if return_tier=True
+    """
+    def _result(content, tier):
+        return (content, tier) if return_tier else content
+
     if not url or not url.startswith("http"):
-        return ""
+        return _result("", "none")
 
     # Attempt 1 — trafilatura (free, fast)
     try:
@@ -111,7 +126,7 @@ def fetch_url_content(url: str) -> str:
         if text and len(text) > 200:      # recived something
             if looks_like_real_content(text):
                 print(f"Trafiltura Success ✅  In Loading Content :{len(text)} characters")
-                return text[:6000]
+                return _result(text[:6000], "trafilatura")
             else:
                 print("Trafiltura Loaded Junk Content Discarding & Switching To Jina")
     except:
@@ -131,7 +146,7 @@ def fetch_url_content(url: str) -> str:
 
             if looks_like_real_content(cleaned):
                 print(f"Jina Success ✅  In Loading Content:{len(cleaned)} characters")
-                return cleaned[:6000]
+                return _result(cleaned[:6000], "jina")
             else:
                 print("Jina Loaded Junk Content Discarding & Switching To Tavily")
 
@@ -148,14 +163,14 @@ def fetch_url_content(url: str) -> str:
             content = result["results"][0].get("raw_content", "")
             if looks_like_real_content(content):
                 print(f"Tavily Success ✅  In Loading Content:{len(content)} characters ")
-                return content[:6000]
+                return _result(content[:6000], "tavily")
             else:
                 print("Tavily Loaded Junk Content Discarding & Returned 0 Char as all Fetcher Failed")
     except Exception as e:
         print(f"[tavily] error: {e}")
         print("All Fetcher[Trafiltura,Jina,Tavily] Failed to load the content ")
 
-    return ""   # all attempts failed
+    return _result("", "none")   # all attempts failed
 
 
 
