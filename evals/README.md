@@ -111,6 +111,29 @@ human and judge verdicts stored).
 
 ---
 
+---
+
+### Layer 4 — Operational Evals (infrastructure health, real network, no LLM judging)
+
+Probes that test the pipeline's operational plumbing — API latency, tier
+routing, fallback resilience, quota math, and chaos recovery. These answer
+"will the pipeline survive a real run?" rather than "is the output good?"
+
+**Entry point:** Individual scripts in `evals/ops/` (see `evals/ops/README.md`)
+
+| Task | Script | What it tests | Verdict |
+|------|--------|--------------|---------|
+| B1 | `ops/ops_probe.py` | Agent 1 HN API latency + story count (×20 runs) | HEALTHY |
+| B2 | `ops/tool_access_replay.py` | Agent 2 tier distribution on 40 cached URLs | HEALTHY |
+| B3 | `ops/fallback_stress.py` | Agent 3 local fallback (qwen3.5:9b ×30 stories) | HEALTHY |
+| B4 | `ops/quota_table.md` | Groq + YouTube quota arithmetic (static doc) | 2/day fits |
+| B5 | `ops/chaos_checks.py` | Groq 429, Exa timeout, DDG timeout resilience | 6/6 HEALTHY |
+| B6 | — | Fixes applied from B1–B3 findings | ✅ verified |
+
+**B6 fixes applied:**
+- Agent 1: concurrent HN fetches + over-fetch for non-story items
+- Agent 2: `return_tier` parameter for clean tier-name returns
+
 ## How the Layers Connect
 
 ```
@@ -120,6 +143,8 @@ Layer 2: Quality evals (agent output vs frozen golden answers)
     ↓ all above threshold?
 Layer 3: Calibration (can we trust the LLM judge used in Layer 2?)
     ↓ agreement ≥ 80%?
+Layer 4: Operational evals (latency, fallback, chaos)
+    ↓ all healthy?
 CI gate (GitHub Actions — blocks PRs on failure)
 ```
 
