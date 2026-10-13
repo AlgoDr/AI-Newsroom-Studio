@@ -170,6 +170,9 @@ def _quality_eval_wrapper(test_fn, label: str):
     except ImportError as e:
         return False, f"SKIPPED: {label} — missing dependency: {e}"
     except Exception as e:
+        msg = str(e)
+        if "SKIPPED" in msg:
+            return False, f"SKIPPED: {label} — {msg.replace('SKIPPED: ', '')}"
         return False, f"{label}: CRASHED — {type(e).__name__}: {e}"
 
 
