@@ -42,6 +42,12 @@ if _ENV_FILE.exists():
     except ImportError:
         pass
 
+# CI has no GROQ_KEY — set a dummy so agent modules with module-level
+# Groq() clients can import. Unit evals test pure-Python functions
+# (date formatting, content quality gates) that never call the API.
+if not os.getenv("GROQ_KEY"):
+    os.environ["GROQ_KEY"] = "gsk_CI_DUMMY_KEY_evals_only"
+
 
 def _run_suite(label: str, evals: list) -> tuple[int, int, int, list[str]]:
     """Run a list of (passed, detail) eval functions.

@@ -5,7 +5,7 @@
 requests>=2.31
 python-dotenv>=1.0
 trafilatura>=1.12
-duckduckgo-search>=6.0
+ddgs>=0.1
 wikipedia>=1.4
 ollama>=0.4
 groq>=0.9
