@@ -15,12 +15,12 @@
       "CTA": "Follow for daily tech news."
     },
     "word_count": 154,
-    "human_verdict": null,
-    "human_flagged_sections": null,
-    "human_notes": "",
-    "judge_verdict": null,
-    "judge_flagged_sections": null,
-    "agreement": null
+    "human_verdict": "pass",
+    "human_flagged_sections": [],
+    "human_notes": "S1 draws attention well, HOOK through S2_HOOK flows nicely. S2_CORE data feels thin but acceptable.",
+    "judge_verdict": "pass",
+    "judge_flagged_sections": [],
+    "agreement": "agree"
   },
   {
     "script_id": 2,
@@ -38,12 +38,14 @@
       "CTA": "Drop a comment if you'd switch to a lithium-recycled battery."
     },
     "word_count": 191,
-    "human_verdict": null,
-    "human_flagged_sections": null,
-    "human_notes": "",
-    "judge_verdict": null,
-    "judge_flagged_sections": null,
-    "agreement": null
+    "human_verdict": "fail",
+    "human_flagged_sections": [
+      "S3_CORE"
+    ],
+    "human_notes": "S1 boring topic choice. S3_CORE does not finish thoroughly. CTA covers for S3 completion.",
+    "judge_verdict": "pass",
+    "judge_flagged_sections": [],
+    "agreement": "disagree"
   },
   {
     "script_id": 5,
@@ -61,12 +63,17 @@
       "CTA": "Comment with your favorite physics resource."
     },
     "word_count": 162,
-    "human_verdict": null,
-    "human_flagged_sections": null,
-    "human_notes": "",
-    "judge_verdict": null,
-    "judge_flagged_sections": null,
-    "agreement": null
+    "human_verdict": "fail",
+    "human_flagged_sections": [
+      "S3_CORE"
+    ],
+    "human_notes": "S3 feels unfinished. CTA doing double duty to close S3.",
+    "judge_verdict": "fail",
+    "judge_flagged_sections": [
+      "S1_TWIST",
+      "S2_TWIST"
+    ],
+    "agreement": "agree"
   },
   {
     "script_id": 7,
@@ -84,12 +91,14 @@
       "CTA": "If you found these stories interesting and want to hear more about tech news every day, make sure you hit that subscribe button and turn on notifications."
     },
     "word_count": 202,
-    "human_verdict": null,
-    "human_flagged_sections": null,
-    "human_notes": "",
-    "judge_verdict": null,
-    "judge_flagged_sections": null,
-    "agreement": null
+    "human_verdict": "pass",
+    "human_flagged_sections": [],
+    "human_notes": "Solid overall structure and flow.",
+    "judge_verdict": "fail",
+    "judge_flagged_sections": [
+      "CTA"
+    ],
+    "agreement": "disagree"
   },
   {
     "script_id": 9,
@@ -107,12 +116,14 @@
       "CTA": "Subscribe for tech that matters."
     },
     "word_count": 160,
-    "human_verdict": null,
-    "human_flagged_sections": null,
-    "human_notes": "",
-    "judge_verdict": null,
-    "judge_flagged_sections": null,
-    "agreement": null
+    "human_verdict": "pass",
+    "human_flagged_sections": [],
+    "human_notes": "Good despite difficulty. Content holds up.",
+    "judge_verdict": "fail",
+    "judge_flagged_sections": [
+      "S1_TWIST"
+    ],
+    "agreement": "disagree"
   },
   {
     "script_id": 10,
@@ -130,12 +141,14 @@
       "CTA": "Hit follow for daily tech deep dives."
     },
     "word_count": 194,
-    "human_verdict": null,
-    "human_flagged_sections": null,
-    "human_notes": "",
-    "judge_verdict": null,
-    "judge_flagged_sections": null,
-    "agreement": null
+    "human_verdict": "fail",
+    "human_flagged_sections": [
+      "S3_CORE"
+    ],
+    "human_notes": "S3_TWIST missing here as well. Same pattern.",
+    "judge_verdict": "pass",
+    "judge_flagged_sections": [],
+    "agreement": "disagree"
   },
   {
     "script_id": 11,
@@ -153,12 +166,14 @@
       "CTA": "Follow for daily open-source news."
     },
     "word_count": 160,
-    "human_verdict": null,
-    "human_flagged_sections": null,
-    "human_notes": "",
-    "judge_verdict": null,
-    "judge_flagged_sections": null,
-    "agreement": null
+    "human_verdict": "fail",
+    "human_flagged_sections": [
+      "S3_CORE"
+    ],
+    "human_notes": "S3_CORE incomplete. Same structural pattern \u2014 missing S3_TWIST means S3 never resolves properly.",
+    "judge_verdict": "pass",
+    "judge_flagged_sections": [],
+    "agreement": "disagree"
   },
   {
     "script_id": 14,
@@ -176,12 +191,17 @@
       "CTA": "If you enjoyed hearing about these stories and want to stay in the loop with the latest tech news and hardware reviews, be sure to smash that follow button and share this with a friend who might find it useful too."
     },
     "word_count": 192,
-    "human_verdict": null,
-    "human_flagged_sections": null,
-    "human_notes": "",
-    "judge_verdict": null,
-    "judge_flagged_sections": null,
-    "agreement": null
+    "human_verdict": "fail",
+    "human_flagged_sections": [
+      "S3_CORE"
+    ],
+    "human_notes": "S3_TWIST is the problem \u2014 same structural issue, S3 lacks proper conclusion.",
+    "judge_verdict": "fail",
+    "judge_flagged_sections": [
+      "S1_TWIST",
+      "CTA"
+    ],
+    "agreement": "agree"
   },
   {
     "script_id": 16,
@@ -199,12 +219,12 @@
       "CTA": "Subscribe for research that matters."
     },
     "word_count": 185,
-    "human_verdict": null,
-    "human_flagged_sections": null,
-    "human_notes": "",
-    "judge_verdict": null,
-    "judge_flagged_sections": null,
-    "agreement": null
+    "human_verdict": "pass",
+    "human_flagged_sections": [],
+    "human_notes": "S1 boring. S3_CORE is big enough, acceptable overall.",
+    "judge_verdict": "pass",
+    "judge_flagged_sections": [],
+    "agreement": "agree"
   },
   {
     "script_id": 19,
@@ -222,11 +242,16 @@
       "CTA": "Hit follow for dev tool updates."
     },
     "word_count": 181,
-    "human_verdict": null,
-    "human_flagged_sections": null,
-    "human_notes": "",
-    "judge_verdict": null,
-    "judge_flagged_sections": null,
-    "agreement": null
+    "human_verdict": "fail",
+    "human_flagged_sections": [
+      "S3_CORE"
+    ],
+    "human_notes": "S1 boring. S3_CORE fine on its own but S3 does not feel like it finishes. CTA covers S3 completion. Structural issue: no S3_TWIST.",
+    "judge_verdict": "fail",
+    "judge_flagged_sections": [
+      "S1_CONTEXT",
+      "S2_CORE"
+    ],
+    "agreement": "agree"
   }
 ]

@@ -1,168 +1,196 @@
 # Evals — AI Newsroom Studio
 
-Quality gate suite for the 10-agent pipeline. Every agent that classifies, judges, or generates text has a frozen golden dataset, a metric, and a threshold it must pass before changes ship.
+Quality gate suite for the 10-agent pipeline. Three layers of testing,
+zero LLM calls at the unit level, frozen golden datasets at the quality
+level, and human-vs-machine agreement at the calibration level.
 
-## How to run
+**CI entry point:** `python evals/run_all.py` — exit 0 = all pass, exit 1 = failure.
 
-```bash
-cd /path/to/AI-Newsroom-Studio
-
-# Single agent eval via pytest
-python -m pytest evals/quality/ref_based/test_agent3.py -v
-python -m pytest evals/quality/ref_based/test_agent5.py -v
-python -m pytest evals/quality/ref_based/test_agent6.py -v
-
-# Judge calibration (A3)
-python evals/calibration/run_calibration.py --judge
-python evals/calibration/run_calibration.py --agreement
-```
-
-Exit code 0 = all pass. Non-zero = at least one failure.
-
-> **Note:** `run_all.py` (CI entry point) is planned but not yet built. Run individual evals via pytest for now.
+**Current result:** 10/11 passed, 0 skipped, 1 known data issue.
 
 ---
 
-## Phase A — Offline Quality Evals (current status)
+## The Three Layers
 
-Each task tests one agent against a human-labelled golden dataset. "Ref-based" means a correct answer exists and scoring is pure Python comparison; "ref-free" means no single correct answer exists, so an LLM judge scores the output on a rubric.
+### Layer 1 — Unit Evals (deterministic, no API, <2 seconds)
+
+Pure Python assertions against frozen checkpoint data. These verify
+structural contracts — "is the data shaped right?" — not content quality.
+They run on every commit, cost nothing, and catch regressions instantly.
+
+**Entry point:** `python evals/run_all.py`
+
+| # | Eval | Agent | What it checks |
+|---|------|-------|----------------|
+| 1 | `eval_checkpoint_integrity` | — | Golden checkpoint has 8 stories, a script, shots, SEO, and video fields |
+| 2 | `eval_stories_cache` | — | 178 cached stories, 161 with both content and background |
+| 3 | `eval_selected_stories_have_editorial` | A4 | 3 selected stories each have an editorial justification string |
+| 4 | `eval_agent1_velocity_ranking` | A1 | Velocity formula ranks stories in the correct order |
+| 5 | `eval_agent2_looks_like_real_content` | A2 | Trafilatura extracts non-empty text from 5 real cached URLs |
+| 6 | `eval_agent2_strip_citation_artifacts` | A2 | Citation markers like `[1]` are stripped cleanly from extracted text |
+| 7 | `eval_agent6_humanize_dates` | A6 | All 12 time buckets (today → 4+ years ago) produce correct human-readable strings |
+| 8 | `eval_agent6_qc_script_compliance` | A6 | Script word count is within [150, 225] and all required sections present |
+| 9 | `eval_agent7_shot_list_integrity` | A7 | 10 shots exist and their duration shares sum to exactly 1.00 |
+| 10 | `eval_agent9_tags_fallback` | A9 | Fallback tag generation produces valid tags when primary fails |
+| 11 | `eval_seo_completeness` | A9 | SEO title, description, and tags are all present and non-empty |
+
+**Known failure:** #8 (`eval_agent6_qc_script_compliance`) — the golden
+checkpoint contains a script with word_count=131, below the 150 minimum.
+This is a data provenance issue (the checkpoint was saved from a run where
+QC approved a too-short script), not an eval bug. Fix: re-run the pipeline
+to produce a compliant checkpoint.
+
+**SKIP handling:** Evals that can't import a dependency (e.g. trafilatura)
+return `SKIPPED` and are excluded from the pass/fail count. With the
+project venv (`../multi-agent-env/bin/python`), all 11 evals run with 0
+skips.
+
+---
+
+### Layer 2 — Quality Evals (frozen golden datasets, LLM-judged or ref-based)
+
+Each agent that classifies, judges, or generates text has a frozen golden
+dataset — inputs where the correct output is already known. The eval runs
+the agent on these inputs and compares its output to the human-labelled
+answer.
+
+**Entry point:** `python -m pytest evals/quality/ref_based/test_<agent>.py -v`
 
 | Task | Agent | What it tests | Type | Metric | Gate | Score | Status |
 |------|-------|--------------|------|--------|------|-------|--------|
-| A1 | Agent 3 | Credibility labels (REAL/OPINION/SPAM) | ref-based | Macro-F1 | ≥ 0.70 | **0.990** | PASS |
-| A2 | — | GroqJudge adapter for DeepEval | infra | — | — | — | Built, unused |
-| A3 | Agent 6 | Judge calibration (human vs LLM agreement) | calibration | Verdict agreement | ≥ 80% | — | Not yet run |
-| A4 | Agent 4 | Dedup merge accuracy | ref-based | Micro-F1 | ≥ 0.70 | **0.800** | PASS |
-| A5 | Agent 6 | JUDGE section-flag agreement | ref-based | Micro-F1 | ≥ 0.60 | **0.615** | PASS |
-| A6 | Agent 5 | Script generation quality (7 dimensions) | ref-free | Composite mean | ≥ 0.70 | **0.890** | PASS |
-| A7 | — | Date humanizer unit test | unit | Exact match | all pass | — | PASS |
+| A1 | Agent 3 (Fact Checker) | Credibility labels: REAL / OPINION / SPAM | ref-based | Macro-F1 | ≥ 0.70 | **0.990** | PASS |
+| A4 | Agent 4 (Editorial) | Dedup merge accuracy on planted duplicate pairs | ref-based | Micro-F1 | ≥ 0.70 | **0.800** | PASS |
+| A5 | Agent 6 (Script QC) | JUDGE section-flag agreement on 10 scripts (some deliberately broken) | ref-based | Micro-F1 | ≥ 0.60 | **0.615** | PASS |
+| A6 | Agent 5 (Script Writer) | Script generation quality across 7 dimensions (15 frozen story triples) | ref-free | Composite mean | ≥ 0.70 | **0.890** | PASS |
+
+**Why two scoring types:**
+- **Ref-based** (A1, A4, A5): a correct answer exists (the right label, the right merge group, the right flags). Scoring is pure Python comparison — exact match, F1, precision/recall.
+- **Ref-free** (A6): no single correct script exists for a set of stories. An LLM judge (qwen3.8-27b on Groq) scores the output on a rubric across 7 dimensions (structure, word count, CTA, hook specificity, twist quality, faithfulness, story alignment).
+
+**Golden datasets** (frozen, committed to git, never change):
+
+| File | Agent | n | Contents |
+|------|-------|---|---------|
+| `golden_dataset/agent3_credibility_v1.json` | A3 | 30 | Stories + human label (REAL/OPINION/SPAM) |
+| `golden_dataset/agent4_dedup_v1.json` | A4 | 10 sets (80 titles) | Title sets + expected merge pairs |
+| `golden_dataset/agent5_script_v1.json` | A5 | 15 | Story triples as script generation inputs |
+| `golden_dataset/agent6_judge_v2.json` | A6 | 10 | Scripts with planted issues + expected flags |
 
 ---
 
-## Recent Fixes (2026-10-12)
+### Layer 3 — Judge Calibration (human vs LLM agreement)
 
-### Agent 5 (`experiments/agents/agent5.py`) — 3 fixes
+The Layer 2 evals for Agent 5 use an LLM as the judge. But can we trust
+the LLM judge? Calibration answers this: a human and the judge
+independently score the same scripts, and we measure how often they agree.
 
-1. **CTA markdown stripping** — `_parse_script()` now strips bold markdown artifacts (`**`) from CTA text. Eliminated 2/15 eval failures (t2, t15).
+**Entry point:**
+```bash
+python evals/calibration/run_calibration.py --judge      # LLM scores 10 scripts
+python evals/calibration/run_calibration.py --agreement   # compare human vs LLM
+```
 
-2. **Word count expansion prompt** — Expansion prompt now specifies "approximately 170 words" (midpoint of 150–225) instead of just "at least 150." `MAX_ATTEMPTS` bumped from 2 to 3. Addresses 3/15 word count failures (t11, t14, t15).
+| Metric | Value | Gate | Verdict |
+|--------|-------|------|---------|
+| Verdict agreement | 5/10 (50%) | ≥ 80% | **FAIL** |
+| Flagged-section Jaccard | 0.200 | — | Low overlap |
 
-3. **Hook specificity** — Added "Your HOOK must name a specific technology, product, or event from Story 1" to the generation prompt. Addresses 2/15 hook specificity zeroes (t4, t6).
+**Root cause (structural, not random):**
 
-### Agent 6 (`experiments/agents/agent6.py`) — 2 fixes ported from test wrapper
+The script template's `SECTION_ORDER` has no `S3_TWIST` — Story 3 never
+resolves. The human catches this every time (flags S3_CORE on 6/10
+scripts). The LLM judge only checks quality *within* existing sections,
+so it can't flag a section that should exist but doesn't. This creates
+3 false passes. Separately, the judge is stricter on micro-quality
+(twist restatements, CTA phrasing), creating 2 false fails.
 
-1. **TWIST restatement detection** — Deterministic post-processing in `_judge_script()`: signal-phrase detection + SequenceMatcher word-overlap (≥0.50) catches restatements the LLM judge misses. Previously only ran in the eval test wrapper (`test_agent6.py`), now in production.
+**Path forward:** Add S3_TWIST to the template, then re-calibrate.
 
-2. **CTA propagation** — When `cta_ok=False`, CTA is now added to `flagged_sections` so the binary verdict and rewrite loop both act on it. Previously the LLM judge detected bad CTAs but the flag never propagated to the rewrite stage.
-
-Both evals re-verified PASS after fixes (Agent 5: 538s, Agent 6: 238s).
+**Dataset:** `calibration/judge_calibration_v1.json` (10 scripts, both
+human and judge verdicts stored).
 
 ---
 
-## Eval Architecture
+## How the Layers Connect
 
-### Deterministic vs LLM-judged
+```
+Layer 1: Unit evals (structural contracts, pure Python)
+    ↓ all pass?
+Layer 2: Quality evals (agent output vs frozen golden answers)
+    ↓ all above threshold?
+Layer 3: Calibration (can we trust the LLM judge used in Layer 2?)
+    ↓ agreement ≥ 80%?
+CI gate (GitHub Actions — blocks PRs on failure)
+```
 
-The pipeline separates concerns strictly:
-
-- **Deterministic scoring** (pure Python): word count range, section presence, CTA exact match, label comparison, date humanization. These never use an LLM — they are reliable, reproducible, and free.
-- **LLM-judged scoring** (qwen/qwen3.8-27b via Groq): hook specificity, twist quality, faithfulness, story alignment. These score free-form text on a rubric where no single correct answer exists.
-
-### F1 metric choices
-
-- **Macro-F1** for imbalanced classes (A1: 26 REAL / 4 OPINION / 0 SPAM) — protects minority class detection
-- **Micro-F1** for pooled decisions (A4, A5) — each merge/flag decision weighted equally
-
-### Model swap policy
-
-Every model swap requires a multi-run reliability test (N ≥ 5) using real cached data before integration. No model is trusted on a single sample.
+Layers 1–3 are built. The CI gate (Phase C in the Production Plan) is
+the next integration step.
 
 ---
 
 ## File Map
 
-### Scripts (what runs the eval)
+### Infrastructure
 
-| File | Task | What it does |
-|------|------|-------------|
-| `quality/ref_based/test_agent3.py` | A1 | Calls `llm_credibility_check()` on 30 golden stories, compares predicted label to human label, computes macro-F1 |
-| `quality/groq_judge.py` | A2 | `GroqJudge(DeepEvalBaseLLM)` — routes DeepEval's judge calls to Groq instead of OpenAI. Built but not imported by any eval script yet |
-| `calibration/run_calibration.py` | A3 | Runs Agent 6 JUDGE on 10 calibration scripts (`--judge`), then computes human–LLM agreement (`--agreement`) |
-| `quality/ref_based/test_agent4_v3.py` | A4 | Calls `deduplicate_stories()` on 10 title sets, compares merge groups to human-labelled pairs, computes micro-F1 |
-| `quality/ref_based/test_agent6.py` | A5 | Calls `_judge_script()` on 10 golden scripts via patched wrapper (TWIST restatement + CTA propagation), compares flagged sections to human labels, computes micro-F1 |
-| `quality/ref_based/test_agent5.py` | A6 | Calls `script_writer_node()` on 15 test inputs, scores output on 7 dimensions (3 deterministic + 4 LLM-judged), computes composite mean |
-| `quality/ref_free/test_agent2.py` | — | Agent 2 background synthesis faithfulness eval (dataset ready, not yet run) |
-| `content_evals.py` | all | Wraps quality eval functions + checkpoint-based evals (faithfulness, relevance, cost). Will plug into `run_all.py` when built |
-| `unit_evals.py` | A7+ | Deterministic unit tests (date humanizer, word count, section presence, velocity formula, etc.) |
+| File | Purpose |
+|------|---------|
+| `run_all.py` | CI entry point — runs all unit evals, prints table, exit 0 or 1 |
+| `unit_evals.py` | 11 deterministic eval functions (Layer 1) |
+| `config.py` | Shared constants: TARGET_MIN_WORDS, TARGET_MAX_WORDS, SECTION_ORDER, paths |
+| `dataset.py` | Golden data loaders: `load_golden_checkpoint()`, `load_stories_cache()`, `golden_script()`, `selected_stories()` |
+| `__init__.py` | Package marker |
+| `content_evals.py` | Content-level eval wrappers (Layer 2 integration into run_all.py — planned) |
 
-### Golden Datasets (frozen inputs + human labels)
+### Quality Eval Scripts (Layer 2)
 
-| File | Task | n | Contents |
-|------|------|---|---------|
-| `golden_dataset/agent3_credibility_v1.json` | A1 | 30 | Story title + content + human-assigned label (REAL/OPINION/SPAM) |
-| `golden_dataset/agent4_dedup_v1.json` | A4 | 10 sets (80 titles) | Title sets + expected merge pairs |
-| `golden_dataset/agent5_script_v1.json` | A6 | 15 | Test inputs (selected stories) for script generation. No "correct" output — scored on rubric |
-| `golden_dataset/agent6_judge_v2.json` | A5 | 10 | Scripts with planted issues + human-labelled expected flags |
-| `golden_dataset/agent2_context_v1.json` | — | — | Agent 2 background synthesis test inputs (not yet run) |
-| `calibration/judge_calibration_v1.json` | A3 | 10 | Calibration scripts for human vs LLM judge comparison (not yet run) |
+| File | Agent | What it does |
+|------|-------|-------------|
+| `quality/ref_based/test_agent3.py` | A3 | Calls `llm_credibility_check()` on 30 stories, computes macro-F1 |
+| `quality/ref_based/test_agent4_v3.py` | A4 | Calls `deduplicate_stories()` on 10 title sets, computes micro-F1 |
+| `quality/ref_based/test_agent5.py` | A5 | Calls `script_writer_node()` on 15 inputs, scores 7 dimensions |
+| `quality/ref_based/test_agent6.py` | A6 | Calls `_judge_script()` on 10 scripts, computes micro-F1 |
+| `quality/groq_judge.py` | — | GroqJudge adapter for DeepEval (routes judge calls to Groq) |
 
-### Results (baseline run outputs)
+### Calibration (Layer 3)
 
-| File | Task | Key finding |
-|------|------|------------|
-| `results/agent3_baseline.md` | A1 | Macro-F1 = 0.990. Both primary (gpt-oss-120b) and fallback (qwen3.5:9b) pass. 1 failure: "Stolen Buttons" art project misclassified as SPAM |
-| `results/agent4_baseline.md` | A4 | Micro-F1 = 0.800 with granite4.2:8b (PASS). Previous qwen baseline was 0.333. 6 models tested across 4 prompt versions |
-| `results/agent5_baseline.md` | A6 | Composite = 0.890 (n=15, expanded from n=5). Systematic issues: word count expansion (20%), CTA markdown (13%), hook specificity (13%) |
-| `results/agent6_baseline.md` | A5 | Micro-F1 = 0.615 (post bug fixes). Binary verdict 9/10. Transition over-flagging is the #1 precision issue |
+| File | Purpose |
+|------|---------|
+| `calibration/run_calibration.py` | Runs LLM judge on calibration scripts (`--judge`) and computes agreement (`--agreement`) |
+| `calibration/judge_calibration_v1.json` | 10 scripts with human + judge verdicts and flags |
+
+### Baseline Results
+
+| File | Key finding |
+|------|-------------|
+| `results/agent3_baseline.md` | Macro-F1 = 0.990, 29/30 correct |
+| `results/agent4_baseline.md` | Micro-F1 = 0.800 (granite4.2:8b), PASS |
+| `results/agent5_baseline.md` | Composite = 0.890 (n=15), PASS |
+| `results/agent6_baseline.md` | Micro-F1 = 0.615, PASS |
+| `results/unit_evals_baseline.md` | 10/11 passed, 0 skipped, 1 known data issue |
+| `results/calibration_baseline.md` | 50% verdict agreement, root cause = missing S3_TWIST |
 
 ### Tooling
 
 | File | Purpose |
 |------|---------|
-| `golden_dataset/LABELING_GUIDE.md` | Instructions for manually labelling golden datasets |
+| `golden_dataset/LABELING_GUIDE.md` | Instructions for labelling golden datasets |
 | `golden_dataset/label_helper.py` | Helper script for labelling workflow |
 | `golden_dataset/pull_candidates.py` | Pulls candidate stories from cache for golden set construction |
 
 ---
 
-## Agent 5 Eval Details (A6)
+## Design Principles
 
-**Composite: 0.890 | Gate: ≥ 0.70 | PASS**
+1. **Deterministic where possible.** Word count, section presence, velocity
+   ranking, date formatting — these are pure Python, never delegated to an
+   LLM. Reliable, reproducible, free.
 
-7 scoring dimensions:
+2. **Frozen inputs.** Golden datasets are committed to git and never change.
+   If an agent's behavior changes, the eval catches it.
 
-| Dimension | Type | Average | Notes |
-|-----------|------|---------|-------|
-| structure | deterministic | 1.000 | All expected sections present |
-| word_count | deterministic | 0.800 | 3 failures (expansion overshoot/undershoot) |
-| cta_exact | deterministic | 0.867 | 2 failures (markdown contamination) |
-| hook_specificity | LLM-judged | 0.743 | Weakest dimension, 2 zeroes on dense technical inputs |
-| twist_quality | LLM-judged | 0.877 | Solid |
-| faithfulness | LLM-judged | 0.943 | Strong |
-| story_alignment | LLM-judged | 1.000 | Perfect |
+3. **Model swap policy.** Every model swap requires a multi-run reliability
+   test (N ≥ 5) using real cached data before integration.
 
-Best test: t13 (0.986) — policy/regulatory content, perfect hook + faithfulness.
-Worst test: t15 (0.650) — double failure (WC + CTA), only test below gate.
-
----
-
-## Agent 6 JUDGE Eval Details (A5)
-
-**Micro-F1: 0.615 | Gate: ≥ 0.60 | PASS**
-
-Post-processing fixes (TWIST restatement detection + CTA propagation) lifted F1 from 0.615 to 0.755 in the test wrapper; these are now ported to production `agent6.py`.
-
-Key findings:
-- **Transition over-flagging** is the #1 precision issue — 6/10 false positive flags are spurious S2_HOOK/S3_HOOK
-- **CTA detection** is perfect (10/10 category, 10/10 ok)
-- **Fallback rate**: 40% of scripts fall back to qwen3.5:9b when gpt-oss-120b returns `finish_reason=length`
-
----
-
-## Known Issues & Next Steps
-
-1. **A4 now PASS** (F1 = 0.800 with granite4.2:8b) — improved from 0.333 with qwen baseline
-2. **A3 judge calibration** — blocked on manual scoring of 10 scripts (~1 hour)
-3. **Transition over-flagging** — prompt calibration needed to reduce false positives on S2_HOOK/S3_HOOK
-4. **Agent 2 eval** — dataset ready, test script built, not yet run
-5. **`run_all.py`** — CI entry point not yet built; individual evals run via pytest
+4. **Honest baselines.** A 50% calibration score is documented as-is with
+   root cause analysis, not swept under the rug. The eval system's job is
+   to reveal problems, not hide them.

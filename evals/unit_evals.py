@@ -107,7 +107,10 @@ def eval_agent1_velocity_ranking() -> tuple[bool, str]:
 # ══════════════════════════════════════════════════════════════════
 
 def eval_agent2_looks_like_real_content() -> tuple[bool, str]:
-    from agents.agent2 import looks_like_real_content
+    try:
+        from agents.agent2 import looks_like_real_content
+    except ImportError as e:
+        return False, f"SKIPPED: missing dependency — {e}"
     good = ("\n".join(
         "This article explores the technical details and industry impact "
         "of the announcement in depth, covering multiple perspectives and "
@@ -128,7 +131,10 @@ def eval_agent2_looks_like_real_content() -> tuple[bool, str]:
 
 
 def eval_agent2_strip_citation_artifacts() -> tuple[bool, str]:
-    from agents.agent2 import _strip_citation_artifacts
+    try:
+        from agents.agent2 import _strip_citation_artifacts
+    except ImportError as e:
+        return False, f"SKIPPED: missing dependency — {e}"
     dirty = "OpenAI announced a new model【2†L10-L12】 with support for tool calls【3†L5-L7】."
     clean = _strip_citation_artifacts(dirty)
     if "【" in clean or "†" in clean:
@@ -148,7 +154,10 @@ def eval_agent6_humanize_dates() -> tuple[bool, str]:
     This version tests exact output across all time buckets and catches
     real phrasings from cached stories (e.g. 'on July 16, 2026').
     """
-    from agents.agent6 import _humanize_dates
+    try:
+        from agents.agent6 import _humanize_dates
+    except Exception as e:
+        return False, f"SKIPPED: missing dependency — {e}"
 
     now = datetime.now(timezone.utc)
     failures = []

@@ -1,0 +1,96 @@
+"""Data loading helpers for checkpoint-based evals.
+
+Loads the golden pipeline checkpoint and stories cache so the eval
+functions can score pipeline output without re-running agents.
+
+Paths are relative to the project root (two levels up from evals/).
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+# Project root: evals/ sits one level below the repo root
+_EVALS_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _EVALS_DIR.parent
+
+# ── Checkpoint paths ─────────────────────────────────────────────
+# The golden checkpoint is the most complete one (through Agent 9).
+# Fall back to earlier checkpoints if the full one doesn't exist.
+_CHECKPOINT_CANDIDATES = [
+    _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent9.json",
+    _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent8.json",
+    _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent7.json",
+    _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent6_1.json",
+    _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent6.json",
+    _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent5.json",
+]
+
+_STORIES_CACHE = _PROJECT_ROOT / "experiments" / "data" / "stories_cache.json"
+
+
+def load_golden_checkpoint() -> dict:
+    """Load the most complete pipeline checkpoint available."""
+    for path in _CHECKPOINT_CANDIDATES:
+        if path.exists():
+            with open(path) as f:
+                return json.load(f)
+    raise FileNotFoundError(
+        f"No checkpoint found. Searched:\n"
+        + "\n".join(f"  {p}" for p in _CHECKPOINT_CANDIDATES)
+    )
+
+
+def load_stories_cache() -> dict:
+    """Load the stories cache (slug -> story dict)."""
+    if not _STORIES_CACHE.exists():
+        raise FileNotFoundError(f"Stories cache not found: {_STORIES_CACHE}")
+    with open(_STORIES_CACHE) as f:
+        return json.load(f)
+
+
+def golden_script(state: dict) -> dict:
+    """Extract the script dict from a checkpoint state."""
+    script = state.get("script")
+    if not script:
+        raise ValueError("Checkpoint has no 'script' key")
+    return script
+
+
+def selected_stories(state: dict) -> list[dict]:
+    """Return stories with a selection_rank, sorted by rank.
+
+    The checkpoint stores stories as a dict (slug -> story).
+    Stories chosen by Agent 4 have a 'selection_rank' field.
+    """
+    stories = state.get("stories", {})
+    if isinstance(stories, dict):
+        all_stories = list(stories.values())
+    elif isinstance(stories, list):
+        all_stories = stories
+    else:
+        return []
+
+    ranked = [s for s in all_stories
+              if isinstance(s, dict) and s.get("selection_rank")]
+    ranked.sort(key=lambda s: s["selection_rank"])
+    return ranked
+
+
+def checkpoint_summary(state: dict) -> str:
+    """One-line summary of a checkpoint for eval output."""
+    n_stories = len(state.get("stories", {}))
+    script = state.get("script", {})
+    wc = script.get("word_count", "?")
+    approved = script.get("approved", False)
+    has_shots = bool(state.get("shot_list"))
+    has_seo = bool(state.get("seo", {}).get("title"))
+    has_video = bool(state.get("video_path"))
+    return (
+        f"checkpoint: {n_stories} stories, script({wc}w, "
+        f"{'approved' if approved else 'not approved'}), "
+        f"shots={'yes' if has_shots else 'no'}, "
+        f"seo={'yes' if has_seo else 'no'}, "
+        f"video={'yes' if has_video else 'no'}"
+    )

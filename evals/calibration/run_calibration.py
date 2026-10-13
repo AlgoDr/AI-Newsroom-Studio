@@ -47,7 +47,7 @@ def _save_calibration(data):
 
 def run_judge():
     """Import Agent 6's judge and score each calibration script."""
-    from agents.agent6 import judge_script
+    from agents.agent6 import _judge_script
 
     data = _load_calibration()
     print(f"Running judge on {len(data)} calibration scripts...\n")
@@ -55,15 +55,29 @@ def run_judge():
     for entry in data:
         sid = entry["script_id"]
         sections = entry["sections"]
+        word_count = entry.get("word_count", sum(
+            len(s.split()) for s in sections.values()
+        ))
+
+        # _judge_script expects a script dict with "sections" and "word_count"
+        script_dict = {
+            "sections": sections,
+            "word_count": word_count,
+        }
 
         print(f"Script {sid}:")
         try:
-            result = judge_script(sections)
-            verdict = result.get("verdict", "unknown")
-            flagged = result.get("flagged_sections", [])
+            judgment = _judge_script(script_dict)
+            # flagged_sections is a dict {label: reason}
+            flagged = judgment.get("flagged_sections", {})
+            flagged_list = list(flagged.keys()) if isinstance(flagged, dict) else flagged
+
+            # Derive pass/fail: pass if no flagged sections
+            verdict = "fail" if flagged_list else "pass"
+
             entry["judge_verdict"] = verdict
-            entry["judge_flagged_sections"] = flagged
-            print(f"  verdict={verdict}, flagged={flagged}")
+            entry["judge_flagged_sections"] = flagged_list
+            print(f"  verdict={verdict}, flagged={flagged_list}")
         except Exception as e:
             print(f"  ERROR: {type(e).__name__}: {e}")
             entry["judge_verdict"] = "error"
@@ -73,8 +87,7 @@ def run_judge():
 
     _save_calibration(data)
     print(f"\nJudge scores saved to {CALIBRATION_FILE}")
-    print("Next: manually fill in human_verdict and human_flagged_sections,")
-    print("then run with --agreement")
+    print("Next: run with --agreement to compare human vs judge.")
 
 
 # ── Step 2: Compute agreement ────────────────────────────────────
@@ -84,13 +97,21 @@ def compute_agreement():
     data = _load_calibration()
 
     # Check that human scores are filled in
-    missing = [e["script_id"] for e in data
-               if e.get("human_verdict") is None]
-    if missing:
-        print(f"ERROR: human_verdict not filled for scripts: {missing}")
+    missing_human = [e["script_id"] for e in data
+                     if e.get("human_verdict") is None]
+    if missing_human:
+        print(f"ERROR: human_verdict not filled for scripts: {missing_human}")
         print("Please fill in human_verdict ('pass' or 'fail') and")
         print("human_flagged_sections (list of section names) in:")
         print(f"  {CALIBRATION_FILE}")
+        return 1
+
+    # Check that judge scores are filled in
+    missing_judge = [e["script_id"] for e in data
+                     if e.get("judge_verdict") is None]
+    if missing_judge:
+        print(f"ERROR: judge_verdict not filled for scripts: {missing_judge}")
+        print("Run with --judge first.")
         return 1
 
     # Verdict agreement
@@ -98,7 +119,7 @@ def compute_agreement():
     disagree = []
     for e in data:
         hv = e["human_verdict"].lower()
-        jv = (e.get("judge_verdict") or "").lower()
+        jv = e["judge_verdict"].lower()
         if hv == jv:
             agree_verdict += 1
             e["agreement"] = "agree"
@@ -125,8 +146,8 @@ def compute_agreement():
     print("=" * 60)
     print("JUDGE CALIBRATION RESULTS")
     print("=" * 60)
-    print(f"\nVerdict agreement: {agree_verdict}/{len(data)} "
-          f"({agree_verdict/len(data)*100:.0f}%)")
+    pct = agree_verdict / len(data) * 100
+    print(f"\nVerdict agreement: {agree_verdict}/{len(data)} ({pct:.0f}%)")
     if disagree:
         print(f"  Disagreements on scripts: {disagree}")
 
@@ -138,18 +159,18 @@ def compute_agreement():
     for e, j in zip(data, jaccard_scores):
         sid = e["script_id"]
         hv = e["human_verdict"]
-        jv = e.get("judge_verdict", "?")
+        jv = e["judge_verdict"]
         ag = e["agreement"]
         hf = e.get("human_flagged_sections", [])
         jf = e.get("judge_flagged_sections", [])
-        print(f"  #{sid:2d}: human={hv:4s} judge={jv:4s} [{ag:8s}] "
+        print(f"  #{sid:2d}: human={hv:<4s} judge={jv:<4s} [{ag:<8s}] "
               f"jaccard={j:.2f} h_flag={hf} j_flag={jf}")
 
     print(f"\n{'=' * 60}")
     if agree_verdict >= 8:
-        print("CALIBRATION: GOOD (≥80% verdict agreement)")
+        print("CALIBRATION: GOOD (>=80% verdict agreement)")
     elif agree_verdict >= 6:
-        print("CALIBRATION: ACCEPTABLE (≥60% verdict agreement)")
+        print("CALIBRATION: ACCEPTABLE (>=60% verdict agreement)")
     else:
         print("CALIBRATION: POOR (<60% — review judge prompts)")
     print("=" * 60)
