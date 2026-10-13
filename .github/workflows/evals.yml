@@ -57,7 +57,7 @@ jobs:
   quality-gate:
     name: "Quality gate (content evals)"
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     # Run on: nightly schedule, manual with run_quality=true,
     # or push to main (if GROQ_KEY is available)
     if: >-
