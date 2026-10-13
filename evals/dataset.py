@@ -4,6 +4,9 @@ Loads the golden pipeline checkpoint and stories cache so the eval
 functions can score pipeline output without re-running agents.
 
 Paths are relative to the project root (two levels up from evals/).
+
+On CI the full experiments/data/ tree is git-ignored, so we fall back
+to committed fixtures in evals/fixtures/.
 """
 
 from __future__ import annotations
@@ -15,9 +18,13 @@ from pathlib import Path
 _EVALS_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _EVALS_DIR.parent
 
+# ── CI fixtures (committed, always available) ────────────────────
+_FIXTURES = _EVALS_DIR / "fixtures"
+
 # ── Checkpoint paths ─────────────────────────────────────────────
 # The golden checkpoint is the most complete one (through Agent 9).
-# Fall back to earlier checkpoints if the full one doesn't exist.
+# Fall back to earlier checkpoints if the full one doesn't exist,
+# then fall back to the committed CI fixture.
 _CHECKPOINT_CANDIDATES = [
     _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent9.json",
     _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent8.json",
@@ -25,9 +32,11 @@ _CHECKPOINT_CANDIDATES = [
     _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent6_1.json",
     _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent6.json",
     _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent5.json",
+    _FIXTURES / "golden_checkpoint.json",
 ]
 
 _STORIES_CACHE = _PROJECT_ROOT / "experiments" / "data" / "stories_cache.json"
+_STORIES_CACHE_CI = _FIXTURES / "stories_cache.json"
 
 
 def load_golden_checkpoint() -> dict:
@@ -44,10 +53,13 @@ def load_golden_checkpoint() -> dict:
 
 def load_stories_cache() -> dict:
     """Load the stories cache (slug -> story dict)."""
-    if not _STORIES_CACHE.exists():
-        raise FileNotFoundError(f"Stories cache not found: {_STORIES_CACHE}")
-    with open(_STORIES_CACHE) as f:
-        return json.load(f)
+    for path in [_STORIES_CACHE, _STORIES_CACHE_CI]:
+        if path.exists():
+            with open(path) as f:
+                return json.load(f)
+    raise FileNotFoundError(
+        f"Stories cache not found at {_STORIES_CACHE} or {_STORIES_CACHE_CI}"
+    )
 
 
 def golden_script(state: dict) -> dict:
