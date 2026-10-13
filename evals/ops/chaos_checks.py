@@ -164,7 +164,7 @@ try:
     # Patch DDG at the DDGS class level so _fetch_ddg_results' own
     # try/except catches it (matching real timeout behavior)
     from unittest.mock import patch as _patch
-    from duckduckgo_search import DDGS as _OrigDDGS
+    from ddgs import DDGS as _OrigDDGS
 
     class _FakeDDGS:
         def __init__(self, **kw): pass
