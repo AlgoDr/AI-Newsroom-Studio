@@ -173,6 +173,13 @@ def run_eval(backend: str = "groq"):
     y_true = [tc.expected_output for tc in test_cases]
     y_pred = [tc.actual_output   for tc in test_cases]
 
+    # CI guard: if ALL predictions are NONE, no model was reachable
+    if all(p == "NONE" for p in y_pred):
+        raise RuntimeError(
+            "SKIPPED: all predictions NONE — no classification model available "
+            "(Groq rate-limited or unavailable, no Ollama on CI)"
+        )
+
     matrix, class_metrics, macro_f1 = compute_macro_f1(y_true, y_pred)
     passed = macro_f1 >= THRESHOLD
 

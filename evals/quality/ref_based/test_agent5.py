@@ -463,7 +463,13 @@ def run_eval() -> tuple[float, list[EvalResult]]:
 
     # ── Overall ────────────────────────────────────────────────────
     valid = [r for r in results if not r.generation_error]
-    overall = sum(r.composite for r in valid) / len(valid) if valid else 0.0
+    # CI guard: if ALL results errored, no model was reachable — SKIP
+    if not valid:
+        raise RuntimeError(
+            "SKIPPED: all script generations failed — no model available "
+            "(Groq rate-limited or unavailable, no Ollama on CI)"
+        )
+    overall = sum(r.composite for r in valid) / len(valid)
 
     print(f"\n{'='*70}")
     print(f"OVERALL RESULTS")
