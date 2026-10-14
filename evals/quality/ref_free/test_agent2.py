@@ -268,6 +268,16 @@ def test_agent2_background_faithfulness():
     # Run Agent 2 synthesis
     results = _run_agent2(goldens)
 
+    # ── CI guard: if ALL backgrounds are empty, no synthesis model
+    # was reachable (no Ollama on CI, Groq rate-limited). SKIP rather
+    # than fail — this is an infra condition, not a quality failure.
+    non_empty = sum(1 for r in results if (r["background"] or "").strip())
+    if non_empty == 0:
+        raise RuntimeError(
+            "SKIPPED: all backgrounds empty — no synthesis model available "
+            "(Ollama not running, Groq rate-limited or unavailable)"
+        )
+
     # Build test cases
     test_cases = _build_test_cases(results)
 
@@ -300,15 +310,6 @@ def test_agent2_background_faithfulness():
           f"threshold={THRESHOLD}")
     print(f"{'='*60}")
 
-    # ── CI guard: if ALL backgrounds are empty, no synthesis model
-    # was reachable (no Ollama on CI, Groq rate-limited). SKIP rather
-    # than fail — this is an infra condition, not a quality failure.
-    non_empty = sum(1 for r in results if r["background"].strip())
-    if non_empty == 0:
-        raise RuntimeError(
-            "SKIPPED: all backgrounds empty — no synthesis model available "
-            "(Ollama not running, Groq rate-limited or unavailable)"
-        )
 
     # DeepEval assertion
     overall_tc = LLMTestCase(
