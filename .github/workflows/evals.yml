@@ -21,6 +21,16 @@ on:
         type: boolean
         default: false
 
+# Langfuse (optional): with the three secrets set, CI eval scores show up in
+# Langfuse under environment "ci". Without them (forks, new clones) the
+# reporting is a silent no-op and nothing fails.
+env:
+  LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+  LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+  LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+  LANGFUSE_TRACING_ENVIRONMENT: ci
+  LANGFUSE_TIMEOUT: "30"
+
 jobs:
   # ──────────────────────────────────────────────────────────
   # FAST GATE — deterministic unit evals + chaos checks
