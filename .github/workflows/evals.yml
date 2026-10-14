@@ -1,0 +1,104 @@
+# AI Newsroom Studio — CI Eval Gates
+#
+# Two tiers:
+#   Fast gate  — every push & PR, no API keys, <2 min
+#   Quality gate — nightly + manual, needs GROQ_KEY
+#
+name: Evals
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Nightly at 00:30 UTC (06:00 IST)
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+    inputs:
+      run_quality:
+        description: "Also run quality gate (needs GROQ_KEY secret)"
+        type: boolean
+        default: false
+
+jobs:
+  # ──────────────────────────────────────────────────────────
+  # FAST GATE — deterministic unit evals + chaos checks
+  # No API keys, no network calls, under 2 minutes
+  # ──────────────────────────────────────────────────────────
+  fast-gate:
+    name: "Fast gate (unit + chaos)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run unit evals
+        run: python evals/run_all.py
+
+      - name: Run chaos checks (B5)
+        run: python evals/ops/chaos_checks.py
+
+  # ──────────────────────────────────────────────────────────
+  # QUALITY GATE — content evals on Groq (golden datasets)
+  # Nightly schedule, manual trigger, or on push with secret
+  # ──────────────────────────────────────────────────────────
+  quality-gate:
+    name: "Quality gate (content evals)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Run on: nightly schedule, manual with run_quality=true,
+    # or push to main (if GROQ_KEY is available)
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_quality) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    env:
+      GROQ_KEY: ${{ secrets.GROQ_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Check GROQ_KEY
+        run: |
+          if [ -z "$GROQ_KEY" ]; then
+            echo "::warning::GROQ_KEY not set — content evals will skip"
+          fi
+
+      - name: Run unit + content evals
+        run: python evals/run_all.py --content
+
+      - name: Save nightly score
+        if: github.event_name == 'schedule'
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          python evals/run_all.py --content 2>&1 | tee "evals/results/nightly_${DATE}.log"
+
+      - name: Upload nightly log
+        if: github.event_name == 'schedule'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-eval-${{ github.run_id }}
+          path: evals/results/nightly_*.log
+          retention-days: 90

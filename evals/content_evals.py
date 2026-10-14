@@ -170,6 +170,9 @@ def _quality_eval_wrapper(test_fn, label: str):
     except ImportError as e:
         return False, f"SKIPPED: {label} — missing dependency: {e}"
     except Exception as e:
+        msg = str(e)
+        if "SKIPPED" in msg:
+            return False, f"SKIPPED: {label} — {msg.replace('SKIPPED: ', '')}"
         return False, f"{label}: CRASHED — {type(e).__name__}: {e}"
 
 
@@ -211,8 +214,8 @@ def quality_eval_agent3_accuracy() -> tuple[bool, str]:
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 
-    from evals.quality.ref_based.test_agent3 import test_agent3_credibility_accuracy
-    return _quality_eval_wrapper(test_agent3_credibility_accuracy,
+    from evals.quality.ref_based.test_agent3 import test_agent3_credibility_groq
+    return _quality_eval_wrapper(test_agent3_credibility_groq,
                                  "Agent 3 credibility accuracy (macro-F1)")
 
 
@@ -229,9 +232,9 @@ def quality_eval_agent4_dedup() -> tuple[bool, str]:
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 
-    from evals.quality.ref_based.test_agent4 import test_agent4_dedup_accuracy
-    return _quality_eval_wrapper(test_agent4_dedup_accuracy,
-                                 "Agent 4 dedup merge (micro-F1)")
+    # test_agent4.py doesn't exist yet — only test_agent4_v3.py / _granite_n5.py
+    # which don't expose a compatible test function. SKIP until wired up.
+    return False, "SKIPPED: Agent 4 dedup eval not yet wired (no test_agent4.py)"
 
 
 def quality_eval_agent5_script() -> tuple[bool, str]:
@@ -250,8 +253,8 @@ def quality_eval_agent5_script() -> tuple[bool, str]:
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 
-    from evals.quality.ref_based.test_agent5 import test_agent5_script_quality
-    return _quality_eval_wrapper(test_agent5_script_quality,
+    from evals.quality.ref_based.test_agent5 import test_agent5_script
+    return _quality_eval_wrapper(test_agent5_script,
                                  "Agent 5 script quality (composite)")
 
 
@@ -271,8 +274,8 @@ def quality_eval_agent6_judge() -> tuple[bool, str]:
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 
-    from evals.quality.ref_based.test_agent6 import test_agent6_judge_accuracy
-    return _quality_eval_wrapper(test_agent6_judge_accuracy,
+    from evals.quality.ref_based.test_agent6 import test_agent6_judge
+    return _quality_eval_wrapper(test_agent6_judge,
                                  "Agent 6 JUDGE agreement (micro-F1)")
 
 

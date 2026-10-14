@@ -1,0 +1,6 @@
+# Dev / CI dependencies (on top of requirements.txt)
+-r requirements.txt
+
+pytest>=8.0
+deepeval>=4.0
+pytest-asyncio>=1.0

@@ -16,6 +16,7 @@ PROJECT_ROOT = EVALS_ROOT.parent
 
 GOLDEN = EVALS_ROOT / "golden_dataset" / "agent3_credibility_v1.json"
 CACHE  = PROJECT_ROOT / "experiments" / "data" / "stories_cache.json"
+CACHE_CI = EVALS_ROOT / "fixtures" / "stories_cache.json"
 
 sys.path.insert(0, str(PROJECT_ROOT / "experiments"))
 
@@ -129,7 +130,8 @@ def run_eval(backend: str = "groq"):
     # Load data
     with open(GOLDEN) as f:
         golden = json.load(f)
-    with open(CACHE) as f:
+    cache_path = CACHE if CACHE.exists() else CACHE_CI
+    with open(cache_path) as f:
         cache = json.load(f)
 
     # ── Step 1: Run agent, build LLMTestCase objects ───────────

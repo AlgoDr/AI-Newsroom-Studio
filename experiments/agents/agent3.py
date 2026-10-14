@@ -3,7 +3,7 @@ import dotenv
 import ollama
 from urllib.parse import urlparse
 from groq import Groq
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 import time
 
 dotenv.load_dotenv(".env")

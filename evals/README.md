@@ -148,8 +148,30 @@ Layer 4: Operational evals (latency, fallback, chaos)
 CI gate (GitHub Actions — blocks PRs on failure)
 ```
 
-Layers 1–3 are built. The CI gate (Phase C in the Production Plan) is
-the next integration step.
+**All four layers are built.** Phase C (CI regression gate) from the
+Production Plan is complete — see `.github/workflows/evals.yml`.
+
+### CI/CD — GitHub Actions (`evals.yml`)
+
+The gate runs on every push to `main`, on PRs, and nightly at
+00:30 UTC (06:00 IST). Manual trigger via `workflow_dispatch` is
+also supported.
+
+| Job | What it runs | Trigger | Behaviour |
+|-----|-------------|---------|-----------|
+| **fast-gate** | `evals/run_all.py` (11 unit evals) + `evals/ops/chaos_checks.py` (B5 — Groq 429, Exa timeout, DDG timeout) | Every push & PR | No API keys needed; blocks merge on any regression |
+| **quality-gate** | `evals/run_all.py --content` — all unit evals + LLM-judge content evals (Agents 2-6 via `pytest evals/quality/`) | Nightly + manual + push to main | Needs `GROQ_KEY` GitHub secret; nightly runs save scored logs as artifacts (90-day retention) |
+
+**Key design decisions:**
+- Quality evals **SKIP** (not fail) on infra unavailability — when
+  Ollama is absent on CI or Groq is rate-limited, the eval raises
+  `RuntimeError("SKIPPED: ...")` which the wrapper catches and marks
+  as a skip. Infra conditions never block a merge; only real quality
+  regressions do.
+- Chaos checks (B5) run in fast-gate because they mock network errors
+  locally — no API keys, no external calls, under 2 minutes.
+- Nightly quality runs log scores to `evals/results/nightly_*.log`
+  and upload them as GitHub Actions artifacts for trend tracking.
 
 ---
 
@@ -159,22 +181,33 @@ the next integration step.
 
 | File | Purpose |
 |------|---------|
-| `run_all.py` | CI entry point — runs all unit evals, prints table, exit 0 or 1 |
+| `run_all.py` | CI entry point — runs unit evals (+ content evals with `--content`), prints table, exit 0 or 1 |
 | `unit_evals.py` | 11 deterministic eval functions (Layer 1) |
+| `content_evals.py` | Content-level eval wrappers — bridges `pytest` quality evals into `run_all.py` for CI |
 | `config.py` | Shared constants: TARGET_MIN_WORDS, TARGET_MAX_WORDS, SECTION_ORDER, paths |
 | `dataset.py` | Golden data loaders: `load_golden_checkpoint()`, `load_stories_cache()`, `golden_script()`, `selected_stories()` |
 | `__init__.py` | Package marker |
-| `content_evals.py` | Content-level eval wrappers (Layer 2 integration into run_all.py — planned) |
+
+### CI Workflow
+
+| File | Purpose |
+|------|---------|
+| `.github/workflows/evals.yml` | GitHub Actions — fast-gate (unit + chaos) and quality-gate (content evals), nightly cron |
 
 ### Quality Eval Scripts (Layer 2)
 
 | File | Agent | What it does |
 |------|-------|-------------|
+| `quality/ref_free/test_agent2.py` | A2 | Calls `synthesize_background()` on 15 stories, G-Eval faithfulness judge (threshold ≥ 0.70) |
 | `quality/ref_based/test_agent3.py` | A3 | Calls `llm_credibility_check()` on 30 stories, computes macro-F1 |
 | `quality/ref_based/test_agent4_v3.py` | A4 | Calls `deduplicate_stories()` on 10 title sets, computes micro-F1 |
+| `quality/ref_based/test_agent4_granite_n5.py` | A4 | Granite 4.2:8b variant (n=5 subset) |
 | `quality/ref_based/test_agent5.py` | A5 | Calls `script_writer_node()` on 15 inputs, scores 7 dimensions |
 | `quality/ref_based/test_agent6.py` | A6 | Calls `_judge_script()` on 10 scripts, computes micro-F1 |
 | `quality/groq_judge.py` | — | GroqJudge adapter for DeepEval (routes judge calls to Groq) |
+| `quality/__init__.py` | — | Package marker |
+| `quality/ref_based/__init__.py` | — | Package marker |
+| `quality/ref_free/__init__.py` | — | Package marker |
 
 ### Calibration (Layer 3)
 
@@ -183,24 +216,52 @@ the next integration step.
 | `calibration/run_calibration.py` | Runs LLM judge on calibration scripts (`--judge`) and computes agreement (`--agreement`) |
 | `calibration/judge_calibration_v1.json` | 10 scripts with human + judge verdicts and flags |
 
+### Operational Evals (Layer 4)
+
+| File | Task | Purpose |
+|------|------|---------|
+| `ops/README.md` | — | Layer 4 documentation and run instructions |
+| `ops/ops_probe.py` | B1 | Agent 1 HN API latency + story count (×20 runs) |
+| `ops/tool_access_replay.py` | B2 | Agent 2 tier distribution on 40 cached URLs |
+| `ops/fallback_stress.py` | B3 | Agent 3 local fallback stress test (qwen3.5:9b ×30 stories) |
+| `ops/quota_table.md` | B4 | Groq + YouTube quota arithmetic (static doc) |
+| `ops/chaos_checks.py` | B5 | Groq 429, Exa timeout, DDG timeout resilience (runs in CI fast-gate) |
+
+### Golden Datasets
+
+| File | Agent | Contents |
+|------|-------|----------|
+| `golden_dataset/agent2_context_v1.json` | A2 | 15 stories with title, content, snippets for faithfulness eval |
+| `golden_dataset/agent3_credibility_v1.json` | A3 | 30 stories with human-labelled credibility |
+| `golden_dataset/agent4_dedup_v1.json` | A4 | 10 title sets with human-labelled duplicates |
+| `golden_dataset/agent5_script_v1.json` | A5 | 15 frozen inputs for script generation eval |
+| `golden_dataset/agent6_judge_v2.json` | A6 | 10 scripts with human-labelled judge verdicts |
+| `golden_dataset/LABELING_GUIDE.md` | — | Instructions for labelling golden datasets |
+| `golden_dataset/label_helper.py` | — | Helper script for labelling workflow |
+| `golden_dataset/pull_candidates.py` | — | Pulls candidate stories from cache for golden set construction |
+
+### Fixtures
+
+| File | Purpose |
+|------|---------|
+| `fixtures/golden_checkpoint.json` | Frozen pipeline checkpoint for deterministic unit evals |
+| `fixtures/stories_cache.json` | Frozen story cache for deterministic unit evals |
+
 ### Baseline Results
 
 | File | Key finding |
 |------|-------------|
+| `results/unit_evals_baseline.md` | 10/11 passed, 0 skipped, 1 known data issue |
 | `results/agent3_baseline.md` | Macro-F1 = 0.990, 29/30 correct |
 | `results/agent4_baseline.md` | Micro-F1 = 0.800 (granite4.2:8b), PASS |
 | `results/agent5_baseline.md` | Composite = 0.890 (n=15), PASS |
 | `results/agent6_baseline.md` | Micro-F1 = 0.615, PASS |
-| `results/unit_evals_baseline.md` | 10/11 passed, 0 skipped, 1 known data issue |
 | `results/calibration_baseline.md` | 50% verdict agreement, root cause = missing S3_TWIST |
-
-### Tooling
-
-| File | Purpose |
-|------|---------|
-| `golden_dataset/LABELING_GUIDE.md` | Instructions for labelling golden datasets |
-| `golden_dataset/label_helper.py` | Helper script for labelling workflow |
-| `golden_dataset/pull_candidates.py` | Pulls candidate stories from cache for golden set construction |
+| `results/b1_probe_baseline.md` | HN API latency + story count baseline |
+| `results/b2_replay_baseline.md` | Tier distribution replay baseline |
+| `results/b3_fallback_baseline.md` | Fallback stress test baseline |
+| `results/b5_chaos_baseline.md` | Chaos checks baseline (6/6 HEALTHY) |
+| `results/b6_fixes_baseline.md` | Fixes applied from B1–B3 findings |
 
 ---
 

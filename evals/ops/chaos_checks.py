@@ -31,6 +31,12 @@ from unittest.mock import patch, MagicMock
 import dotenv
 dotenv.load_dotenv(os.path.join("experiments", ".env"))
 
+# CI has no GROQ_KEY — set a dummy so agent3's module-level Groq()
+# client initialises. The chaos checks monkeypatch the client before
+# any real call, so the dummy key is never sent to Groq.
+if not os.getenv("GROQ_KEY"):
+    os.environ["GROQ_KEY"] = "gsk_CI_DUMMY_KEY_chaos_checks_only"
+
 sys.path.insert(0, "experiments")
 sys.path.insert(0, ".")
 
@@ -158,7 +164,7 @@ try:
     # Patch DDG at the DDGS class level so _fetch_ddg_results' own
     # try/except catches it (matching real timeout behavior)
     from unittest.mock import patch as _patch
-    from duckduckgo_search import DDGS as _OrigDDGS
+    from ddgs import DDGS as _OrigDDGS
 
     class _FakeDDGS:
         def __init__(self, **kw): pass
