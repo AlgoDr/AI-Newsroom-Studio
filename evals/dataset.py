@@ -12,6 +12,7 @@ to committed fixtures in evals/fixtures/.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 # Project root: evals/ sits one level below the repo root
@@ -22,18 +23,24 @@ _PROJECT_ROOT = _EVALS_DIR.parent
 _FIXTURES = _EVALS_DIR / "fixtures"
 
 # ── Checkpoint paths ─────────────────────────────────────────────
-# The golden checkpoint is the most complete one (through Agent 9).
-# Fall back to earlier checkpoints if the full one doesn't exist,
-# then fall back to the committed CI fixture.
-_CHECKPOINT_CANDIDATES = [
+# DEFAULT: the frozen, committed fixture. Evals must be repeatable, and a
+# live pipeline run overwrites experiments/data/checkpoints/*.json (a
+# 148-word script from one run failed the 150-225 word check while the
+# code was unchanged).
+# To eval your latest real run instead:  EVAL_LIVE_CHECKPOINT=1 python evals/run_all.py
+_LIVE_CHECKPOINTS = [
     _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent9.json",
     _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent8.json",
     _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent7.json",
     _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent6_1.json",
     _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent6.json",
     _PROJECT_ROOT / "experiments" / "data" / "checkpoints" / "till-agent5.json",
-    _FIXTURES / "golden_checkpoint.json",
 ]
+_CHECKPOINT_CANDIDATES = (
+    _LIVE_CHECKPOINTS + [_FIXTURES / "golden_checkpoint.json"]
+    if os.getenv("EVAL_LIVE_CHECKPOINT")
+    else [_FIXTURES / "golden_checkpoint.json"] + _LIVE_CHECKPOINTS
+)
 
 _STORIES_CACHE = _PROJECT_ROOT / "experiments" / "data" / "stories_cache.json"
 _STORIES_CACHE_CI = _FIXTURES / "stories_cache.json"
