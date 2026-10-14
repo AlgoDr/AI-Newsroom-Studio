@@ -87,7 +87,7 @@ def content_eval_faithfulness() -> tuple[bool, str]:
              f"NEWS SCRIPT TO EVALUATE:\n{target}",
     )
     if score is None:
-        return False, f"SKIPPED: faithfulness judge unavailable — {note}"
+        return False, note
     passed = score >= config.FAITHFULNESS_THRESHOLD
     verdict = "PASS" if passed else "FAIL"
     return passed, (f"faithfulness={score:.2f} "
@@ -127,7 +127,7 @@ def content_eval_relevance() -> tuple[bool, str]:
         user=f"LEAD STORY:\n{lead['title']}\n\nSEO TITLE:\n{seo_title}\n\nHOOK:\n{hook}",
     )
     if score is None:
-        return False, f"SKIPPED: relevance judge unavailable — {note}"
+        return False, note
     passed = score >= config.RELEVANCE_THRESHOLD
     verdict = "PASS" if passed else "FAIL"
     return passed, (f"relevance(lead)={score:.2f} "

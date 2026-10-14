@@ -85,6 +85,16 @@ The system identifies the most buzzworthy topics from HackerNews, enriches them 
   lives under a production-status Google OAuth app (no more 7-day
   expiry), with a silent-refresh + auto-browser-consent fallback
   (ISSUE-33/33c). First fully unattended upload verified end-to-end.
+- **Ops eval suite + CI regression gate live** -- Layer 4 operational
+  evals (B1–B6) added: HN API latency probe, tier-distribution replay,
+  fallback stress test (qwen3.5:9b ×30), Groq/YouTube quota arithmetic,
+  and chaos checks (Groq 429, Exa/DDG timeouts — all 6/6 HEALTHY).
+  GitHub Actions workflow (`.github/workflows/evals.yml`) runs on every
+  push to `main` and nightly at 00:30 UTC. Two-tier gate: `fast-gate`
+  (unit evals + chaos checks, no API keys) blocks merges on regression;
+  `quality-gate` (LLM-judge content evals, needs `GROQ_KEY` secret)
+  SKIPs gracefully when no model is reachable on CI. Nightly runs save
+  scored logs as GitHub Actions artifacts for trend tracking.
 
 ---
 

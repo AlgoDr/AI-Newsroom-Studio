@@ -154,7 +154,7 @@ def run_eval(backend: str = "groq"):
         predicted = classify_credibility(title, content, backend)
         if predicted is None:
             skipped.append((i, title, "model returned None"))
-            continue  # exclude from F1 — model couldn't classify
+            predicted = "NONE"
 
         # Package as DeepEval test case
         tc = LLMTestCase(
@@ -164,13 +164,6 @@ def run_eval(backend: str = "groq"):
             context=[content[:200]],   # first 200 chars for DeepEval report
         )
         test_cases.append(tc)
-
-    # CI guard: if no test cases survived, no model was reachable
-    if not test_cases:
-        raise RuntimeError(
-            "SKIPPED: no successful classifications — no model available "
-            "(Groq rate-limited or unavailable, no Ollama on CI)"
-        )
 
     # ── Step 2: Run DeepEval evaluate() ────────────────────────
     metric = ClassificationMetric()
