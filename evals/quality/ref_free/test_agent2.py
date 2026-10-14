@@ -318,6 +318,13 @@ def test_agent2_background_faithfulness():
     )
     overall_metric = FaithfulnessMetric()
     overall_metric.score = mean_score
+    try:  # D5: numeric faithfulness score into Langfuse (no-op if off)
+        from evals.langfuse_scores import EvalRunReporter
+        with EvalRunReporter(suite="agent2-faithfulness") as _rep:
+            _rep.score("agent2/faithfulness_mean", mean_score,
+                       f"{passed}/{len(scores)} above {THRESHOLD}")
+    except Exception:
+        pass
     overall_metric.success = mean_score >= THRESHOLD
     overall_metric.reason = (
         f"mean={mean_score:.3f}, {passed}/{len(scores)} above threshold, "

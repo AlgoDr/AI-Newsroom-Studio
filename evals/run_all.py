@@ -49,6 +49,9 @@ if not os.getenv("GROQ_KEY"):
     os.environ["GROQ_KEY"] = "gsk_CI_DUMMY_KEY_evals_only"
 
 
+_REPORTER = None  # D5: set by main(); None = Langfuse reporting off
+
+
 def _run_suite(label: str, evals: list) -> tuple[int, int, int, list[str]]:
     """Run a list of (passed, detail) eval functions.
 
@@ -82,6 +85,8 @@ def _run_suite(label: str, evals: list) -> tuple[int, int, int, list[str]]:
             failures.append(f"{name}: {detail}")
 
         print(f"  [{status}] {name} ({elapsed:.1f}s)")
+        if _REPORTER is not None and status != "SKIP":
+            _REPORTER.score(f"{label}/{name}", ok, str(detail))
         if detail:
             # Indent multi-line details
             for line in detail.split("\n"):
@@ -91,6 +96,7 @@ def _run_suite(label: str, evals: list) -> tuple[int, int, int, list[str]]:
 
 
 def main() -> int:
+    global _REPORTER
     ap = argparse.ArgumentParser(
         description="AI Newsroom Studio — eval runner"
     )
@@ -103,6 +109,11 @@ def main() -> int:
         help="Run only unit evals (default when --content is not set)"
     )
     args = ap.parse_args()
+
+    from evals.langfuse_scores import EvalRunReporter
+    _rep = EvalRunReporter(suite="content+unit" if args.content else "unit")
+    _rep.__enter__()
+    _REPORTER = _rep
 
     all_failures: list[str] = []
     total_passed = 0
@@ -140,8 +151,12 @@ def main() -> int:
         print(f"\n  Content: {p}/{t} passed, {s} skipped\n")
 
     # ── Summary ──────────────────────────────────────────────────
-    print("=" * 60)
     real_ran = total_count - total_skipped
+    if real_ran:
+        _rep.score("eval/pass_rate", total_passed / real_ran,
+                   f"{total_passed}/{real_ran} passed")
+    _rep.__exit__(None, None, None)
+    print("=" * 60)
     print(f"TOTAL: {total_passed}/{real_ran} passed"
           + (f" ({total_skipped} skipped)" if total_skipped else ""))
     if all_failures:
