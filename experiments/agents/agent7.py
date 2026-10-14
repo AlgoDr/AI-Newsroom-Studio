@@ -24,6 +24,8 @@ from urllib.parse import urlparse
 import re
 from urllib.parse import urlparse as _urlparse  # noqa: F401 (explicit, avoids shadowing)
 
+from langfuse import observe
+from agent_tools.trace_utils import log_generation, add_metadata, mark_issue
 # ---------------------------------------------------------------------
 # Fallback query categories, used when a story's own content doesn't
 # translate to a natural literal visual (e.g. a CVE writeup, an abstract
@@ -255,14 +257,14 @@ def build_shot_list(state: dict, ollama_generate_fn=None) -> list[dict]:
 
     return shot_list
 
-
+@observe(name="Agent-7:video-assembly-prompt", capture_input=False, capture_output=False)
 def video_assembly_prompt_node(state: dict) -> dict:
     """
     LangGraph-style node wrapper, matching the pattern used by every
     other agent in this pipeline (state in, state out).
     """
     import ollama
-
+    @observe(name="Agent-7:stock-query-ollama-local", as_type="generation")
     def _ollama_query(prompt: str) -> str:
         response = ollama.generate(
             model="qwen3.5:4b-mlx",
@@ -271,6 +273,7 @@ def video_assembly_prompt_node(state: dict) -> dict:
             keep_alive=0,
             options={"temperature": 0.3, "num_ctx": 2048},  # low temp: extraction, not creative writing
         )
+        log_generation("qwen3.5:4b-mlx", response.get("prompt_eval_count"), response.get("eval_count"))
         return response["response"]
 
     shot_list = build_shot_list(state, ollama_generate_fn=_ollama_query)
@@ -278,6 +281,9 @@ def video_assembly_prompt_node(state: dict) -> dict:
     fallback_count = sum(1 for s in shot_list if s.get("used_fallback_query"))
     print(f"[agent7] built shot list: {len(shot_list)} sections, "
           f"{fallback_count} used fallback queries")
+    add_metadata(shot_count=len(shot_list), fallback_queries=fallback_count)
+    if fallback_count:
+        mark_issue(f"{fallback_count} shots used fallback queries")
     for shot in shot_list:
         marker = "  (fallback)" if shot.get("used_fallback_query") else ""
         print(f"  {shot['section']:12s} rank={shot['story_rank']} "

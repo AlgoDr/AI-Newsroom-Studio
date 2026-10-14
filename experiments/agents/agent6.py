@@ -69,6 +69,10 @@ DATE_PATTERN = re.compile(
 
 groq_client = Groq(api_key=os.getenv("GROQ_KEY"))
 
+from langfuse import observe, get_client
+langfuse = get_client()
+from agent_tools.trace_utils import log_generation, add_metadata, mark_issue
+
 
 # ── TWIST restatement detection (ported from test_agent6.py) ─────
 # Signal phrases that mark a restatement twist (start of sentence).
@@ -187,6 +191,17 @@ def _scan_tts_readiness(sections: dict) -> dict:
             warnings[label] = "; ".join(reasons)
     return warnings
 
+@observe(name="Agent-6:judge-groq-cloud", as_type="generation")
+def _call_groq_judge(prompt: str):
+    resp = groq_client.chat.completions.create(
+        model=JUDGE_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,
+        max_tokens=1500,
+    )
+    log_generation(JUDGE_MODEL, resp.usage.prompt_tokens, resp.usage.completion_tokens)
+    return resp
+
 
 def _judge_script(script: dict) -> dict:
     """Stage 1 -- gpt-oss-120b judges every QC dimension in one call.
@@ -231,12 +246,7 @@ CTA_OK: YES or NO"""
 
     raw = ""
     try:
-        resp = groq_client.chat.completions.create(
-            model=JUDGE_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=1500,
-        )
+        resp = _call_groq_judge(prompt)
         raw = (resp.choices[0].message.content or "").strip()
         finish_reason = resp.choices[0].finish_reason
         if raw and finish_reason == "length":
@@ -247,9 +257,11 @@ CTA_OK: YES or NO"""
             print(f"  [qc] JUDGE empty content, finish_reason={finish_reason}")
     except Exception as e:
         print(f"  [qc] JUDGE (gpt-oss-120b) call failed: {e}")
+        
 
 
     if not raw:
+        mark_issue("judge cloud failed -> local")
         print("  [qc] JUDGE empty/failed on gpt-oss-120b -> "
               f"falling back to local {JUDGE_FALLBACK_MODEL}")
         print(f"  [qc-diag] CLOUD FALLBACK TRIGGERED — reason: "
@@ -260,6 +272,7 @@ CTA_OK: YES or NO"""
 
     if not raw:
         print("  [qc] JUDGE failed on both cloud and local -- defaulting to all-pass")
+        mark_issue("judge failed on both -> all-pass", "ERROR")
         judgment = _default_judgment_pass()
     else:
         judgment = _parse_judgment(raw, valid_labels=section_labels)
@@ -306,7 +319,7 @@ CTA_OK: YES or NO"""
 
     return judgment
 
-
+@observe(name="Agent-6:judge-ollama-local", as_type="generation")
 def _judge_script_local(prompt: str) -> str:
     """Local fallback for the JUDGE stage -- qwen3.5:9b via Ollama."""
     try:
@@ -318,6 +331,7 @@ def _judge_script_local(prompt: str) -> str:
             keep_alive=0,
             options={"temperature": 0.1, "num_ctx": 4096},
         )
+        log_generation(JUDGE_FALLBACK_MODEL, resp.get("prompt_eval_count"), resp.get("eval_count"))
         raw = (resp.get("response") or "").strip()
         # Diagnostic logging: show full local model output for debugging
         total_dur = resp.get("total_duration", 0) / 1e9  # nanoseconds → seconds
@@ -394,6 +408,17 @@ def _default_judgment_pass() -> dict:
     }
 
 
+@observe(name="Agent-6:rewrite-groq-cloud", as_type="generation")
+def _call_groq_rewrite(prompt: str):
+    resp = groq_client.chat.completions.create(
+        model=REWRITE_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.4,
+        max_tokens=500,
+    )
+    log_generation(REWRITE_MODEL, resp.usage.prompt_tokens, resp.usage.completion_tokens)
+    return resp
+
 def _rewrite_flagged(script: dict, judgment: dict) -> dict:
     """Stage 2 -- qwen/qwen3.8-27b rewrites ONLY flagged sections."""
     sections = dict(script["sections"])
@@ -447,17 +472,14 @@ SECTION_LABEL: rewritten text"""
 
     raw = ""
     try:
-        resp = groq_client.chat.completions.create(
-            model=REWRITE_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-            max_tokens=500,
-        )
+        resp = _call_groq_rewrite(prompt)
         raw = (resp.choices[0].message.content or "").strip()
     except Exception as e:
         print(f"  [qc] REWRITE (qwen/qwen3.8-27b) call failed: {e}")
+        
 
     if not raw:
+        mark_issue("rewrite cloud failed -> local")
         print("  [qc] REWRITE empty/failed on Groq -> "
               f"falling back to local {REWRITE_FALLBACK_MODEL}")
         raw = _rewrite_flagged_local(prompt)
@@ -465,6 +487,7 @@ SECTION_LABEL: rewritten text"""
 
     if not raw:
         print("  [qc] REWRITE failed on both cloud and local -- keeping original sections")
+        mark_issue("rewrite failed on both", "ERROR")
         return sections
 
     rewritten = _parse_rewrite_output(raw)
@@ -500,7 +523,7 @@ def _parse_rewrite_output(raw: str) -> dict:
                 result[label] = text
     return result
 
-
+@observe(name="Agent-6:rewrite-ollama-local", as_type="generation")
 def _rewrite_flagged_local(prompt: str) -> str:
     """Local fallback for the REWRITE stage -- gemma4:12b-mlx via Ollama."""
     try:
@@ -512,6 +535,7 @@ def _rewrite_flagged_local(prompt: str) -> str:
             keep_alive=0,
             options={"temperature": 0.4, "num_ctx": 4096},
         )
+        log_generation(REWRITE_FALLBACK_MODEL, resp.get("prompt_eval_count"), resp.get("eval_count"))
         return (resp.get("response") or "").strip()
     except Exception as e:
         print(f"  [qc] local REWRITE fallback also failed: {e}")
@@ -550,7 +574,7 @@ def _build_annotated_and_tts_text(sections: dict) -> tuple:
 
     return annotated_text, tts_ready_text
 
-
+@observe(name="Agent-6:script-qc", capture_input=False, capture_output=False)
 def script_qc_node(state: dict) -> dict:
     """LangGraph node -- orchestrates Agent 6's full QC pipeline."""
     script = state.get("script", {})
@@ -613,13 +637,25 @@ def script_qc_node(state: dict) -> dict:
             qc_notes.append(f"iteration {iteration}: CTA rejected (category {judgment['cta_category']})")
 
         new_sections = _rewrite_flagged(working_script, judgment)
+        _norm = lambda t: (t or "").replace("’", "'").strip()
+        changed = [l for l in new_sections
+              if _norm(new_sections[l]) != _norm(working_script["sections"].get(l, ""))]
+        add_metadata(**{f"iter{iteration}_flagged": list(judgment["flagged_sections"]),f"iter{iteration}_changed": changed})
+        if judgment["flagged_sections"] and not changed:
+            mark_issue(f"iteration {iteration}: rewrite changed nothing")
+
+
         working_script["sections"] = new_sections
 
         if iteration == MAX_ITERATIONS:
             print(f"  [qc] still has issues after {MAX_ITERATIONS} iterations "
                   f"-- approving as-is (never blocks pipeline)")
+            mark_issue("accepted with remaining issues after max iterations")
             qc_notes.append(f"accepted after {MAX_ITERATIONS} iterations with remaining issues")
             approved = True
+
+
+    add_metadata(iterations=iterations, approved=approved)
 
     final_sections = working_script["sections"]
     full_text_parts = [final_sections.get(label, "") for label in SECTION_ORDER if final_sections.get(label)]

@@ -13,6 +13,11 @@ import requests
 groq_client = Groq(api_key=os.getenv("GROQ_KEY"))
 
 
+from langfuse import observe, get_client
+langfuse = get_client()
+
+from agent_tools.trace_utils import log_generation, add_metadata, mark_issue
+
 from agent_tools.milestone_tracker import MilestoneTracker
 
 # ISSUE-7 tracker — logs every real gpt-oss-20b firing
@@ -100,6 +105,7 @@ def clean_jina(text: str) -> str:
 
 # Fetches the content of the article from url with 3 services:
 
+@observe(name="Agent-2:fetch-article", capture_output=False)
 def fetch_url_content(url: str, return_tier: bool = False):
     """Fetch article content via 3-tier fallback: trafilatura → Jina → Tavily.
 
@@ -114,6 +120,11 @@ def fetch_url_content(url: str, return_tier: bool = False):
         tuple (content, tier) if return_tier=True
     """
     def _result(content, tier):
+        add_metadata(tier=tier, chars=len(content or ""))
+        if tier == "none":
+            mark_issue("all fetch tiers failed", "ERROR")
+        elif tier != "trafilatura":
+            mark_issue(f"served by {tier} (trafilatura failed or junk)")
         return (content, tier) if return_tier else content
 
     if not url or not url.startswith("http"):
@@ -203,7 +214,7 @@ def fetch_wiki_background(topic: str) -> str:
         return ""
     
 
-
+@observe(name="Agent-2:extract-keyword-ollama-local", as_type="generation")
 def extract_wiki_keyword(title: str) -> str:
     """AI pulls the core entity: 'CRISPR shreds cancer cells' -> 'CRISPR'."""
     prompt = f"""Extract the single most important search term from this headline.
@@ -221,7 +232,7 @@ Search term:"""
             options={"temperature": 0.1, "num_ctx": 2048}
         )
         kw = resp["response"].strip().strip('"').split("\n")[0].strip()
-        
+        log_generation("llama3.2:3b", resp.get("prompt_eval_count"), resp.get("eval_count"))
         if 0 < len(kw) <= 40:
             return kw       # keyword looks valid → use it
         else:
@@ -280,7 +291,8 @@ def synthesize_background(topic: str, content: str, snippets: list) -> str:
     has_real_snippets = len(snippets) >= 2   # at least 2 real snippets
     snippet_chars = len(snippet_text)
     use_cloud = not has_real_snippets and snippet_chars < 200
-    
+
+    add_metadata(snippet_count=len(snippets), route="qwen3.5:9b" if not use_cloud else "cloud", story=topic[:80])
     print(f"  [synth] {len(snippets)} snippets, {snippet_chars} snippet chars "
           f"→ {'groq/compound (will search)' if use_cloud else 'qwen3.5:9b'}")
 
@@ -289,11 +301,13 @@ def synthesize_background(topic: str, content: str, snippets: list) -> str:
         if result:
             return result
         print(f"  [synth] compound empty/failed → local 9B fallback")
+        mark_issue("cloud synthesis empty/failed -> local 9B")
 
     return _synthesize_local(content[:3500], snippet_text)
 
 
 
+@observe(name="Agent-2:synthesize-groq-cloud", as_type="generation") # langfuse trace
 def _synthesize_grokapi_cloud(content: str, snippet_text: str) -> str:
     """Cloud synthesis for 0-snippet stories needing web search context.
 
@@ -335,14 +349,17 @@ Background paragraph:"""
             temperature=0.2,
             max_tokens=300,
         )
+        log_generation("groq/compound-mini", resp.usage.prompt_tokens, resp.usage.completion_tokens)
         raw = resp.choices[0].message.content
         print(f"  [synth] groq/compound-mini → {len(raw) if raw else 0} chars raw")
         result = _clean_synthesis(raw.strip() if raw else "")
         if result:
             return result
         print(f"  [synth] compound-mini returned empty → trying big boss")
+        mark_issue("compound-mini returned empty")
     except Exception as e:
         print(f"  [synth] compound-mini failed ({type(e).__name__}: {e}) → trying big boss")
+        mark_issue(f"compound-mini failed: {type(e).__name__}")
 
     # ── OPTION B: gpt-oss-120b with explicit web_search tool ──────────────
     # 120B reasoning model + browser search via Groq Responses API.
@@ -360,6 +377,7 @@ Background paragraph:"""
             tools=[{"type": "web_search_preview"}],
             temperature=0.2,
         )
+        log_generation("openai/gpt-oss-20b", resp.usage.input_tokens, resp.usage.output_tokens)
         raw = resp.output_text
         print(f"  [synth] gpt-oss-20b + web_search → {len(raw) if raw else 0} chars raw")
         result = _clean_synthesis(raw.strip() if raw else "")
@@ -378,8 +396,10 @@ Background paragraph:"""
         if result:
             return result
         print(f"  [synth] big boss(oss-20B) also returned empty → 8B fallback")
+        mark_issue("gpt-oss-20b returned empty")
     except Exception as e:
         print(f"  [synth] gpt-oss-20b failed ({type(e).__name__}: {e}) → 8B fallback")
+        mark_issue(f"gpt-oss-20b failed: {type(e).__name__}")
 
 
 
@@ -396,7 +416,7 @@ Background paragraph:"""
     return ""   # both cloud options failed → caller falls through to _synthesize_local
 
 
-
+@observe(name="Agent-2:synthesize-local(ollama call)", as_type="generation") # langfuse trace
 def _synthesize_local(content: str, snippet_text: str) -> str:
     """qwen3.5:9b local — no payload limit, handles large articles."""
     try:
@@ -425,11 +445,13 @@ Background:"""
             keep_alive=0 # ← release model from memory(memory overhead but neccesary but in mac it is faster 2-3 sec) after each call
                     # forces fresh load next call — no context bleed
         )
+        log_generation("qwen3.5:9b", resp.get("prompt_eval_count"), resp.get("eval_count"))
         result = resp["response"].strip()
         print(f"  [synth] qwen3.5:9b → {len(result)} chars")
         return _clean_synthesis(result)
     except Exception as e:
         print(f"  [synth] local 9B failed ({e}) → empty")
+        mark_issue("local 9B failed -> empty", "ERROR")
         return ""
 
 
@@ -453,6 +475,7 @@ def _clean_synthesis(result: str) -> str:
 
 
 # to run both function a wrapper function is been used
+@observe(name="Agent-2:fetch-trend-background", capture_input=False, capture_output=False)
 def fetch_trend_background(topic: str, content: str) -> str:
     """Full pipeline: gather snippets (DDG + Wikipedia) →
     one content-anchored ollama synthesis."""

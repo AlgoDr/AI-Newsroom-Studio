@@ -11,10 +11,14 @@ dotenv.load_dotenv('.env')
 HEADERS = {"User-Agent": "newsroom-studio/1.0"}
 
 
+from langfuse import observe, get_client
+from agent_tools.trace_utils import add_metadata, mark_issue
+langfuse = get_client()
 
 # 1. Hackernews — zero auth, works immediately
 
 
+@observe(name="Agent-1:fetch-trends", capture_input=False, capture_output=False)
 def fetch_trends(top_n: int =8) -> list:
     "to fetch Tech-Trends from hackernews"
 
@@ -63,6 +67,9 @@ def fetch_trends(top_n: int =8) -> list:
             })
 
     stories.sort(key=lambda x: x["velocity"], reverse=True)
+    add_metadata(story_count=len(stories[:top_n]), ids_fetched=len(ids))
+    if not stories:
+        mark_issue("HN returned no stories", "ERROR")
     return stories[:top_n]
 
 

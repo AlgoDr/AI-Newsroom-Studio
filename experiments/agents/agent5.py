@@ -53,6 +53,11 @@ from groq import Groq
 
 dotenv.load_dotenv(".env")
 
+from langfuse import observe, get_client
+langfuse = get_client()
+
+from agent_tools.trace_utils import log_generation, add_metadata, mark_issue
+
 # CONSTANTS
 
 MODEL          = "qwen/qwen3.8-27b"   # creative generation model
@@ -339,6 +344,48 @@ def _parse_script(raw: str) -> dict:
     return sections
 
 
+# -----------------------------------------------------------------------------
+# LANGFUSE-TRACED LLM CALLS (one generation per call)
+# Tracing must never break the pipeline: usage logging is wrapped so a
+# Langfuse problem is swallowed instead of triggering the fallback path.
+# -----------------------------------------------------------------------------
+
+SCRIPT_SYSTEM_PROMPT = (
+    "You are a YouTube Shorts script writer for a daily tech news channel. "
+    "Write punchy, conversational scripts optimised for spoken delivery. "
+    "Always follow the labelled section format exactly as instructed."
+)
+
+
+
+
+@observe(name="Agent-5:script-generation-groq-cloud", as_type="generation")
+def _call_groq_script(prompt: str) -> str:
+    resp = groq_client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": SCRIPT_SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.4,    # reduced: prevents story reordering
+        max_tokens=500,
+    )
+    log_generation(MODEL, resp.usage.prompt_tokens, resp.usage.completion_tokens)
+    return (resp.choices[0].message.content or "").strip()
+
+
+@observe(name="Agent-5:word-count-fix-groq-cloud", as_type="generation")
+def _call_groq_correction(prompt: str) -> str:
+    resp = groq_client.chat.completions.create(
+        model=MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+        max_tokens=600,
+    )
+    log_generation(MODEL, resp.usage.prompt_tokens, resp.usage.completion_tokens)
+    return resp.choices[0].message.content.strip()
+
+
 # FUNCTION 5 -- _enforce_word_count
 
 def _enforce_word_count(raw: str, attempt: int = 1) -> tuple:
@@ -362,10 +409,12 @@ def _enforce_word_count(raw: str, attempt: int = 1) -> tuple:
     if TARGET_MIN <= word_count <= TARGET_MAX:
         print(f"  [script] within target ({TARGET_MIN}-{TARGET_MAX})")
         return raw, word_count, attempt
+    
 
     if attempt >= MAX_ATTEMPTS:
         print(f"  [script] still {word_count} words after {attempt} attempts "
               f"-- accepting as-is (Agent 6 will review)")
+        mark_issue(f"still {word_count} words after {attempt} attempts")
         return raw, word_count, attempt
 
     if word_count > TARGET_MAX:
@@ -386,23 +435,19 @@ def _enforce_word_count(raw: str, attempt: int = 1) -> tuple:
         print(f"  [script] {word_count} < {TARGET_MIN} -> expanding...")
 
     try:
-        resp = groq_client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": correction_prompt}],
-            temperature=0.3,
-            max_tokens=600,
-        )
-        corrected = resp.choices[0].message.content.strip()
+        corrected = _call_groq_correction(correction_prompt)
         # recurse for one more check (attempt 2)
         return _enforce_word_count(corrected, attempt + 1)
 
     except Exception as e:
         print(f"  [script] word count correction failed ({e}) -- accepting original")
+        mark_issue("word count correction failed -> accepted original")
         return raw, word_count, attempt
 
 
 # FUNCTION 5b -- _generate_script_local (NEW -- Groq fallback for Step 3)
 
+@observe(name="Agent-5:script-generation-ollama-local", as_type="generation")
 def _generate_script_local(prompt: str) -> str:
     """Local fallback for the PRIMARY script generation call -- gemma4:12b-mlx
     via Ollama, Metal-accelerated. Used only when qwen/qwen3.8-27b
@@ -432,6 +477,7 @@ def _generate_script_local(prompt: str) -> str:
             keep_alive=0,
             options={"temperature": 0.4, "num_ctx": 4096},
         )
+        log_generation(FALLBACK_MODEL, resp.get("prompt_eval_count"), resp.get("eval_count"))
         return (resp.get("response") or "").strip()
     except Exception as e:
         print(f"  [script] local fallback also failed: {e}")
@@ -440,6 +486,7 @@ def _generate_script_local(prompt: str) -> str:
 
 # FUNCTION 6 -- script_writer_node (LangGraph node)
 
+@observe(name="Agent-5:script-writer", capture_input=False, capture_output=False) # langfuse trace
 def script_writer_node(state: dict) -> dict:
     """LangGraph node -- orchestrates the full Agent 5 pipeline.
 
@@ -485,27 +532,9 @@ def script_writer_node(state: dict) -> dict:
     # previously any Groq failure here produced 0 words with no
     # recovery attempt).
     raw = ""
+    used_local = False
     try:
-        resp = groq_client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a YouTube Shorts script writer for a daily tech news channel. "
-                        "Write punchy, conversational scripts optimised for spoken delivery. "
-                        "Always follow the labelled section format exactly as instructed."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
-            temperature=0.4,    # reduced: prevents story reordering
-            max_tokens=500,
-        )
-        raw = (resp.choices[0].message.content or "").strip()
+        raw = _call_groq_script(prompt)
         print(f"  [script] LLM response: {len(raw)} chars, "
               f"~{len(raw.split())} words (before enforcement)")
 
@@ -513,14 +542,17 @@ def script_writer_node(state: dict) -> dict:
         print(f"  [script] LLM call failed: {e}")
 
     if not raw:
+        mark_issue("Groq empty/failed -> local fallback")
         print(f"  [script] Groq empty/failed -> falling back to local {FALLBACK_MODEL}")
         raw = _generate_script_local(prompt)
+        used_local = True
         if raw:
             print(f"  [script] local fallback response: {len(raw)} chars, "
                   f"~{len(raw.split())} words (before enforcement)")
 
     if not raw:
         print("  [script] generation failed on both cloud and local -- no script generated")
+        mark_issue("script generation failed on cloud and local", "ERROR")
         state["script"] = {
             "full_text":    "",
             "word_count":   0,
@@ -534,6 +566,7 @@ def script_writer_node(state: dict) -> dict:
 
     # Step 4: enforce word count (trim/expand if needed)
     final_text, word_count, attempts = _enforce_word_count(raw, attempt=1)
+    add_metadata(word_count=word_count, attempts=attempts,path="local" if used_local else "cloud")
 
     # Step 5: parse into labelled sections
     sections = _parse_script(final_text)

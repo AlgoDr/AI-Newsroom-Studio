@@ -80,6 +80,8 @@ import unicodedata
 import wave
 from datetime import datetime, timezone
 
+from langfuse import observe
+from agent_tools.trace_utils import add_metadata, mark_issue
 KOKORO_MODEL         = "mlx-community/Kokoro-82M-bf16"
 
 # Per-chunk voice fallback ladder. mlx-audio 0.4.4's Kokoro crashes with
@@ -451,6 +453,7 @@ def _generate_audio(text: str, voice: str, _regen_done: bool = False) -> tuple:
         all_audio_files.extend(chunk_files)
 
     if skipped_chunks:
+        mark_issue(f"{len(skipped_chunks)} TTS chunk(s) skipped", "ERROR")
         print(f"  [voiceover] {len(skipped_chunks)} chunk(s) skipped: "
               f"{skipped_chunks}")
 
@@ -464,6 +467,7 @@ def _generate_audio(text: str, voice: str, _regen_done: bool = False) -> tuple:
     # (_regen_done prevents infinite recursion if the fallback voice
     # hits the same class of failure on other chunks).
     if failed_voices and not _regen_done:
+        mark_issue(f"{len(failed_voices)} chunk(s) needed fallback voice -> whole script regenerated")
         fb_voice = VOICE_FALLBACKS.get(voice, [voice])[0]
         print(f"  [voiceover] {len(failed_voices)} chunk(s) needed fallback "
               f"voice {fb_voice} -- regenerating the WHOLE script with "
@@ -527,7 +531,7 @@ def _verify_duration(actual_seconds: float, word_count: int) -> bool:
 
     return within_tolerance
 
-
+@observe(name="Agent-6.1:voice-over", capture_input=False, capture_output=False)
 def voice_over_node(state: dict, voice: str = DEFAULT_VOICE) -> dict:
     """LangGraph node -- generates production voice-over audio from
     Agent 6's QC'd tts_ready_text. Only runs if Agent 6 approved.
@@ -582,6 +586,7 @@ def voice_over_node(state: dict, voice: str = DEFAULT_VOICE) -> dict:
 
     # _generate_audio returns 3-tuple or (None, 0) on total failure
     if result[0] is None:
+        mark_issue("voice-over generation failed", "ERROR")
         print("  [voiceover] generation failed")
         return state
 
@@ -599,6 +604,8 @@ def voice_over_node(state: dict, voice: str = DEFAULT_VOICE) -> dict:
     state["script"]["audio_chunks"]      = chunk_count
     state["script"]["chunks_skipped"]    = chunks_skipped
 
+    add_metadata(chunk_count=chunk_count, chunks_skipped=chunks_skipped,
+                 voice=voice, audio_duration_s=duration, duration_verified=duration_ok)
     print(f"\n  [voiceover] audio generated")
     print(f"  [voiceover]    path:          {audio_path}")
     print(f"  [voiceover]    duration:      {duration}s")

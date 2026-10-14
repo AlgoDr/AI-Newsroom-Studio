@@ -57,6 +57,10 @@ CATEGORY_ID = "28"  # Science & Technology -- fixed, not computed per-video
 CHANNEL_TAGLINE = "AI Newsroom Studio -- autonomous, zero human editing"
 
 
+
+from langfuse import observe
+from agent_tools.trace_utils import log_generation, add_metadata, mark_issue
+
 # ---------------------------------------------------------------------
 # TITLE -- reuse Agent 5's HOOK, rule-based truncation only
 # ---------------------------------------------------------------------
@@ -304,7 +308,7 @@ def _select_thumbnail_frame(frames_dir: str, fps: int = 30,
 # ---------------------------------------------------------------------
 # ORCHESTRATION
 # ---------------------------------------------------------------------
-
+@observe(name="Agent-9:seo-optimizer", capture_input=False, capture_output=False)
 def seo_optimizer_node(state: dict) -> dict:
     """
     LangGraph-style node wrapper, matching the pattern used by every
@@ -317,6 +321,7 @@ def seo_optimizer_node(state: dict) -> dict:
     """
     import ollama
 
+    @observe(name="Agent-9:tag-extraction-ollama-local", as_type="generation")
     def _ollama_query(prompt: str) -> str:
         response = ollama.generate(
             model="qwen3.5:4b-mlx",
@@ -325,6 +330,7 @@ def seo_optimizer_node(state: dict) -> dict:
             keep_alive=0,
             options={"temperature": 0.3, "num_ctx": 2048},  # low temp: extraction, not creative writing
         )
+        log_generation("qwen3.5:4b-mlx", response.get("prompt_eval_count"), response.get("eval_count"))
         return response["response"]
 
     sections = state["script"]["sections"]
@@ -350,6 +356,9 @@ def seo_optimizer_node(state: dict) -> dict:
     print(f"[agent9] description: {len(description)} chars")
     print(f"[agent9] tags: {len(tags)} tags, {fallback_count} used fallback "
           f"extraction, {sum(len(t)+1 for t in tags)} chars of {TAGS_TOTAL_BUDGET} budget")
+    add_metadata(tag_count=len(tags), fallback_count=fallback_count)
+    if fallback_count:
+        mark_issue(f"{fallback_count} stories used rule-based tag fallback")
     print(f"[agent9] thumbnail: {thumbnail_path or '(none -- using YouTube default)'}")
 
     state["seo"] = {

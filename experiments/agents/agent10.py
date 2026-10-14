@@ -76,6 +76,9 @@ RETRIABLE_STATUS_CODES = [500, 502, 503, 504]
 MAX_UPLOAD_RETRIES = 5
 
 
+from langfuse import observe
+from agent_tools.trace_utils import add_metadata, mark_issue
+
 # ---------------------------------------------------------------------
 # PATH RESOLUTION -- the actual bug found on first real test
 # ---------------------------------------------------------------------
@@ -222,7 +225,7 @@ def _already_published(video_path: str) -> dict | None:
 # ---------------------------------------------------------------------
 # UPLOAD
 # ---------------------------------------------------------------------
-
+@observe(name="Agent-10:upload-video", capture_input=False)
 def _upload_video(youtube, video_path: str, seo: dict) -> str:
     """
     Resumable upload with retry on transient (5xx) errors only --
@@ -262,6 +265,7 @@ def _upload_video(youtube, video_path: str, seo: dict) -> str:
         except HttpError as e:
             if e.resp.status in RETRIABLE_STATUS_CODES and retry_count < MAX_UPLOAD_RETRIES:
                 retry_count += 1
+                mark_issue(f"upload retry {retry_count}/{MAX_UPLOAD_RETRIES}")
                 wait = 2 ** retry_count
                 print(f"  [agent10] transient upload error (status "
                       f"{e.resp.status}), retry {retry_count}/{MAX_UPLOAD_RETRIES} "
@@ -270,9 +274,10 @@ def _upload_video(youtube, video_path: str, seo: dict) -> str:
             else:
                 raise  # permanent error, or retries exhausted -- surface it
 
+    add_metadata(upload_retries=retry_count)
     return response["id"]
 
-
+@observe(name="Agent-10:set-thumbnail", capture_input=False)
 def _set_thumbnail(youtube, video_id: str, thumbnail_path: str | None) -> bool:
     """
     Separate required API call -- YouTube's videos.insert does NOT
@@ -353,7 +358,7 @@ def _notify_failure(error_message: str) -> None:
 # ---------------------------------------------------------------------
 # ORCHESTRATION
 # ---------------------------------------------------------------------
-
+@observe(name="Agent-10:publisher", capture_input=False, capture_output=False)
 def publisher_node(state: dict) -> dict:
     """
     LangGraph-style node wrapper. Reads state["video_path"] (Agent 8)
@@ -414,10 +419,12 @@ def publisher_node(state: dict) -> dict:
 
         state["youtube_video_id"] = video_id
         state["youtube_url"] = video_url
+        add_metadata(video_id=video_id, privacy=PRIVACY_STATUS, thumbnail_set=thumbnail_set)
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
         print(f"  [agent10] upload FAILED: {error_msg}")
+        mark_issue(f"upload failed: {type(e).__name__}", "ERROR")
         _notify_failure(error_msg)
         state["youtube_video_id"] = None
         state["youtube_url"] = None

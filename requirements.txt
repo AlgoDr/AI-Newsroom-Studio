@@ -12,6 +12,9 @@ groq>=0.9
 numpy>=1.26
 Pillow>=10.0
 
+# Observability (Langfuse tracing; no-op when keys are unset)
+langfuse==4.17.0
+
 # Agent 2 — paid fallback tiers (optional, graceful skip if missing)
 # tavily-python>=0.5
 # exa-py>=1.0

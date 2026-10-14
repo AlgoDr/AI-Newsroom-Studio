@@ -42,6 +42,10 @@ import ollama
 
 dotenv.load_dotenv(".env")
 
+from langfuse import observe, get_client
+from agent_tools.trace_utils import add_metadata, mark_issue
+langfuse = get_client()
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CONSTANTS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -143,9 +147,20 @@ def score_editorially(stories: dict) -> dict:
     return stories
 
 
+
+@observe(name="Agent-4:topic-clustering-ollama-local", as_type="generation")
+def _call_ollama_dedup(prompt: str) -> str:
+    resp = ollama.generate(model="granite4.2:8b", prompt=prompt, stream=False,
+                           think=False, keep_alive=0,
+                           options={"temperature": 0.1, "num_ctx": 4096})
+    langfuse.update_current_generation(
+        model="granite4.2:8b",
+        usage_details={"input": resp.get("prompt_eval_count", 0),
+                       "output": resp.get("eval_count", 0)})
+    return resp["response"].strip()
+
 # ─────────────────────────────────────────────────────────────────────────────
 # FUNCTION 3 — deduplicate_topics
-# ─────────────────────────────────────────────────────────────────────────────
 
 def deduplicate_topics(stories: dict) -> dict:
     """Cluster stories by topic using granite4.2:8b — one call, Prompt V3.
@@ -206,16 +221,7 @@ Example for 6 titles where 2 and 5 cover the same event:
 JSON:"""
 
     try:
-        resp = ollama.generate(
-            model="granite4.2:8b",
-            prompt=prompt,
-            stream=False,
-            think=False,
-            keep_alive=0,
-            options={"temperature": 0.1, "num_ctx": 4096},
-        )
-
-        raw = resp["response"].strip()
+        raw = _call_ollama_dedup(prompt).strip()
         print(f"  [deduplicate] granite4.2:8b raw: {raw[:120]}")
 
         # ── Clean malformed JSON ─────────────────────────────────────
@@ -298,6 +304,7 @@ JSON:"""
         print(f"  [deduplicate] granite4.2:8b failed ({type(e).__name__}: {e}) "
               f"→ no deduplication, all stories eligible")
         # safe fallback: treat every story as its own cluster
+        mark_issue("granite4.2:8b dedup failed -> no deduplication")
         for i, (sid, story) in enumerate(stories.items()):
             story["_topic_cluster"] = i
             story["_is_duplicate"]  = False
@@ -408,6 +415,8 @@ def _notify_no_stories() -> None:
 # FUNCTION 5 — editorial_node (LangGraph node)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
+@observe(name="Agent-4:editorial-node", capture_input=False, capture_output=False) # langfuse trace
 def editorial_node(state: dict) -> dict:
     """LangGraph node — orchestrates the full Agent 4 pipeline.
 
@@ -442,6 +451,11 @@ def editorial_node(state: dict) -> dict:
     for sid, story in eligible.items():
         stories[sid] = story
 
+    add_metadata(
+        eligible_count=len(eligible),
+        cluster_count=len({s.get('_topic_cluster') for s in eligible.values()}),
+        selected_count=sum(1 for s in eligible.values() if s.get('selected')),
+    )
     return {"stories": stories}
 
 

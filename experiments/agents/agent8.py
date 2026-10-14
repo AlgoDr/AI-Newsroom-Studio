@@ -52,6 +52,9 @@ TEXT_COLOR = (201, 209, 217)
 DIM_COLOR = (139, 148, 158)
 
 
+
+from langfuse import observe
+from agent_tools.trace_utils import add_metadata, mark_issue
 # ---------------------------------------------------------------------
 # Audio envelope (unchanged logic from today's prototype, confirmed
 # working against real 83s pipeline audio)
@@ -371,6 +374,7 @@ def assemble_broll_mode(shot_list: list[dict], audio_path: str, output_path: str
 # ---------------------------------------------------------------------
 # Assembly (reactive mode -- proven path)
 # ---------------------------------------------------------------------
+@observe(name="Agent-8:render-and-mux", capture_input=False, capture_output=False)
 def assemble_reactive_mode(shot_list: list[dict], audio_path: str, output_path: str,
                             frames_dir: str = "frames_agent8") -> dict:
     """
@@ -446,7 +450,7 @@ def assemble_reactive_mode(shot_list: list[dict], audio_path: str, output_path: 
         "output_path": output_path,
     }
 
-
+@observe(name="Agent-8:video-assembler", capture_input=False, capture_output=False)
 def video_assembler_node(state: dict, mode: str = "reactive") -> dict:
     """
     LangGraph-style node wrapper. mode="reactive" is the only tested
@@ -471,6 +475,8 @@ def video_assembler_node(state: dict, mode: str = "reactive") -> dict:
     else:
         raise ValueError(f"Unknown mode '{mode}', expected 'reactive' or 'broll'")
 
+    add_metadata(mode=mode, shot_count=len(shot_list), duration_s=stats.get("duration_s"),
+                 render_time_s=stats.get("render_time_s"))
     print(f"[agent8] assembled video: {stats}")
     state["video_path"] = output_path
     state["video_stats"] = stats

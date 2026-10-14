@@ -19,6 +19,11 @@ except ImportError:
     EXA_AVAILABLE = False
     print("[agent3] exa-py not installed -- cross-verify will use DDG only")
 
+
+from langfuse import observe, get_client
+langfuse = get_client()
+from agent_tools.trace_utils import log_generation, add_metadata, mark_issue
+
 # -----------------------------------------------------------------------------
 # CLIENTS -- instantiated once at module load, reused for all stories
 # Never instantiated inside functions (avoids per-call overhead)
@@ -139,110 +144,11 @@ LABEL_SCORES = {
 }
 
 
-def llm_credibility_check(title: str, content: str) -> float:
-    """Classify content as REAL/OPINION/SPAM using gpt-oss-120b.
-
-    Guards (checked before calling any model -- unchanged):
-      < 100 chars -> 0.0 neutral (can't judge, lean toward neutral)
-      < 500 chars -> 0.0 neutral (too thin to classify reliably)
-
-    Fallback (NEW): if gpt-oss-120b fails, returns empty, or gives an
-    unparseable response, falls back to qwen3.5:9b (local, Ollama)
-    before giving up. Previously this function had NO fallback at
-    all -- any Groq failure silently returned 0.0 neutral, which
-    during a full-run Groq outage (a recurring, confirmed issue this
-    session) meant EVERY story lost its credibility signal, leaving
-    Agent 4's selection driven by velocity alone.
-
-    Confirmed via a multi-run reliability test
-    (test_agent3_credibility_reliability.py): 15/15 runs across 3
-    real stories -- ZFS NAS, The Economist (opinion piece), and a
-    Tenda firmware CVE disclosure (a deliberate stress test for
-    whether a safety filter might suppress classification of
-    security-disclosure content) -- 100% consistent, 100% correct
-    classification from qwen2.5:7b across all three.
-
-    Final fallback (when BOTH models fail): 0.0 neutral -- unchanged
-    from the original behavior, never discard on any failure.
-
-    NOTE: In -1 to +1 design, 0.0 is neutral (unknown), not "bad".
-    Only SPAM -> -0.7 is negative. Empty/uncertain -> 0.0.
-    """
-    if not content or len(content) < 100:
-        print(f"  [llm_cred_check] empty content -> 0.0 neutral")
-        return 0.0
-
-    if len(content) < 500:
-        print(f"  [llm_cred_check] thin content ({len(content)} chars) -> 0.0 neutral")
-        return 0.0
-
-    prompt = f"""Classify what this article is about.
-
-TITLE: {title}
-
-ARTICLE:
-{content}
-
-Categories:
-- REAL: a genuine product, technology, company, research finding, or event
-        (real things can have promotional tone -- that is still REAL)
-- OPINION: a personal essay, rant, or opinion piece (not reporting a thing)
-- SPAM: scam, clickbait, or misinformation with no real substance
-
-Respond with ONLY one word: REAL, OPINION, or SPAM.
-
-Verdict:"""
-
-    raw = None
-    try:
-        resp = groq_client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=600,
-        )
-        raw = resp.choices[0].message.content
-        print(f"  [llm_cred_check DEBUG] raw={repr(raw[:80] if raw else None)}")
-    except Exception as e:
-        print(f"  [llm_cred_check] Groq failed: {e}")
-        raw = None
-
-    score = _parse_credibility_label(raw, title)
-
-    if score is None:
-        print(f"  [llm_cred_check] gpt-oss-120b gave no usable label -> "
-              f"falling back to local {CREDIBILITY_FALLBACK_MODEL}")
-        raw_local = _llm_credibility_check_local(prompt)
-        score = _parse_credibility_label(raw_local, title)
-
-    if score is None:
-        print(f"  [llm_cred_check] failed on both cloud and local -> 0.0 neutral")
-        return 0.0
-
-    return score
 
 
-def _parse_credibility_label(raw, title: str):
-    """Extract a REAL/OPINION/SPAM score from a raw model response.
-
-    Returns the score (float) if a usable label is found, or None if
-    the response was empty or unparseable -- the caller decides
-    whether to attempt a fallback or give up with 0.0 neutral.
-    """
-    if not raw or not raw.strip():
-        return None
-
-    label = raw.strip().upper()
-    for word in ["REAL", "OPINION", "SPAM"]:
-        if word in label:
-            score = LABEL_SCORES[word]
-            print(f"  [llm_cred_check] {title[:40]!r} -> {word!r} -> {score}")
-            return score
-
-    print(f"  [llm_cred_check] unparseable {label[:30]!r}")
-    return None
 
 
+@observe(name="Agent-3:classify-ollama-local", as_type="generation")
 def _llm_credibility_check_local(prompt: str) -> str:
     """Local fallback for credibility classification -- qwen3.5:9b via
     Ollama, Metal-accelerated. Used only when gpt-oss-120b fails,
@@ -262,6 +168,7 @@ def _llm_credibility_check_local(prompt: str) -> str:
             keep_alive=0,
             options={"temperature": 0.1, "num_ctx": 4096},
         )
+        log_generation(CREDIBILITY_FALLBACK_MODEL, resp.get("prompt_eval_count"), resp.get("eval_count"))
         return (resp.get("response") or "").strip()
     except Exception as e:
         print(f"  [llm_cred_check] local fallback also failed: {e}")
@@ -313,11 +220,14 @@ def _fetch_ddg_results(title: str) -> list:
         return []
 
 
+@observe(name="Agent-3:contradiction-groq-cloud", as_type="generation")
 def _check_contradiction(story_content: str,
                           result_snippet: str) -> bool:
-    """Ask compound-mini if the result contradicts the story.
-    Uses compound-mini (not 120b or 20b) -- separate quota pool,
-    simple binary task well within compound-mini's capability.
+    """Ask qwen/qwen3.8-27b if the result contradicts the story.
+    groq/compound-mini returns 404 model_not_found on this key, so the
+    check was silently failing. qwen3.8-27b answers directly (no
+    reasoning tokens), so the small max_tokens below is safe, and it
+    keeps this call off the gpt-oss quota pools.
     Safe default: False (assume consistent on any failure).
     """
     prompt = f"""Does SOURCE B contradict SOURCE A on a specific fact?
@@ -333,16 +243,18 @@ Reply with ONE word only: CONTRADICTS or CONSISTENT or UNRELATED"""
     time.sleep(2)
     try:
         resp = groq_client.chat.completions.create(
-            model="groq/compound-mini",
+            model="qwen/qwen3.8-27b",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=10,
             temperature=0.1,
         )
+        log_generation("qwen/qwen3.8-27b", resp.usage.prompt_tokens, resp.usage.completion_tokens)
         answer = resp.choices[0].message.content.strip().upper()
         print(f"  [verify] contradiction check -> {repr(answer)}")
         return "CONTRADICTS" in answer
     except Exception as e:
         print(f"  [verify] contradiction check failed ({e}) -> assume consistent")
+        mark_issue("contradiction check failed -> assumed consistent")
         return False   # safe default -- never penalize on failure
 
 
@@ -368,6 +280,7 @@ def cross_verify(title: str,
     # try Exa first, fall back to DDG
     results = _fetch_exa_results(title)
     if not results:
+        mark_issue("Exa returned nothing -> DDG fallback")
         results = _fetch_ddg_results(title)
 
     for result in results:
@@ -395,8 +308,7 @@ def cross_verify(title: str,
             return False, True, result_domain
 
         else:
-            print(f"  contradict claim[verify] confirmed by {result_domain} "
-                  f"(trust={trust})")
+            print(f"contradict claim[verify] confirmed by {result_domain} "f"(trust={trust})")
             return True, False, result_domain
 
     print(f"  [verify] neutral -- no credible source found or both tiers failed")
@@ -409,6 +321,7 @@ def cross_verify(title: str,
 # Weights shift when cross-verify finds confirmation or contradiction.
 # -----------------------------------------------------------------------------
 
+@observe(name="Agent-3:check-credibility", capture_input=False, capture_output=False) # langfuse trace
 def check_credibility(story: dict) -> dict:
     """Full credibility pipeline for one story.
 
@@ -468,6 +381,7 @@ def check_credibility(story: dict) -> dict:
           f"src={src:.2f}x{w_src} + "
           f"llm={llm:.2f}x{w_llm} + "
           f"verify={verify_score:.2f}x{w_verify} = {score:.2f}")
+    add_metadata(story=(story.get("title") or "")[:80], regime=regime, verified_by=verified_by, credibility_score=score)
 
     story["credibility_score"] = score
     story["verified_by"]       = verified_by
@@ -509,7 +423,7 @@ Respond with ONLY one word: REAL, OPINION, or SPAM.
 
 Verdict:"""
 
-
+@observe(name="Agent-3:classify-groq-cloud", as_type="generation")
 def _call_groq(prompt: str) -> str | None:
 
     try:
@@ -519,6 +433,7 @@ def _call_groq(prompt: str) -> str | None:
             temperature=0.1,
             max_tokens=600,
         )
+        log_generation("openai/gpt-oss-120b", resp.usage.prompt_tokens, resp.usage.completion_tokens)
         raw = resp.choices[0].message.content
         print(f"  [llm_cred_check DEBUG] raw={repr(raw[:80] if raw else None)}")
     except Exception as e:
@@ -545,11 +460,13 @@ def llm_credibility_check(title: str, content: str) -> float:
 
     label = classify_credibility(title, content, "groq")
     if label is None:
+        mark_issue("gpt-oss-120b no usable label -> local fallback")
         print(f"  [llm_cred_check] gpt-oss-120b gave no usable label -> "
               f"falling back to local {CREDIBILITY_FALLBACK_MODEL}")
         label = classify_credibility(title, content, "local")
 
     if label is None:
+        mark_issue("cloud and local both failed -> neutral 0.0", "ERROR")
         print(f"  [llm_cred_check] failed on both cloud and local -> 0.0 neutral")
         return 0.0
     
