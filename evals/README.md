@@ -150,6 +150,8 @@ CI gate (GitHub Actions — blocks PRs on failure)
 
 **All four layers are built.** Phase C (CI regression gate) from the
 Production Plan is complete — see `.github/workflows/evals.yml`.
+Phase D (Langfuse tracing) is in progress — see
+[Phase D — Langfuse Tracing](#phase-d--langfuse-tracing-in-progress) below.
 
 ### CI/CD — GitHub Actions (`evals.yml`)
 
@@ -172,6 +174,142 @@ also supported.
   locally — no API keys, no external calls, under 2 minutes.
 - Nightly quality runs log scores to `evals/results/nightly_*.log`
   and upload them as GitHub Actions artifacts for trend tracking.
+
+### Phase C status — complete
+
+| Task | Status | What exists |
+|------|--------|-------------|
+| C1 — requirements files | ✅ Done | `requirements.txt` (runtime) and `requirements-dev.txt` (adds pytest, deepeval, pytest-asyncio; includes `requirements.txt`) |
+| C2 — `evals.yml` with two tiers | ✅ Done | `.github/workflows/evals.yml`: fast-gate (unit evals + chaos checks, no keys) on every push and PR; quality-gate (content evals, `GROQ_KEY`) nightly, on manual trigger, and on push to `main` |
+| C3 — check local fallback models before a model swap | ✅ Done | Quality evals skip when Ollama is absent (as on CI), so running `python evals/run_all.py --content` on the Mac exercises the local models. There is no separate `--local` flag |
+| C4 — keep each nightly score | ✅ Done | The nightly job writes `evals/results/nightly_<date>.log` and uploads it as a GitHub Actions artifact (90-day retention). Scores are not committed back to the repo |
+
+---
+
+## Phase D — Langfuse Tracing (in progress)
+
+Status as of 2026-10-15: **D1–D5 done. Remaining from the plan's "done when": one daily run as a single trace (arrives with Phase E1).** The plan's
+"done when" for Phase D (one daily run = one trace) is **not yet met** —
+see *Known gaps*.
+
+| Task | Status | What exists |
+|------|--------|-------------|
+| D1 — Langfuse Cloud + keys | ✅ Done | Account created, keys in `experiments/.env`, `langfuse==4.17.0` pinned in `requirements.txt` and `requirements-dev.txt` |
+| D2 — trace one function | ✅ Done | Agent 5's script call traced first; model name and token usage confirmed in the UI |
+| D3 — spans and generations for every agent | ✅ Done | Agents 1–10 emit spans/generations (table below), model + tokens on every LLM call, fallback generations visible, calls grouped by `session_id` per run (single trace arrives with Phase E1) |
+| D4 — metadata (fallback fired, Agent 2 tier, story count, retries) | ✅ Done (verified on session `20261015_000939`) | `add_metadata` / `mark_issue` on every agent span: fallback fired, Agent 2 tier, story/shot/chunk counts, retries. Fallbacks show as WARNING, total failures as ERROR. Verify: filter the session by Level in the Langfuse UI |
+| D5 — DeepEval scores into Langfuse | ✅ Done (verified: trace `eval-run:unit` + 12 scores in session `20261015_000939`) | `evals/langfuse_scores.py` (`EvalRunReporter`): `run_all.py` sends one BOOLEAN score per eval plus `eval/pass_rate`; `evals/conftest.py` sends pass/fail per DeepEval test; Agent 2 also sends `agent2/faithfulness_mean`. Each run is trace `eval-run:*` in session `eval-<timestamp>`, or in a pipeline session via `EVAL_SESSION_ID=<run_id>`. No-op without Langfuse keys |
+
+### What is instrumented (D3)
+
+| Agent | Span | Generations (model) |
+|-------|------|---------------------|
+| 1 Trend Hunter | `Agent-1:fetch-trends` | — |
+| 2 Context Researcher | `Agent-2:fetch-trend-background` | `extract-keyword-ollama-local` (llama3.2:3b), `synthesize-groq-cloud` (openai/gpt-oss-20b, groq/compound-mini), `synthesize-local(ollama call)` (qwen3.5:9b) |
+| 3 Fact Checker | `Agent-3:check-credibility` | `classify-groq-cloud` (openai/gpt-oss-120b), `check_contradiction-groq-cloud` (no model/tokens recorded in the run — see findings), local fallback call |
+| 4 Editorial | `Agent-4:editorial-node` | `topic-clustering-ollama-local` (granite4.2:8b) |
+| 5 Script Writer | `Agent-5:script-writer` | `script-generation-groq-cloud` (qwen/qwen3.8-27b); word-count correction call; local fallback call |
+| 6 Script QC | `Agent-6:script-qc` | `judge-groq-cloud` (openai/gpt-oss-120b), `rewrite-groq-cloud` (qwen/qwen3.8-27b); local fallback calls |
+| 6.1 Voice-Over | `Agent-6.1:voice-over` | — (Kokoro runs as a subprocess) |
+| 7 Video Prompt | `Agent-7:video-assembly-prompt` | `stock-query-ollama-local` (qwen3.5:4b-mlx) |
+| 8 Video Assembler | `Agent-8:video-assembler` → `Agent-8:render-and-mux` | — |
+| 9 SEO | `Agent-9:seo-optimizer` | `tag-extraction-ollama-local` (qwen3.5:4b-mlx) |
+| 10 Publisher | `Agent-10:publisher` → `upload-video`, `set-thumbnail` | — (upload inputs are not captured) |
+
+Only the Groq and Ollama calls that actually ran in the verification run
+were confirmed in the export; the fallback and correction generations are
+instrumented in code but did not fire.
+
+### Shared helper and configuration
+
+`experiments/agent_tools/trace_utils.py` is the one place tracing helpers
+live: it calls `load_dotenv()` before `get_client()`, and
+`log_generation(model, input_tokens, output_tokens)` attaches model and
+usage to the current generation. It never raises — a logging failure
+prints a `[trace]` line and the pipeline continues.
+
+| Variable | Purpose | Status |
+|----------|---------|--------|
+| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` | Selects the Langfuse project the traces go to | Set in `experiments/.env` |
+| `LANGFUSE_TRACING_ENVIRONMENT` | Label stamped on every trace so runs can be filtered (`dev`, `ci`, `live`) | `dev` set in `.env`; CI and LIVE are not wired yet |
+| `LANGFUSE_TRACING_ENABLED` | Kill switch (`false` turns tracing off) | Name confirmed in the `langfuse` 4.17.0 source; not yet exercised |
+| `LANGFUSE_TIMEOUT` | Seconds the SDK waits when uploading traces (default 5). Short-lived scripts (evals, daily run) hit `Failed to export spans batch due to timeout` at 5s once; set to `30` in `experiments/.env` | Set to `30` |
+| `EVAL_SESSION_ID` | Attach an eval run's scores to a pipeline session (e.g. `20261015_000939`) instead of a new `eval-<timestamp>` session | Optional |
+| `EVAL_LIVE_CHECKPOINT` | `1` = evals read the latest live checkpoint instead of the frozen fixture | Optional; default is the fixture |
+
+The last cell of `experiments/workflow.ipynb` calls `get_client().flush()`
+so scheduled (papermill) runs do not exit with traces unsent.
+
+### Verification
+
+- **Full pipeline run, 2026-10-14:** Agents 1–10 in one run, 16m22s wall
+  clock, 25 traces, 76 observations. Model name and token usage are present
+  on every LLM call that returned a response, except the three Agent 3
+  `check_contradiction` calls. Agent 10 uploaded a real video and set its
+  thumbnail.
+- **Evals with the instrumented agents:** `python evals/run_all.py` 11/11
+  passed; `python evals/ops/chaos_checks.py` 6/6 passed (HEALTHY).
+- **No-op without keys:** `trace_utils.py` with `langfuse==4.17.0` and no
+  keys set returned normally from an `@observe` generation and from
+  `flush()`, with no exception (Langfuse prints that the client is
+  disabled). That test ran in an isolated environment. The 11/11 and 6/6
+  eval run above had the `.env` keys loaded, so a strictly keyless run of
+  the full eval suite is still to be done.
+
+### First traced run — measured findings
+
+Sum of top-level agent spans was 968s of 982s wall clock.
+
+| Agent | Time | Share |
+|-------|------|-------|
+| 2 | 530s | 55% |
+| 8 | 266s | 27.5% |
+| 6.1 | 42s | 4% |
+| 7 | 39s | 4% |
+| 9 | 28s | 3% |
+| 3 | 20s | 2% |
+| 4 | 17s | 2% |
+| 10 | 17s | 1.7% |
+| 6 | 7s | 0.7% |
+| 1 | 2s | 0.2% |
+| 5 | 1s | 0.1% |
+
+- **Agent 6's rewrite changed nothing.** The judge flagged `S1_CONTEXT` for
+  marketing language in both rounds; both rewrites returned the same
+  sentence (only the apostrophe differed). Cause not yet isolated — to be
+  tested with an N=5 run on cached data before any prompt or model change.
+- **Agent 2 cloud synthesis:** 1 of 5 attempts returned text; 4 returned
+  empty in about 0.6s with no error recorded, and 3 stories made no cloud
+  attempt. The one success logged 340,042 input tokens in a single
+  `gpt-oss-20b` call. The cause of the empty returns is unknown because
+  the exception is swallowed (this is what D4 is meant to expose).
+- **Local model latency:** every local call has a floor of about 3–5s even
+  for 3–5 output tokens, and `qwen3.5:9b` synthesis ran at roughly 2.5
+  tokens/s (40–99s per story). Model loading or swapping between
+  `llama3.2:3b` and `qwen3.5:9b` is a hypothesis, not a finding; Ollama's
+  `load_duration` and `eval_duration` need to be logged to confirm.
+- **Payload size:** each node span stores the whole pipeline state as input
+  and output (about 60 KB each; 1.24 MB for the run).
+- **Agent 3 `check_contradiction` appears to fail silently.** The function
+  does call `log_generation`, yet all three calls in the run have no model or
+  tokens, returned `false`, and took 2.0–2.1s — the length of its own
+  `time.sleep(2)`. That points to the Groq call raising and the safe default
+  (`False`) being returned. Cause unconfirmed: the printed
+  `[verify] contradiction check failed (...)` line in the run output would
+  show it. Its span name also does not follow the `classify-…` style.
+
+### Known gaps
+
+- Single trace per daily run is not done (Phase E1); each agent call is still its own trace, grouped by session.
+- A daily run is 25 flat traces with an empty `sessionId`, not one trace.
+  Grouping needs a session id (the existing run id is the candidate).
+- `LANGFUSE_TRACING_ENVIRONMENT` is only set for `dev`. CI (`evals.yml`)
+  and the daily runner (`run-notebook-daily.py`) do not set their own
+  values yet, so a scheduled run would also be labelled `dev`.
+- CI has no Langfuse secrets, so the fast-gate traces nothing (intended)
+  and the quality-gate does not send traces yet.
+- Node spans capture full state; should be replaced with small summaries
+  once D4 metadata exists.
 
 ---
 
